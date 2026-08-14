@@ -93,7 +93,7 @@ The script installs Gateway API CRDs, then:
 - `oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway`
 - `oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management` (Solo UI)
 
-Namespace is `agentgateway-system`. Chart versions default to Solo docs current latest (`v2026.8.0` / UI `0.5.4`).
+Namespace is `agentgateway-system`. Chart versions default to Solo docs current latest (`v2026.8.0` / UI `0.5.5`).
 
 ### Option B — Terraform Helm releases
 

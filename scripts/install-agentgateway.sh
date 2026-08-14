@@ -10,7 +10,7 @@ set -euo pipefail
 
 NAMESPACE="${AGENTGATEWAY_NAMESPACE:-agentgateway-system}"
 AGW_VERSION="${AGENTGATEWAY_CHART_VERSION:-v2026.8.0}"
-UI_VERSION="${SOLO_UI_CHART_VERSION:-0.5.4}"
+UI_VERSION="${SOLO_UI_CHART_VERSION:-0.5.5}"
 CLUSTER_NAME="${CLUSTER_NAME:-showcase}"
 GATEWAY_API_CRDS_URL="${GATEWAY_API_CRDS_URL:-https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/standard-install.yaml}"
 

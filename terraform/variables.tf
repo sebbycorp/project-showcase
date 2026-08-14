@@ -125,7 +125,7 @@ variable "agentgateway_chart_version" {
 variable "solo_ui_chart_version" {
   description = "Solo management / UI Helm chart version."
   type        = string
-  default     = "0.5.4"
+  default     = "0.5.5"
 }
 
 variable "gateway_api_crds_url" {
