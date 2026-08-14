@@ -1,6 +1,11 @@
 # Agentgateway manifests
 
-Apply these **after** the Autopilot cluster exists and Solo Enterprise for Agentgateway is installed (`scripts/install-agentgateway.sh` or a second `terraform apply` with `TF_VAR_agentgateway_license_key`).
+These YAML files are the source of truth for the Gateway and OpenAI LLM path.
+`terraform apply` (with `TF_VAR_agentgateway_license_key` and `TF_VAR_openai_api_key`)
+creates the same objects via the kubectl provider. `scripts/install-agentgateway.sh`
+applies them as a fallback.
+
+Manual apply (only if you are not using Terraform or the script):
 
 1. `kubectl apply -f manifests/gateway.yaml`
 2. Create `openai-secret` if you did not pass `OPENAI_API_KEY` / `TF_VAR_openai_api_key`:

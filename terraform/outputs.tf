@@ -40,14 +40,14 @@ output "agentgateway_helm_enabled" {
 }
 
 output "next_steps" {
-  description = "What to do after the cluster exists."
+  description = "What to do after apply."
   value       = <<-EOT
     1. ${local.get_credentials_command}
     2. kubectl config current-context   # expect ${local.kube_context}
-    3. Install Agentgateway + Solo UI (pick one):
-         - scripts/install-agentgateway.sh
-         - terraform apply with TF_VAR_agentgateway_license_key (and optional TF_VAR_openai_api_key)
-    4. Apply manifests/gateway.yaml, then the OpenAI backend (see manifests/).
-    5. Chrome extension chat client comes next (not in this repo yet).
+    3. If this apply had no license/OpenAI key, rebuild the live stack with:
+         export TF_VAR_agentgateway_license_key
+         export TF_VAR_openai_api_key
+         terraform apply
+    4. Solo UI: kubectl port-forward service/solo-enterprise-ui -n ${var.agentgateway_namespace} 4000:80
   EOT
 }

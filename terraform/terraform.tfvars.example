@@ -10,6 +10,7 @@ create_project  = true
 region       = "us-central1"
 cluster_name = "showcase"
 
-# Leave both unset / empty on the first apply (cluster only).
-# agentgateway_license_key = ""
-# openai_api_key           = ""
+# Never put real keys in this file or in git. Pass them at apply time:
+#   export TF_VAR_agentgateway_license_key
+#   export TF_VAR_openai_api_key
+# Leave both empty on a first apply that only creates the cluster.

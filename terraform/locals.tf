@@ -4,6 +4,10 @@ locals {
   install_agentgateway = trimspace(var.agentgateway_license_key) != ""
   create_openai_secret = local.install_agentgateway && trimspace(var.openai_api_key) != ""
 
+  # for_each cannot take a sensitive condition (license / API key).
+  install_agentgateway_gate = nonsensitive(local.install_agentgateway)
+  create_openai_secret_gate = nonsensitive(local.create_openai_secret)
+
   kube_host    = "https://${google_container_cluster.autopilot.endpoint}"
   kube_ca_cert = base64decode(google_container_cluster.autopilot.master_auth[0].cluster_ca_certificate)
 

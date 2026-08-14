@@ -1,0 +1,13 @@
+# Shared Solo management / UI values (Terraform helm_release + fallback script).
+# ClickHouse must persist on Autopilot: the chart default is emptyDir with a
+# 50Mi ephemeral-storage request, which GKE Autopilot evicts.
+clickhouse:
+  persistentVolume:
+    enabled: true
+    size: 20Gi
+    storageClass: standard-rwo
+  resources:
+    requests:
+      ephemeral-storage: 2Gi
+    limits:
+      ephemeral-storage: 2Gi

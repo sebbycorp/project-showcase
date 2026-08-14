@@ -1,12 +1,12 @@
-# Second apply step: Helm stays disabled until agentgateway_license_key is set.
-# First apply creates the project + Autopilot cluster only.
+# Helm + LLM path stay disabled until agentgateway_license_key is set.
+# After the cluster exists, one apply with the license (and OpenAI key) creates
+# Gateway API CRDs, charts, openai-secret, Gateway, backend, and HTTPRoute.
 #
 #   export TF_VAR_agentgateway_license_key
 #   export TF_VAR_openai_api_key
 #   terraform apply
 #
-# Prefer scripts/install-agentgateway.sh if you want the exact Solo CLI flow
-# (Gateway API CRDs + charts) without the Helm provider.
+# scripts/install-agentgateway.sh is an optional non-Terraform fallback.
 
 resource "helm_release" "enterprise_agentgateway_crds" {
   count = local.install_agentgateway ? 1 : 0
@@ -19,7 +19,10 @@ resource "helm_release" "enterprise_agentgateway_crds" {
   wait             = true
   timeout          = 600
 
-  depends_on = [google_container_cluster.autopilot]
+  depends_on = [
+    google_container_cluster.autopilot,
+    time_sleep.gateway_api_crds,
+  ]
 }
 
 resource "helm_release" "enterprise_agentgateway" {
@@ -64,6 +67,10 @@ resource "helm_release" "solo_ui" {
     name  = "licensing.licenseKey"
     value = var.agentgateway_license_key
   }
+
+  # ClickHouse PVC + Autopilot ephemeral-storage. cpu/memory stay at chart
+  # defaults; this file only overrides persistence and ephemeral-storage.
+  values = [file("${path.module}/../helm/management-values.yaml")]
 
   depends_on = [helm_release.enterprise_agentgateway]
 }
