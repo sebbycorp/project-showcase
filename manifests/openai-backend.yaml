@@ -1,0 +1,42 @@
+# Apply after openai-secret exists in agentgateway-system.
+# Create the secret from your environment — do not put a key in this file:
+#
+#   kubectl -n agentgateway-system create secret generic openai-secret \
+#     --from-literal=Authorization="${OPENAI_API_KEY}"
+#
+# Docs: https://docs.solo.io/agentgateway/latest/llm/providers/openai/
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: openai
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      openai: {}
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
+    ai:
+      routes:
+        "/v1/responses": "Responses"
+        "/v1/chat/completions": "Completions"
+        "/v1/models": "Models"
+        "*": "Passthrough"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: openai
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - backendRefs:
+        - name: openai
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
