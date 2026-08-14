@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars (gitignored) or pass the same keys as TF_VAR_*.
+# Do not put license keys or API keys in this file or in git.
+
+project_id      = "maniak-showcase"
+project_name    = "showcase"
+org_id          = "629527910221"
+billing_account = "011C38-867461-BE95B1"
+create_project  = true
+
+region       = "us-central1"
+cluster_name = "showcase"
+
+# Leave both unset / empty on the first apply (cluster only).
+# agentgateway_license_key = ""
+# openai_api_key           = ""

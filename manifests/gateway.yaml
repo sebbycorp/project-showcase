@@ -1,0 +1,16 @@
+# Apply after Solo Enterprise for Agentgateway is installed.
+# Data-plane pods (agentgateway-proxy, ext-auth, rate-limit) appear after this Gateway exists.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: agentgateway-proxy
+  namespace: agentgateway-system
+spec:
+  gatewayClassName: enterprise-agentgateway
+  listeners:
+    - protocol: HTTP
+      port: 80
+      name: http
+      allowedRoutes:
+        namespaces:
+          from: All
