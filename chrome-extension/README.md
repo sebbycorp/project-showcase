@@ -1,5 +1,7 @@
 # Agentgateway (Chrome extension)
 
+![Chat tab](../docs/images/chat.png)
+
 Install, cluster setup, and how to use the popup are in the [root README](../README.md).
 
 ## Load unpacked

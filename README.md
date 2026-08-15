@@ -4,14 +4,22 @@ A Chrome extension for chatting, testing, and teaching [Solo Agentgateway](https
 
 The extension is in [`chrome-extension/`](chrome-extension/). Current version: **0.9.8** (`manifest.json`).
 
+![Chat tab](docs/images/chat.png)
+
 ## Use cases
 
 These match the tabs and header controls in the popup.
 
 - **Chat with an LLM through Agentgateway.** On **Chat**, set **Endpoint URL**, pick a **Provider** (OpenAI, Claude, Grok, Bedrock, Gemini), choose a **Model**, then **Test** or send a message. The gateway injects backend auth — Chat does not store or send an API key.
 - **LLM provider testing.** The **LLM** tab runs **Chat ping**, **Model failover**, and **List / call model** against the Chat endpoint. Each card has a visual hop flow (AI Agent → Agentgateway → provider), a result drawer with latency, an estimated token/cost line when usage is present, and **Open in Solo UI**.
+
+![LLM tab](docs/images/llm.png)
+
 - **Deploy and test LLM configs from a catalog.** On **LLM**, open **Build & apply config**. Search the **LLM config catalog** (Connect / Route / Protect / Control), fill the form, preview YAML, and **Apply** `Gateway`, `HTTPRoute`, `EnterpriseAgentgatewayBackend`, and `EnterpriseAgentgatewayPolicy` (plus Model / RateLimit / Budget where the recipe uses them).
 - **MCP: one-click virtual MCP, live status, and tests.** The **MCP** tab has **One-click deploys** (for example **Deploy everything server**, **Deploy website fetcher**, **Deploy virtual MCP**). Virtual examples show a live **Running** / **Pending** / **Error** (or **Missing**) chip. **Run test** and **Run all** probe initialize, list tools, echo, and fetch. Separate cards cover **MCP initialize**, **List tools**, **Call echo**, **Call fetch**, **JWT / unauth**, and **Tool calling**.
+
+![MCP tab](docs/images/mcp.png)
+
 - **A2A and API/HTTP.** **A2A** probes **A2A agent-card / health**. **API/HTTP** runs **HTTP request**, **Unauthenticated request**, and **Junk / policy-probe**. Each tab can **Apply** a prebuilt example when a cluster is connected.
 - **Connect to any cluster and apply CRDs.** In **Settings → Cluster**, choose **Source** **Manual** (GKE, AKS, EKS, or Local) or **Omni** (Sidero Omni). **Test connection**, then apply from the builders or **Resources**.
 - **Clusters without a public proxy.** **Settings → Port forward** copies a `kubectl port-forward` command. Run it locally, click **Use localhost**, and point Chat / MCP / API tests at `127.0.0.1`. **Check localhost** reports Reachable or Not reachable.
@@ -34,6 +42,8 @@ Click the toolbar icon to open the popup. Version **0.9.8** is the `version` fie
 
 Open the **gear** in the header. That is **Settings**. Cluster connection lives here, not on a top-level tab.
 
+![Settings](docs/images/settings.png)
+
 ### Connect with API server URL + bearer token
 
 1. Under **Cluster**, set **Source** to **Manual**.
@@ -42,6 +52,8 @@ Open the **gear** in the header. That is **Settings**. Cluster connection lives 
 4. Paste **Bearer token** (password field). Chrome cannot run exec plugins, so this must be a real token — not a kubeconfig that only has `exec`.
 5. Set **Namespace** (default `agentgateway-system`).
 6. Click **Test connection**.
+
+![Cluster connect form](docs/images/cluster.png)
 
 Typical token sources (same text the UI uses):
 
