@@ -8,9 +8,32 @@
   </head>
   <body>
     <header class="header">
-      <div class="brand">
-        <span class="brand-mark">Solo</span>
-        <h1>Agentgateway</h1>
+      <div class="brand-row">
+        <div class="brand">
+          <img
+            class="brand-logo"
+            src="icons/agw-mark-color.svg"
+            width="22"
+            height="22"
+            alt=""
+          />
+          <h1>Agentgateway</h1>
+        </div>
+        <button
+          type="button"
+          id="tab-settings"
+          data-area="settings"
+          class="settings-btn"
+          aria-label="Settings"
+          title="Settings"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.4.32.64.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.24.1.51 0 .64-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"
+            />
+          </svg>
+        </button>
       </div>
       <nav class="area-tabs" aria-label="Areas">
         <button type="button" id="tab-chat" data-area="chat" class="is-active">
@@ -313,7 +336,23 @@
       </div>
     </section>
 
+    <section id="area-settings" class="area" hidden>
+      <div class="panel">
+        <h2 class="cluster-heading">Settings</h2>
+        <label class="toggle" for="hooray">
+          <input id="hooray" type="checkbox" checked />
+          <span class="toggle-ui" aria-hidden="true"></span>
+          <span class="toggle-copy">
+            <span class="toggle-title">Hooray</span>
+            <span class="hint">Confetti on a successful test.</span>
+          </span>
+        </label>
+      </div>
+    </section>
+
+    <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
     <script src="yaml.js"></script>
+    <script src="confetti.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

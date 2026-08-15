@@ -8,7 +8,7 @@ const CHAT_PATH = "/v1/chat/completions";
 const TEST_MESSAGE = { role: "user", content: "Reply with the word pong." };
 const JUNK_PROMPT = `policy-probe ${"x".repeat(1024)}`;
 const BODY_SNIPPET = 400;
-const AREAS = ["chat", "scenarios", "cluster"];
+const AREAS = ["chat", "scenarios", "cluster", "settings"];
 const STORAGE_KEYS = [
   "endpoint",
   "model",
@@ -26,6 +26,7 @@ const STORAGE_KEYS = [
   "clusterConnected",
   "clusterKind",
   "clusterManifest",
+  "hooray",
 ];
 const CLUSTER_HELP = {
   gke: "API server from kubectl cluster-info or gcloud container clusters describe. Token from gcloud auth print-access-token. Chrome cannot run gke-gcloud-auth-plugin.",
@@ -159,7 +160,20 @@ const els = {
   loadExample: document.getElementById("load-example"),
   applyCrds: document.getElementById("apply-crds"),
   crdApplyResult: document.getElementById("crd-apply-result"),
+  tabSettings: document.getElementById("tab-settings"),
+  areaSettings: document.getElementById("area-settings"),
+  hooray: document.getElementById("hooray"),
+  confetti: document.getElementById("confetti"),
 };
+
+let hoorayOn = true;
+
+function celebrate() {
+  if (!hoorayOn) {
+    return;
+  }
+  burstConfetti(els.confetti);
+}
 
 const scenarioPanels = {
   failover: els.scenarioFailover,
@@ -621,12 +635,15 @@ function setArea(area) {
   els.tabChat.classList.toggle("is-active", selected === "chat");
   els.tabScenarios.classList.toggle("is-active", selected === "scenarios");
   els.tabCluster.classList.toggle("is-active", selected === "cluster");
+  els.tabSettings.classList.toggle("is-active", selected === "settings");
   els.areaChat.classList.toggle("is-active", selected === "chat");
   els.areaScenarios.classList.toggle("is-active", selected === "scenarios");
   els.areaCluster.classList.toggle("is-active", selected === "cluster");
+  els.areaSettings.classList.toggle("is-active", selected === "settings");
   els.areaChat.hidden = selected !== "chat";
   els.areaScenarios.hidden = selected !== "scenarios";
   els.areaCluster.hidden = selected !== "cluster";
+  els.areaSettings.hidden = selected !== "settings";
 }
 
 function setScenario(name) {
@@ -670,6 +687,8 @@ async function loadSettings() {
       "Last test succeeded. Re-test if the token may have expired.";
     els.clusterTestResult.append(detail);
   }
+  hoorayOn = stored.hooray !== false;
+  els.hooray.checked = hoorayOn;
   setArea(AREAS.includes(stored.area) ? stored.area : "chat");
   setScenario(stored.scenario || "failover");
   updateEndpointHints();
@@ -689,6 +708,16 @@ els.tabScenarios.addEventListener("click", () => {
 els.tabCluster.addEventListener("click", () => {
   setArea("cluster");
   persist({ area: "cluster" });
+});
+
+els.tabSettings.addEventListener("click", () => {
+  setArea("settings");
+  persist({ area: "settings" });
+});
+
+els.hooray.addEventListener("change", () => {
+  hoorayOn = els.hooray.checked;
+  persist({ hooray: hoorayOn });
 });
 
 els.scenarioType.addEventListener("change", () => {
@@ -765,6 +794,9 @@ els.test.addEventListener("click", async () => {
     body: summary.body,
     isError: !summary.ok,
   });
+  if (summary.ok) {
+    celebrate();
+  }
   els.test.disabled = false;
 });
 
@@ -878,6 +910,9 @@ els.runFailover.addEventListener("click", async () => {
   });
 
   setScenarioResult([summary, ...cards]);
+  if (winner) {
+    celebrate();
+  }
   els.runFailover.disabled = false;
 });
 
@@ -904,7 +939,7 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.5.0" },
+      clientInfo: { name: "agentgateway-extension", version: "0.6.0" },
     },
   };
 
@@ -949,6 +984,9 @@ els.probeMcp.addEventListener("click", async () => {
       snippet(result.error || result.raw || "(empty body)")
     ),
   ]);
+  if (!result.error && result.status >= 200 && result.status < 300) {
+    celebrate();
+  }
   els.probeMcp.disabled = false;
 });
 
@@ -995,6 +1033,9 @@ els.probeA2a.addEventListener("click", async () => {
       snippet(result.error || result.raw || "(empty body)")
     ),
   ]);
+  if (!result.error && result.status >= 200 && result.status < 300) {
+    celebrate();
+  }
   els.probeA2a.disabled = false;
 });
 
@@ -1035,6 +1076,7 @@ els.runSecurity.addEventListener("click", async () => {
       junk.body
     ),
   ]);
+  celebrate();
   els.runSecurity.disabled = false;
 });
 
@@ -1439,6 +1481,9 @@ els.testCluster.addEventListener("click", async () => {
     isError: !ok,
   });
   await persist({ clusterConnected: ok });
+  if (ok) {
+    celebrate();
+  }
   els.testCluster.disabled = false;
 });
 

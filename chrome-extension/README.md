@@ -1,16 +1,32 @@
 # Agentgateway (Chrome extension)
 
-Manifest V3 popup with three areas: **Chat**, **Scenarios**, and **Cluster**.
+Manifest V3 popup with **Chat**, **Scenarios**, **Cluster**, and a header
+gear for **Settings**.
 Chat and Scenarios talk to a user-configured Agentgateway. The gateway injects
 backend auth, so those areas do **not** store or send an API key or license
 key. Cluster talks to a Kubernetes API server so you can list and apply
 Agentgateway CRDs from the popup.
 
-The popup uses the Solo Enterprise dark palette (navy surfaces, teal accent).
+The popup matches the [agentgateway.dev](https://agentgateway.dev/) product
+site: deep navy/black surfaces (`#0B0E18`, `#111422`, `#181C2E`), purple
+accent (`#8A3FFC` / `#A06EFF`), and a tight header with the official mark
+beside the title. The dark wordmark and color mark are vendored in
+`icons/` from the live homepage (`/agw-dark.svg`, `/agw-mark-color.svg`) —
+they are not hotlinked at runtime. Toolbar PNGs (`icon16.png`,
+`icon32.png`, `icon48.png`) are rasterized from that mark and set as
+`action.default_icon`.
+
 Chat, Failover, and MCP show a live sequence diagram
 (Client → Agentgateway → provider, or Client → MCP for a raw MCP URL).
 **Test**, **Run test**, and **Probe** highlight each hop in order, then
-mark the path teal on success or the failing hop red.
+mark the path in the site accent on success or the failing hop red.
+
+The header gear opens **Settings**. **Hooray** (default on, stored in
+`chrome.storage.local`) plays a short canvas confetti burst after a
+successful Chat **Test**, a Failover run where a model succeeds, an MCP
+or A2A probe that returns HTTP 2xx, a Security check that finishes as
+designed, or a Cluster **Test connection** success. Turn it off to skip
+the burst.
 
 ## Load unpacked
 
@@ -92,6 +108,14 @@ attack recipes.
    whether the gateway accepted or rejected it
 
 Each check shows HTTP status, latency, and the reply or error.
+
+## Settings
+
+The gear in the header opens **Settings**.
+
+- **Hooray** — “Confetti on a successful test.” Persisted in
+  `chrome.storage.local`; default **on**. One ~1s canvas burst, not a
+  loop. Honors `prefers-reduced-motion`.
 
 ## Cluster
 
