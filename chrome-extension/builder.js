@@ -212,7 +212,7 @@
       group: "Protect",
       label: "Prompt guard",
       docs: "https://docs.solo.io/agentgateway/latest/llm/guardrails/regex/",
-      blurb: "Reject requests that match a regex (docs example: credit card).",
+      blurb: "Workshop builtin-guardrails: jailbreak/DAN → 403, PII builtins CreditCard/Ssn/Email/PhoneNumber → 422, response Mask.",
       fields: ["core", "targetRoute", "regex"],
     },
     {
@@ -1119,16 +1119,58 @@
   function promptGuardDoc(fields) {
     const namespace = cleanNs(fields.namespace);
     const name = cleanName(fields.name, "openai-prompt-guard");
-    const match = String(fields.regex || "").trim() || "credit card";
+    const extra = String(fields.regex || "").trim();
+    const request = [
+      {
+        regex: {
+          action: "Reject",
+          matches: [
+            "(?i)(ignore|disregard|forget|override|bypass).{0,40}(previous|prior|earlier).{0,20}(instructions|rules|guidelines)",
+            "(?i)(do anything now|DAN mode|enable DAN|activate DAN|STAN mode|DUDE mode|AIM mode)",
+          ],
+        },
+        response: {
+          message:
+            "Request blocked: jailbreak attempt detected. Role hijacking and persona manipulation are not permitted.",
+          statusCode: 403,
+        },
+      },
+      {
+        regex: {
+          action: "Reject",
+          builtins: ["CreditCard", "Ssn", "Email", "PhoneNumber"],
+        },
+        response: {
+          message:
+            "Request blocked: personally identifiable information (PII) detected.",
+          statusCode: 422,
+        },
+      },
+    ];
+    if (extra) {
+      request.push({
+        regex: { action: "Reject", matches: [extra] },
+        response: {
+          message: "Rejected due to inappropriate content",
+          statusCode: 403,
+        },
+      });
+    }
     return policyDoc(name, namespace, {
       targetRefs: [routeTarget(fields, "openai")],
       backend: {
         ai: {
           promptGuard: {
-            request: [
+            request,
+            response: [
               {
-                response: { message: "Rejected due to inappropriate content" },
-                regex: { action: "Reject", matches: [match] },
+                regex: {
+                  action: "Mask",
+                  builtins: ["CreditCard", "Ssn", "Email", "PhoneNumber"],
+                },
+                response: {
+                  message: "Response filtered: PII redacted from model output.",
+                },
               },
             ],
           },
@@ -1435,7 +1477,7 @@
     if (mode === "prompt-guard") {
       return joinDocs(
         [promptGuardDoc(fields)],
-        `# Docs: ${recipe.docs}\n# Safe regex reject example. Not a jailbreak payload.\n`
+        `# Docs: ${recipe.docs}\n# Workshop builtin-guardrails: jailbreak Reject 403, PII builtins Reject 422, response Mask.\n`
       );
     }
     if (mode === "prompt-enrichment") {

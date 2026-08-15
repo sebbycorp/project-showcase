@@ -157,6 +157,10 @@
           autocomplete="off"
         ></textarea>
         <button id="send" type="submit" class="btn">Send</button>
+        <label class="stream-toggle" for="chat-stream" title="Send stream: true and render SSE delta.content">
+          <input id="chat-stream" type="checkbox" />
+          Stream
+        </label>
       </form>
     </section>
 
@@ -381,6 +385,15 @@
             aria-live="polite"
           ></div>
         </article>
+
+        <div class="workshop-head">
+          <span class="field-label">Workshop demos</span>
+          <p class="hint">
+            Apply YAML from the Solo Enterprise workshop, then Run. Hop labels
+            show promptGuard, prompt.prepend, rateLimit, and SSE.
+          </p>
+        </div>
+        <div id="llm-workshop" class="workshop-list"></div>
 
         <details class="deploy" id="llm-deploy" data-deploy-key="llmDeployOpen">
           <summary>Build &amp; apply config</summary>
@@ -700,7 +713,7 @@
                 type="text"
                 spellcheck="false"
                 autocomplete="off"
-                placeholder="credit card"
+                placeholder="optional extra regex (builtins always applied)"
               />
             </div>
             <div class="field-grid" id="llm-header-wrap" hidden>
@@ -1233,6 +1246,15 @@
           ></div>
         </article>
 
+        <div class="workshop-head">
+          <span class="field-label">Workshop demos</span>
+          <p class="hint">
+            OpenAPI→MCP, remote MCP, tool rate limit, FailOpen federation,
+            Search/Code modes, composable MCP, and JWT + tool RBAC.
+          </p>
+        </div>
+        <div id="mcp-workshop" class="workshop-list"></div>
+
         <details class="deploy" id="mcp-deploy" data-deploy-key="mcpDeployOpen">
           <summary>Build &amp; apply config</summary>
           <div class="deploy-body">
@@ -1447,6 +1469,14 @@
           <div id="result-a2a" class="test-drawer" hidden aria-live="polite"></div>
         </article>
 
+        <div class="workshop-head">
+          <span class="field-label">Workshop demos</span>
+          <p class="hint">
+            Real A2A task: agent-card, tasks/send, poll tasks/get.
+          </p>
+        </div>
+        <div id="a2a-workshop" class="workshop-list"></div>
+
         <details class="deploy" id="a2a-deploy" data-deploy-key="a2aDeployOpen">
           <summary>Deploy config</summary>
           <div class="deploy-body">
@@ -1454,6 +1484,7 @@
             <label class="field-label" for="a2a-example">Prebuilt example</label>
             <select id="a2a-example">
               <option value="a2a">A2A backend + HTTPRoute</option>
+              <option value="a2aTask">A2A agent + task route</option>
             </select>
             <label class="field-label" for="a2a-yaml">YAML</label>
             <textarea
@@ -1640,13 +1671,25 @@
           <div id="result-junk" class="test-drawer" hidden aria-live="polite"></div>
         </article>
 
+        <div class="workshop-head">
+          <span class="field-label">Workshop demos</span>
+          <p class="hint">
+            WAF first-pass, direct response / health, and JWT + RBAC on
+            /openai-jwt (Chat without a token still works).
+          </p>
+        </div>
+        <div id="api-workshop" class="workshop-list"></div>
+
         <details class="deploy" id="api-deploy" data-deploy-key="apiDeployOpen">
           <summary>Deploy config</summary>
           <div class="deploy-body">
             <p class="hint" data-deploy-hint></p>
             <label class="field-label" for="api-example">Prebuilt example</label>
             <select id="api-example">
-              <option value="policy">Prompt-guard policy (PII stub)</option>
+              <option value="policy">Prompt Guard (builtin suite)</option>
+              <option value="waf">WAF first-pass</option>
+              <option value="directResponse">Direct response / health</option>
+              <option value="jwtLlm">JWT + RBAC on LLM</option>
             </select>
             <label class="field-label" for="api-yaml">YAML</label>
             <textarea
@@ -1975,6 +2018,7 @@
     <script src="kubeconfig.js"></script>
     <script src="portforward.js"></script>
     <script src="examples.js"></script>
+    <script src="workshop.js"></script>
     <script src="builder.js"></script>
     <script src="confetti.js"></script>
     <script src="popup.js"></script>

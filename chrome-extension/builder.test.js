@@ -219,7 +219,13 @@ const guard = AgwBuilder.generateLlmYaml({
 });
 assert.match(guard, /promptGuard:/);
 assert.match(guard, /action: Reject/);
-assert.match(guard, /credit card/);
+assert.match(guard, /builtins:/);
+assert.match(guard, /CreditCard/);
+assert.match(guard, /Ssn/);
+assert.match(guard, /Email/);
+assert.match(guard, /statusCode: 403/);
+assert.match(guard, /statusCode: 422/);
+assert.match(guard, /action: Mask/);
 
 const enrich = AgwBuilder.generateLlmYaml({
   preset: "prompt-enrichment",

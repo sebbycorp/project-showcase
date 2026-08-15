@@ -1881,6 +1881,64 @@ html.demo-stage .seq-wire {
   padding: 8px 14px;
 }
 
+.stream-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  align-self: flex-end;
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.stream-toggle input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.workshop-head {
+  margin: 16px 0 8px;
+}
+
+.workshop-head .field-label {
+  display: block;
+}
+
+.workshop-head .hint {
+  margin: 3px 0 0;
+}
+
+.workshop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.workshop-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.workshop-fields {
+  margin-top: 10px;
+}
+
+.workshop-field {
+  width: 100%;
+}
+
+.workshop-card .seq-hop {
+  max-width: 104px;
+  white-space: normal;
+}
+
 .toggle {
   display: flex;
   align-items: flex-start;
