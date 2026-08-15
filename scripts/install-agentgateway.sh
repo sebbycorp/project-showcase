@@ -59,6 +59,9 @@ helm upgrade -i management \
 echo "Applying Gateway ${ROOT}/manifests/gateway.yaml..."
 kubectl apply -f "${ROOT}/manifests/gateway.yaml"
 
+echo "Applying tracing policy ${ROOT}/manifests/tracing.yaml..."
+kubectl apply -f "${ROOT}/manifests/tracing.yaml"
+
 if [[ -n "${OPENAI_API_KEY:-}" ]]; then
   echo "Creating openai-secret in ${NAMESPACE}..."
   kubectl apply -f - <<EOF
