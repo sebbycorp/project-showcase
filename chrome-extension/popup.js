@@ -18,6 +18,13 @@ const STORAGE_KEYS = [
   "a2aEndpoint",
   "area",
   "scenario",
+  "chosenModel",
+  "llmExample",
+  "mcpExample",
+  "securityExample",
+  "llmYaml",
+  "mcpYaml",
+  "securityYaml",
   "clusterType",
   "clusterApiServer",
   "clusterToken",
@@ -122,25 +129,43 @@ const els = {
   form: document.getElementById("chat-form"),
   message: document.getElementById("message"),
   send: document.getElementById("send"),
-  scenarioType: document.getElementById("scenario-type"),
-  scenarioFailover: document.getElementById("scenario-failover"),
+  sectionLlm: document.getElementById("section-llm"),
+  sectionMcp: document.getElementById("section-mcp"),
+  sectionSecurity: document.getElementById("section-security"),
+  scenarioLlm: document.getElementById("scenario-llm"),
   scenarioMcp: document.getElementById("scenario-mcp"),
-  scenarioA2a: document.getElementById("scenario-a2a"),
   scenarioSecurity: document.getElementById("scenario-security"),
   primaryModel: document.getElementById("primary-model"),
   fallbackModel: document.getElementById("fallback-model"),
+  chosenModel: document.getElementById("chosen-model"),
+  runChatPing: document.getElementById("run-chat-ping"),
   runFailover: document.getElementById("run-failover"),
-  failoverHint: document.getElementById("failover-endpoint-hint"),
+  runListCall: document.getElementById("run-list-call"),
+  llmHint: document.getElementById("llm-endpoint-hint"),
+  llmExample: document.getElementById("llm-example"),
+  llmYaml: document.getElementById("llm-yaml"),
+  applyLlm: document.getElementById("apply-llm"),
+  llmApplyResult: document.getElementById("llm-apply-result"),
   mcpEndpoint: document.getElementById("mcp-endpoint"),
   probeMcp: document.getElementById("probe-mcp"),
   a2aEndpoint: document.getElementById("a2a-endpoint"),
   probeA2a: document.getElementById("probe-a2a"),
-  runSecurity: document.getElementById("run-security"),
+  mcpExample: document.getElementById("mcp-example"),
+  mcpYaml: document.getElementById("mcp-yaml"),
+  applyMcp: document.getElementById("apply-mcp"),
+  mcpApplyResult: document.getElementById("mcp-apply-result"),
+  runUnauth: document.getElementById("run-unauth"),
+  runJunk: document.getElementById("run-junk"),
   securityHint: document.getElementById("security-endpoint-hint"),
+  securityExample: document.getElementById("security-example"),
+  securityYaml: document.getElementById("security-yaml"),
+  applySecurity: document.getElementById("apply-security"),
+  securityApplyResult: document.getElementById("security-apply-result"),
   scenarioResult: document.getElementById("scenario-result"),
   seqChat: document.getElementById("seq-chat"),
-  seqFailover: document.getElementById("seq-failover"),
+  seqLlm: document.getElementById("seq-llm"),
   seqMcp: document.getElementById("seq-mcp"),
+  seqSecurity: document.getElementById("seq-security"),
   tabCluster: document.getElementById("tab-cluster"),
   areaCluster: document.getElementById("area-cluster"),
   clusterType: document.getElementById("cluster-type"),
@@ -167,6 +192,7 @@ const els = {
 };
 
 let hoorayOn = true;
+let clusterConnected = false;
 
 function celebrate() {
   if (!hoorayOn) {
@@ -176,11 +202,26 @@ function celebrate() {
 }
 
 const scenarioPanels = {
-  failover: els.scenarioFailover,
+  llm: els.scenarioLlm,
   mcp: els.scenarioMcp,
-  a2a: els.scenarioA2a,
   security: els.scenarioSecurity,
 };
+
+const sectionTabs = {
+  llm: els.sectionLlm,
+  mcp: els.sectionMcp,
+  security: els.sectionSecurity,
+};
+
+function normalizeScenario(name) {
+  if (name === "mcp" || name === "a2a") {
+    return "mcp";
+  }
+  if (name === "security") {
+    return "security";
+  }
+  return "llm";
+}
 
 const messages = [];
 
@@ -270,13 +311,18 @@ function currentChatSettings() {
 function updateEndpointHints() {
   const endpoint = normalizeEndpoint(els.endpoint.value);
   const text = `Uses chat endpoint ${endpoint}`;
-  els.failoverHint.textContent = text;
+  els.llmHint.textContent = text;
   els.securityHint.textContent = text;
   refreshSeqDiagrams();
 }
 
 const SEQ_STEP_MS = 240;
-const seqTokens = { "seq-chat": 0, "seq-failover": 0, "seq-mcp": 0 };
+const seqTokens = {
+  "seq-chat": 0,
+  "seq-llm": 0,
+  "seq-mcp": 0,
+  "seq-security": 0,
+};
 
 function isIpHost(host) {
   return (
@@ -351,8 +397,9 @@ function mcpSeqConfig() {
 
 function refreshSeqDiagrams() {
   configureSeq(els.seqChat, llmSeqConfig());
-  configureSeq(els.seqFailover, llmSeqConfig());
+  configureSeq(els.seqLlm, llmSeqConfig());
   configureSeq(els.seqMcp, mcpSeqConfig());
+  configureSeq(els.seqSecurity, llmSeqConfig());
 }
 
 function clearSeqMarks(seq) {
@@ -647,12 +694,14 @@ function setArea(area) {
 }
 
 function setScenario(name) {
-  const selected = scenarioPanels[name] ? name : "failover";
-  els.scenarioType.value = selected;
+  const selected = normalizeScenario(name);
   for (const [key, panel] of Object.entries(scenarioPanels)) {
     const active = key === selected;
     panel.classList.toggle("is-active", active);
     panel.hidden = !active;
+    if (sectionTabs[key]) {
+      sectionTabs[key].classList.toggle("is-active", active);
+    }
   }
 }
 
@@ -662,6 +711,7 @@ async function loadSettings() {
   els.model.value = stored.model || DEFAULT_MODEL;
   els.primaryModel.value = stored.primaryModel || DEFAULT_MODEL;
   els.fallbackModel.value = stored.fallbackModel || DEFAULT_FALLBACK_MODEL;
+  els.chosenModel.value = stored.chosenModel || stored.model || DEFAULT_MODEL;
   els.mcpEndpoint.value = stored.mcpEndpoint || DEFAULT_MCP_ENDPOINT;
   els.a2aEndpoint.value = stored.a2aEndpoint || DEFAULT_A2A_ENDPOINT;
   els.clusterType.value = CLUSTER_HELP[stored.clusterType]
@@ -676,8 +726,10 @@ async function loadSettings() {
     ? stored.clusterKind
     : "Gateway";
   els.crdYaml.value = stored.clusterManifest || EXAMPLE_MANIFEST;
+  loadDeployExamples(stored);
   updateClusterHelp();
-  if (stored.clusterConnected) {
+  clusterConnected = Boolean(stored.clusterConnected);
+  if (clusterConnected) {
     els.clusterTestResult.hidden = false;
     els.clusterTestResult.classList.remove("is-error");
     els.clusterTestResult.replaceChildren();
@@ -690,8 +742,9 @@ async function loadSettings() {
   hoorayOn = stored.hooray !== false;
   els.hooray.checked = hoorayOn;
   setArea(AREAS.includes(stored.area) ? stored.area : "chat");
-  setScenario(stored.scenario || "failover");
+  setScenario(stored.scenario || "llm");
   updateEndpointHints();
+  updateDeployHints();
 }
 
 els.tabChat.addEventListener("click", () => {
@@ -702,6 +755,7 @@ els.tabChat.addEventListener("click", () => {
 els.tabScenarios.addEventListener("click", () => {
   setArea("scenarios");
   updateEndpointHints();
+  updateDeployHints();
   persist({ area: "scenarios" });
 });
 
@@ -720,10 +774,22 @@ els.hooray.addEventListener("change", () => {
   persist({ hooray: hoorayOn });
 });
 
-els.scenarioType.addEventListener("change", () => {
-  setScenario(els.scenarioType.value);
+els.sectionLlm.addEventListener("click", () => {
+  setScenario("llm");
   refreshSeqDiagrams();
-  persist({ scenario: els.scenarioType.value });
+  persist({ scenario: "llm" });
+});
+
+els.sectionMcp.addEventListener("click", () => {
+  setScenario("mcp");
+  refreshSeqDiagrams();
+  persist({ scenario: "mcp" });
+});
+
+els.sectionSecurity.addEventListener("click", () => {
+  setScenario("security");
+  refreshSeqDiagrams();
+  persist({ scenario: "security" });
 });
 
 els.endpoint.addEventListener("change", () => {
@@ -751,6 +817,12 @@ els.fallbackModel.addEventListener("change", () => {
   );
   els.fallbackModel.value = fallbackModel;
   persist({ fallbackModel });
+});
+
+els.chosenModel.addEventListener("change", () => {
+  const chosenModel = normalizeModel(els.chosenModel.value);
+  els.chosenModel.value = chosenModel;
+  persist({ chosenModel });
 });
 
 els.mcpEndpoint.addEventListener("change", () => {
@@ -848,6 +920,32 @@ els.message.addEventListener("keydown", (event) => {
   }
 });
 
+els.runChatPing.addEventListener("click", async () => {
+  const { endpoint, model } = await saveChatSettings();
+  els.runChatPing.disabled = true;
+  setScenarioResult([card("check", "", "Chat ping", "Running…")]);
+  const result = await runWithSeq(
+    els.seqLlm,
+    () => postCompletions(endpoint, model, [TEST_MESSAGE]),
+    { ...llmSeqConfig(), ok: llmRequestOk }
+  );
+  const summary = summarizeCompletion(result, model);
+  const statusText =
+    summary.status == null ? "no response" : `HTTP ${summary.status}`;
+  setScenarioResult([
+    card(
+      "check",
+      summary.ok ? "is-ok" : "is-error",
+      `Chat ping · ${summary.model} · ${statusText} · ${summary.latencyMs} ms`,
+      summary.body
+    ),
+  ]);
+  if (summary.ok) {
+    celebrate();
+  }
+  els.runChatPing.disabled = false;
+});
+
 els.runFailover.addEventListener("click", async () => {
   const { endpoint } = await saveChatSettings();
   const primaryModel = normalizeModel(els.primaryModel.value);
@@ -868,7 +966,7 @@ els.runFailover.addEventListener("click", async () => {
   const seqOpts = { ...llmSeqConfig(), ok: llmRequestOk };
   const primary = summarizeCompletion(
     await runWithSeq(
-      els.seqFailover,
+      els.seqLlm,
       () => postCompletions(endpoint, primaryModel, [TEST_MESSAGE]),
       seqOpts
     ),
@@ -880,7 +978,7 @@ els.runFailover.addEventListener("click", async () => {
     await new Promise((resolve) => setTimeout(resolve, 450));
     const fallback = summarizeCompletion(
       await runWithSeq(
-        els.seqFailover,
+        els.seqLlm,
         () => postCompletions(endpoint, fallbackModel, [TEST_MESSAGE]),
         seqOpts
       ),
@@ -916,6 +1014,87 @@ els.runFailover.addEventListener("click", async () => {
   els.runFailover.disabled = false;
 });
 
+function modelsUrl(chatEndpoint) {
+  try {
+    const url = new URL(normalizeEndpoint(chatEndpoint));
+    if (url.pathname.includes(CHAT_PATH)) {
+      url.pathname = url.pathname.replace(CHAT_PATH, "/v1/models");
+    } else {
+      const base = url.pathname.replace(/\/+$/, "");
+      url.pathname = `${base}/v1/models`;
+    }
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
+function listModelNames(payload) {
+  const data = payload && Array.isArray(payload.data) ? payload.data : [];
+  const names = data
+    .map((item) => (item && item.id) || "")
+    .filter(Boolean);
+  if (names.length) {
+    return names.join("\n");
+  }
+  return snippet(JSON.stringify(payload || {}, null, 2) || "(empty body)");
+}
+
+els.runListCall.addEventListener("click", async () => {
+  const { endpoint } = await saveChatSettings();
+  const chosenModel = normalizeModel(els.chosenModel.value);
+  els.chosenModel.value = chosenModel;
+  await persist({ chosenModel });
+  const listUrl = modelsUrl(endpoint);
+  els.runListCall.disabled = true;
+  setScenarioResult([card("check", "", "List / call", "Listing models…")]);
+
+  const listed = await runWithSeq(
+    els.seqLlm,
+    () => timedFetch(listUrl, { method: "GET", headers: { Accept: "application/json" } }),
+    { ...llmSeqConfig(), ok: mcpRequestOk }
+  );
+  const listOk = !listed.error && listed.status != null && listed.status < 400;
+  const listStatus =
+    listed.status == null ? "no response" : `HTTP ${listed.status}`;
+  const listBody = listed.error
+    ? listed.error
+    : listOk
+      ? listModelNames(listed.payload)
+      : snippet(listed.raw || `HTTP ${listed.status}`);
+
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  const called = summarizeCompletion(
+    await runWithSeq(
+      els.seqLlm,
+      () => postCompletions(endpoint, chosenModel, [TEST_MESSAGE]),
+      { ...llmSeqConfig(), ok: llmRequestOk }
+    ),
+    chosenModel
+  );
+  const callStatus =
+    called.status == null ? "no response" : `HTTP ${called.status}`;
+
+  setScenarioResult([
+    card(
+      "check",
+      listOk ? "is-ok" : "is-error",
+      `List models · ${listStatus} · ${listed.latencyMs} ms`,
+      listBody
+    ),
+    card(
+      "check",
+      called.ok ? "is-ok" : "is-error",
+      `Call ${called.model} · ${callStatus} · ${called.latencyMs} ms`,
+      called.body
+    ),
+  ]);
+  if (listOk && called.ok) {
+    celebrate();
+  }
+  els.runListCall.disabled = false;
+});
+
 async function probeWithFallback(url, primary, secondary, secondaryNote) {
   const first = await timedFetch(url, primary);
   if (!first.error && first.status !== 405) {
@@ -939,7 +1118,7 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.6.0" },
+      clientInfo: { name: "agentgateway-extension", version: "0.7.0" },
     },
   };
 
@@ -990,6 +1169,12 @@ els.probeMcp.addEventListener("click", async () => {
   els.probeMcp.disabled = false;
 });
 
+function a2aSeqConfig() {
+  const a2aUrl = els.a2aEndpoint.value.trim() || DEFAULT_A2A_ENDPOINT;
+  const viaGateway = mcpUsesGateway(a2aUrl, els.endpoint.value);
+  return { viaGateway, target: "A2A" };
+}
+
 els.probeA2a.addEventListener("click", async () => {
   const url = els.a2aEndpoint.value.trim() || DEFAULT_A2A_ENDPOINT;
   els.a2aEndpoint.value = url;
@@ -997,7 +1182,10 @@ els.probeA2a.addEventListener("click", async () => {
   els.probeA2a.disabled = true;
   setScenarioResult([card("check", "", "A2A", "Probing…")]);
 
-  const result = await probeWithFallback(
+  const result = await runWithSeq(
+    els.seqMcp,
+    () =>
+      probeWithFallback(
     url,
     {
       method: "GET",
@@ -1011,7 +1199,9 @@ els.probeA2a.addEventListener("click", async () => {
       },
       body: JSON.stringify({ probe: "health" }),
     },
-    "GET unavailable; used POST health"
+        "GET unavailable; used POST health"
+      ),
+    { ...a2aSeqConfig(), ok: mcpRequestOk }
   );
 
   const ok = !result.error && result.status != null && result.status < 400;
@@ -1039,45 +1229,40 @@ els.probeA2a.addEventListener("click", async () => {
   els.probeA2a.disabled = false;
 });
 
-els.runSecurity.addEventListener("click", async () => {
+async function runSecurityProbe(button, label, messages) {
   const { endpoint, model } = await saveChatSettings();
-  els.runSecurity.disabled = true;
-  setScenarioResult([card("check", "", "Security", "Running probes…")]);
-
-  const unauth = summarizeCompletion(
-    await postCompletions(endpoint, model, [TEST_MESSAGE]),
+  button.disabled = true;
+  setScenarioResult([card("check", "", label, "Running…")]);
+  const summary = summarizeCompletion(
+    await runWithSeq(
+      els.seqSecurity,
+      () => postCompletions(endpoint, model, messages),
+      { ...llmSeqConfig(), ok: llmRequestOk }
+    ),
     model
   );
-  const junk = summarizeCompletion(
-    await postCompletions(endpoint, model, [
-      { role: "user", content: JUNK_PROMPT },
-    ]),
-    model
-  );
-
-  const unauthStatus =
-    unauth.status == null ? "no response" : `HTTP ${unauth.status}`;
-  const junkStatus = junk.status == null ? "no response" : `HTTP ${junk.status}`;
-  const junkVerdict = junk.ok
-    ? "Gateway accepted the junk prompt"
-    : "Gateway rejected the junk prompt";
-
+  const statusText =
+    summary.status == null ? "no response" : `HTTP ${summary.status}`;
   setScenarioResult([
     card(
       "check",
-      unauth.ok ? "is-ok" : "is-error",
-      `Unauthenticated · ${unauthStatus} · ${unauth.latencyMs} ms`,
-      unauth.body
-    ),
-    card(
-      "check",
-      junk.ok ? "is-ok" : "is-error",
-      `Junk prompt · ${junkStatus} · ${junk.latencyMs} ms · ${junkVerdict}`,
-      junk.body
+      summary.ok ? "is-ok" : "is-error",
+      `${label} · ${statusText} · ${summary.latencyMs} ms`,
+      summary.body
     ),
   ]);
   celebrate();
-  els.runSecurity.disabled = false;
+  button.disabled = false;
+}
+
+els.runUnauth.addEventListener("click", () => {
+  runSecurityProbe(els.runUnauth, "Unauthenticated", [TEST_MESSAGE]);
+});
+
+els.runJunk.addEventListener("click", () => {
+  runSecurityProbe(els.runJunk, "Junk / policy-probe", [
+    { role: "user", content: JUNK_PROMPT },
+  ]);
 });
 
 function updateClusterHelp() {
@@ -1103,6 +1288,128 @@ function currentClusterSettings() {
     clusterKind: K8S_KINDS[els.crdKind.value] ? els.crdKind.value : "Gateway",
     clusterManifest: els.crdYaml.value,
   };
+}
+
+const CONNECT_CLUSTER_MSG = "Connect a cluster in the Cluster tab first.";
+
+function exampleYaml(section, key) {
+  const group = DEPLOY_EXAMPLES[section] || {};
+  const item = group[key] || Object.values(group)[0];
+  return item ? item.yaml : "";
+}
+
+function loadDeployExamples(stored) {
+  const llmKey = DEPLOY_EXAMPLES.llm[stored.llmExample]
+    ? stored.llmExample
+    : "gateway";
+  const mcpKey = DEPLOY_EXAMPLES.mcp[stored.mcpExample]
+    ? stored.mcpExample
+    : "mcp";
+  const secKey = DEPLOY_EXAMPLES.security[stored.securityExample]
+    ? stored.securityExample
+    : "policy";
+  els.llmExample.value = llmKey;
+  els.mcpExample.value = mcpKey;
+  els.securityExample.value = secKey;
+  els.llmYaml.value = stored.llmYaml || exampleYaml("llm", llmKey);
+  els.mcpYaml.value = stored.mcpYaml || exampleYaml("mcp", mcpKey);
+  els.securityYaml.value = stored.securityYaml || exampleYaml("security", secKey);
+}
+
+function clusterIsReady() {
+  const settings = currentClusterSettings();
+  return Boolean(
+    clusterConnected && settings.clusterApiServer && settings.clusterToken
+  );
+}
+
+function updateDeployHints() {
+  const connected = clusterIsReady();
+  const text = connected
+    ? "Apply uses the Cluster tab API server, token, and namespace."
+    : CONNECT_CLUSTER_MSG;
+  document.querySelectorAll("[data-deploy-hint]").forEach((node) => {
+    node.textContent = text;
+  });
+  els.applyLlm.disabled = !connected;
+  els.applyMcp.disabled = !connected;
+  els.applySecurity.disabled = !connected;
+}
+
+async function applyYamlDocuments(yaml, resultEl, applyBtn) {
+  if (!clusterIsReady()) {
+    showBox(resultEl, {
+      status: null,
+      latencyMs: 0,
+      body: CONNECT_CLUSTER_MSG,
+      isError: true,
+    });
+    return;
+  }
+
+  const settings = await saveClusterSettings();
+  let docs;
+  try {
+    docs = parseManifestText(yaml);
+  } catch (error) {
+    showBox(resultEl, {
+      status: null,
+      latencyMs: 0,
+      body: error.message || String(error),
+      isError: true,
+    });
+    return;
+  }
+
+  applyBtn.disabled = true;
+  showPending(resultEl, `Applying ${docs.length} document(s)…`);
+
+  const applied = [];
+  for (const doc of docs) {
+    try {
+      applied.push(await applyManifest(settings, doc));
+    } catch (error) {
+      applied.push({
+        name: (doc.metadata && doc.metadata.name) || "unknown",
+        kind: doc.kind || "Unknown",
+        method: "validate",
+        result: {
+          error: error.message || String(error),
+          status: null,
+          latencyMs: 0,
+          raw: "",
+          payload: null,
+          response: null,
+        },
+      });
+    }
+  }
+
+  const nodes = applied.map((item) => {
+    const ok =
+      !item.result.error && item.result.response && item.result.response.ok;
+    const statusText =
+      item.result.status == null ? "no response" : `HTTP ${item.result.status}`;
+    return card(
+      "check",
+      ok ? "is-ok" : "is-error",
+      `${item.method} ${item.kind}/${item.name} · ${statusText} · ${item.result.latencyMs} ms`,
+      ok
+        ? `${item.kind} ${item.name} ${item.method === "POST" ? "created" : "updated"}`
+        : k8sStatusMessage(item.result)
+    );
+  });
+
+  resultEl.hidden = false;
+  resultEl.classList.toggle(
+    "is-error",
+    applied.some(
+      (item) =>
+        item.result.error || !item.result.response || !item.result.response.ok
+    )
+  );
+  resultEl.replaceChildren(...nodes);
+  updateDeployHints();
 }
 
 async function saveClusterSettings(extra = {}) {
@@ -1339,14 +1646,17 @@ async function applyManifest(settings, doc) {
 els.clusterType.addEventListener("change", () => {
   updateClusterHelp();
   saveClusterSettings();
+  updateDeployHints();
 });
 
 els.clusterApiServer.addEventListener("change", () => {
   saveClusterSettings();
+  updateDeployHints();
 });
 
 els.clusterToken.addEventListener("change", () => {
   saveClusterSettings();
+  updateDeployHints();
 });
 
 els.clusterNamespace.addEventListener("change", () => {
@@ -1436,7 +1746,9 @@ els.testCluster.addEventListener("click", async () => {
       body: targetError,
       isError: true,
     });
+    clusterConnected = false;
     await persist({ clusterConnected: false });
+    updateDeployHints();
     return;
   }
 
@@ -1480,7 +1792,9 @@ els.testCluster.addEventListener("click", async () => {
     body,
     isError: !ok,
   });
+  clusterConnected = ok;
   await persist({ clusterConnected: ok });
+  updateDeployHints();
   if (ok) {
     celebrate();
   }
@@ -1551,6 +1865,43 @@ els.listCrds.addEventListener("click", async () => {
   }
 
   els.listCrds.disabled = false;
+});
+
+function bindExampleSelect(select, textarea, section, storageKey, yamlKey) {
+  select.addEventListener("change", () => {
+    const key = select.value;
+    textarea.value = exampleYaml(section, key);
+    persist({ [storageKey]: key, [yamlKey]: textarea.value });
+  });
+  textarea.addEventListener("change", () => {
+    persist({ [yamlKey]: textarea.value });
+  });
+}
+
+bindExampleSelect(els.llmExample, els.llmYaml, "llm", "llmExample", "llmYaml");
+bindExampleSelect(els.mcpExample, els.mcpYaml, "mcp", "mcpExample", "mcpYaml");
+bindExampleSelect(
+  els.securityExample,
+  els.securityYaml,
+  "security",
+  "securityExample",
+  "securityYaml"
+);
+
+els.applyLlm.addEventListener("click", () => {
+  applyYamlDocuments(els.llmYaml.value, els.llmApplyResult, els.applyLlm);
+});
+
+els.applyMcp.addEventListener("click", () => {
+  applyYamlDocuments(els.mcpYaml.value, els.mcpApplyResult, els.applyMcp);
+});
+
+els.applySecurity.addEventListener("click", () => {
+  applyYamlDocuments(
+    els.securityYaml.value,
+    els.securityApplyResult,
+    els.applySecurity
+  );
 });
 
 els.loadExample.addEventListener("click", () => {

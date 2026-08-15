@@ -107,14 +107,24 @@ body {
 }
 
 .area-tabs button,
+.section-tabs button,
 .settings-btn,
-#scenario-type,
+.test-row button,
 #cluster-type,
 #crd-kind,
+#llm-example,
+#mcp-example,
+#security-example,
+#run-chat-ping,
 #run-failover,
+#run-list-call,
 #probe-mcp,
 #probe-a2a,
-#run-security,
+#run-unauth,
+#run-junk,
+#apply-llm,
+#apply-mcp,
+#apply-security,
 #parse-kubeconfig,
 #test-cluster,
 #list-crds,
@@ -183,9 +193,15 @@ body {
 #model,
 #primary-model,
 #fallback-model,
+#chosen-model,
 #mcp-endpoint,
 #a2a-endpoint,
-#scenario-type,
+#llm-example,
+#mcp-example,
+#security-example,
+#llm-yaml,
+#mcp-yaml,
+#security-yaml,
 #cluster-type,
 #cluster-api-server,
 #cluster-token,
@@ -225,13 +241,96 @@ body {
   font-size: 11px;
 }
 
+.section-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.section-tabs button {
+  flex: 1 1 0;
+  padding: 7px 4px 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.section-tabs button:hover {
+  color: var(--text);
+}
+
+.section-tabs button.is-active {
+  background: transparent;
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+#area-scenarios {
+  overflow: hidden;
+}
+
+.scenarios-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .scenario {
   display: none;
-  margin-top: 4px;
 }
 
 .scenario.is-active {
   display: block;
+}
+
+.scenario .panel {
+  border-bottom: 0;
+}
+
+.test-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.test-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.test-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.test-row .hint {
+  margin: 2px 0 0;
+}
+
+.test-row button {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+}
+
+.seq-gw {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 4px;
+}
+
+.seq-logo {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
 }
 
 .seq {
@@ -269,6 +368,10 @@ body {
   flex: 0 1 auto;
   min-width: 0;
   width: 96px;
+}
+
+.seq-col[data-slot="gateway"] {
+  width: 108px;
 }
 
 .seq-box {
@@ -439,10 +542,16 @@ body {
 }
 
 #test,
+#run-chat-ping,
 #run-failover,
+#run-list-call,
 #probe-mcp,
 #probe-a2a,
-#run-security,
+#run-unauth,
+#run-junk,
+#apply-llm,
+#apply-mcp,
+#apply-security,
 #parse-kubeconfig,
 #test-cluster,
 #list-crds,
@@ -459,10 +568,9 @@ body {
   padding: 6px 12px;
 }
 
-#run-failover,
-#probe-mcp,
-#probe-a2a,
-#run-security,
+#apply-llm,
+#apply-mcp,
+#apply-security,
 #parse-kubeconfig,
 #test-cluster,
 #list-crds,
@@ -475,10 +583,16 @@ body {
 }
 
 #test:hover:not(:disabled),
+#run-chat-ping:hover:not(:disabled),
 #run-failover:hover:not(:disabled),
+#run-list-call:hover:not(:disabled),
 #probe-mcp:hover:not(:disabled),
 #probe-a2a:hover:not(:disabled),
-#run-security:hover:not(:disabled),
+#run-unauth:hover:not(:disabled),
+#run-junk:hover:not(:disabled),
+#apply-llm:hover:not(:disabled),
+#apply-mcp:hover:not(:disabled),
+#apply-security:hover:not(:disabled),
 #parse-kubeconfig:hover:not(:disabled),
 #test-cluster:hover:not(:disabled),
 #list-crds:hover:not(:disabled),
@@ -488,10 +602,16 @@ body {
 }
 
 #test:disabled,
+#run-chat-ping:disabled,
 #run-failover:disabled,
+#run-list-call:disabled,
 #probe-mcp:disabled,
 #probe-a2a:disabled,
-#run-security:disabled,
+#run-unauth:disabled,
+#run-junk:disabled,
+#apply-llm:disabled,
+#apply-mcp:disabled,
+#apply-security:disabled,
 #parse-kubeconfig:disabled,
 #test-cluster:disabled,
 #list-crds:disabled,
@@ -561,9 +681,15 @@ body {
 #model:focus,
 #primary-model:focus,
 #fallback-model:focus,
+#chosen-model:focus,
 #mcp-endpoint:focus,
 #a2a-endpoint:focus,
-#scenario-type:focus,
+#llm-example:focus,
+#mcp-example:focus,
+#security-example:focus,
+#llm-yaml:focus,
+#mcp-yaml:focus,
+#security-yaml:focus,
 #cluster-type:focus,
 #cluster-api-server:focus,
 #cluster-token:focus,
@@ -586,6 +712,9 @@ body {
   border-bottom: 0;
 }
 
+#llm-yaml,
+#mcp-yaml,
+#security-yaml,
 #cluster-kubeconfig,
 #crd-yaml {
   resize: vertical;
