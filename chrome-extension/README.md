@@ -21,8 +21,10 @@ xAI/Grok mark, AWS cube, MCP, A2A, Policy). Toolbar PNGs (`icon16.png`,
 Chat and each Services test show a compact one-row flow
 (AI Agent tile → Agentgateway mark → provider or MCP/A2A tile). Hover
 title and `aria-label` name the path; there is no caption bar. **Test**
-and each named **Run** highlight hops in order, then mark the path in
-teal on success or the failing hop red.
+and each named **Run** light tiles in order. The active hop’s chevrons
+march left → right toward the next tile (teal glow, staggered hop 1 then
+hop 2), with a lighter return march after the response. The path settles
+teal on success, or motion stops on the failing hop.
 
 The header gear opens **Settings**. **Hooray** (default on, stored in
 `chrome.storage.local`) plays a short canvas confetti burst after a
@@ -56,8 +58,8 @@ If you enter a base URL without `/v1/chat/completions` (for example
 
 **Test** sends a tiny `POST` and shows HTTP status, round-trip latency, the
 response model when present, and the reply or error. It does not clear chat
-history. While the request is in flight, the sequence diagram highlights
-AI Agent → Agentgateway → provider, then the return path.
+history. While the request is in flight, chevrons travel AI Agent →
+Agentgateway → provider, then a lighter return march.
 
 The chat box uses the same saved endpoint and model for follow-up messages.
 Each send is `POST` with JSON `{ "model": "<chosen model>", "messages": [...] }`.

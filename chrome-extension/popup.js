@@ -326,7 +326,8 @@ function updateEndpointHints() {
   refreshSeqDiagrams();
 }
 
-const SEQ_STEP_MS = 240;
+const SEQ_STEP_MS = 560;
+const SEQ_RETURN_MS = 480;
 const seqTokens = {
   "seq-chat": 0,
   "seq-chat-ping": 0,
@@ -453,7 +454,19 @@ function refreshSeqDiagrams() {
 
 function clearSeqMarks(seq) {
   seq.querySelectorAll(".seq-box, .seq-arrow").forEach((node) => {
-    node.classList.remove("is-on", "is-fail", "is-back");
+    node.classList.remove("is-on", "is-fail", "is-back", "is-hop", "is-transit");
+  });
+}
+
+function setSeqHop(seq, role, step) {
+  seq.querySelectorAll(".seq-box").forEach((box) => {
+    box.classList.toggle("is-hop", role != null && box.dataset.role === role);
+  });
+  seq.querySelectorAll(".seq-arrow").forEach((arrow) => {
+    arrow.classList.toggle(
+      "is-transit",
+      step != null && Number(arrow.dataset.step) === step
+    );
   });
 }
 
@@ -528,31 +541,40 @@ function failSeq(seq, hop, viaGateway, target) {
 
 async function animateSeqForward(seq, viaGateway, target, token) {
   const id = seq.id;
-  markSeq(seq, ["client"], [1], "is-on");
+  markSeq(seq, ["client"], [], "is-on");
+  setSeqHop(seq, "client", null);
   setSeqCaption(seq, "AI Agent sends");
+  if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
+    return false;
+  }
+
+  markSeq(seq, [], [1], "is-on");
+  setSeqHop(seq, null, 1);
   if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
     return false;
   }
 
   if (viaGateway) {
     markSeq(seq, ["gateway"], [], "is-on");
+    setSeqHop(seq, "gateway", null);
     setSeqCaption(seq, "Agentgateway");
     if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
       return false;
     }
-    markSeq(seq, ["target"], [2], "is-on");
-    setSeqCaption(seq, target);
+    markSeq(seq, [], [2], "is-on");
+    setSeqHop(seq, null, 2);
     if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
       return false;
     }
+    markSeq(seq, ["target"], [], "is-on");
+    setSeqHop(seq, "target", 2);
+    setSeqCaption(seq, target);
     return true;
   }
 
-  markSeq(seq, ["target"], [1], "is-on");
+  markSeq(seq, ["target"], [], "is-on");
+  setSeqHop(seq, "target", 1);
   setSeqCaption(seq, target);
-  if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
-    return false;
-  }
   return true;
 }
 
@@ -560,13 +582,19 @@ async function animateSeqReturn(seq, viaGateway, target, token) {
   seq.querySelectorAll(".seq-arrow").forEach((arrow) => {
     arrow.classList.add("is-back");
   });
+  setSeqCaption(seq, "Response");
   if (viaGateway) {
     markSeq(seq, [], [1, 2], "is-on");
-  } else {
-    markSeq(seq, [], [1], "is-on");
+    setSeqHop(seq, "gateway", 2);
+    if (!(await waitSeq(SEQ_RETURN_MS, seq.id, token))) {
+      return false;
+    }
+    setSeqHop(seq, "client", 1);
+    return waitSeq(SEQ_RETURN_MS, seq.id, token);
   }
-  setSeqCaption(seq, "Response");
-  return waitSeq(180, seq.id, token);
+  markSeq(seq, [], [1], "is-on");
+  setSeqHop(seq, "client", 1);
+  return waitSeq(SEQ_RETURN_MS, seq.id, token);
 }
 
 async function runWithSeq(seq, requestFn, { viaGateway, target, ok }) {
@@ -590,6 +618,12 @@ async function runWithSeq(seq, requestFn, { viaGateway, target, ok }) {
     }
     seq.classList.remove("is-run");
     seq.classList.add("is-ok");
+    seq.querySelectorAll(".seq-arrow").forEach((arrow) => {
+      arrow.classList.remove("is-back", "is-transit");
+    });
+    seq.querySelectorAll(".seq-box").forEach((box) => {
+      box.classList.remove("is-hop");
+    });
     markSeq(
       seq,
       viaGateway ? ["client", "gateway", "target"] : ["client", "target"],
@@ -1271,7 +1305,7 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.8.3" },
+      clientInfo: { name: "agentgateway-extension", version: "0.8.4" },
     },
   };
 
