@@ -13,15 +13,16 @@ and professional system type. The header keeps the official color mark
 beside the title. The dark wordmark and color mark are vendored in
 `icons/` from the live homepage (`/agw-dark.svg`, `/agw-mark-color.svg`) —
 they are not hotlinked at runtime. Flow hops use compact vendored SVGs
-in the same folder (AI Agent, OpenAI, Claude, Grok, Bedrock, MCP, A2A,
-Policy). Toolbar PNGs (`icon16.png`,
+in the same folder (AI Agent spark/node, OpenAI blossom, Claude asterisk,
+xAI/Grok mark, AWS cube, MCP, A2A, Policy). Toolbar PNGs (`icon16.png`,
 `icon32.png`, `icon48.png`) are rasterized from that mark and set as
 `action.default_icon`.
 
-Chat and each Services test show a live sequence diagram
-(AI Agent icon → Agentgateway logo → provider or MCP/A2A icon). **Test** and each
-named **Run** highlight hops in order, then mark the path in teal on
-success or the failing hop red.
+Chat and each Services test show a compact one-row flow
+(AI Agent tile → Agentgateway mark → provider or MCP/A2A tile). Hover
+title and `aria-label` name the path; there is no caption bar. **Test**
+and each named **Run** highlight hops in order, then mark the path in
+teal on success or the failing hop red.
 
 The header gear opens **Settings**. **Hooray** (default on, stored in
 `chrome.storage.local`) plays a short canvas confetti burst after a
@@ -68,8 +69,8 @@ Open **Services**, then choose a subnav: **LLM**, **MCP / A2A**, or
 **Security**. Each page lists tests as their own cards. A card has:
 
 - Test name and a one-line description
-- A compact flow diagram for that test
-  (AI Agent icon → Agentgateway logo → provider or target icon)
+- A compact one-row flow for that test
+  (AI Agent tile → Agentgateway mark → provider or target tile)
 - A **Run** button on the same row as the title
 - An expandable results drawer under that test
 
