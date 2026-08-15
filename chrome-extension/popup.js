@@ -6507,4 +6507,5 @@ els.applyCrds.addEventListener("click", async () => {
 });
 
 bindDeployViews();
+updatePortForwardCommand();
 loadSettings();
