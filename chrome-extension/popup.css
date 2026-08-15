@@ -1459,6 +1459,81 @@ html.demo-stage .seq-wire {
   color: var(--muted);
 }
 
+.mcp-deploys {
+  margin: 0 0 14px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.mcp-deploys-head .hint {
+  margin: 4px 0 8px;
+}
+
+.mcp-deploy-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.mcp-deploy-primary .btn {
+  width: 100%;
+  justify-content: center;
+  font-weight: 650;
+}
+
+.mcp-deploy-more-label {
+  margin-top: 12px;
+}
+
+.mcp-deploy-more .btn,
+.mcp-docs-card {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.mcp-docs-cards {
+  display: grid;
+  gap: 6px;
+}
+
+.mcp-docs-card {
+  display: block;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.mcp-docs-card:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.mcp-docs-card strong {
+  display: block;
+  color: var(--text);
+  font-weight: 650;
+}
+
+.mcp-deploy-btn.is-busy {
+  opacity: 0.8;
+}
+
+.mcp-deploy-btn.is-ok {
+  border-color: var(--ok-fg);
+}
+
+.mcp-deploy-btn.is-fail {
+  border-color: #b42318;
+}
+
 .catalog-selected {
   margin-top: 8px;
 }

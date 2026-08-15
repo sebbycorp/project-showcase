@@ -60,8 +60,9 @@ to read on a projector. Normal mode stays 448×600.
 The header gear opens **Settings**. **Hooray** (default on, stored in
 `chrome.storage.local`) plays a short canvas confetti burst after a
 successful Chat **Test**, LLM Chat ping, Failover (when a model
-succeeds), List/call (both steps ok), an MCP or A2A probe that returns
-HTTP 2xx, an API/HTTP probe that finishes as designed, or a Cluster
+succeeds), List/call (both steps ok), an MCP initialize / list / call /
+JWT probe that finishes as designed, an A2A probe that returns HTTP 2xx,
+an API/HTTP probe that finishes as designed, or a Cluster
 **Test connection** success. Turn it off to skip the burst.
 
 ## Load unpacked
@@ -192,8 +193,57 @@ work like the existing builder. No secret values.
 
 ### MCP
 
-- **MCP initialize** — JSON-RPC `initialize` (GET fallback). Default
-  `http://35.226.209.32/mcp`
+The **MCP endpoint** field is shared by every MCP test. It defaults to
+the Chat gateway host + `/mcp` (for example
+`http://35.226.209.32/mcp`).
+
+**One-click deploys** sit above the tests (not only in the YAML
+accordion). Apply uses the Settings cluster (Manual or Omni). If the
+cluster is not connected, buttons say “Connect a cluster in Settings
+first.” Resources use the Settings namespace; virtual-backend service
+hosts that the docs write as `*.default.svc.cluster.local` are rewritten
+to that namespace. Documented `apiVersion`s are preferred; if the live
+cluster already uses `enterpriseagentgateway.solo.io` for backends,
+Apply rewrites `agentgateway.dev` backends to match.
+
+- **Deploy everything server** — exact Deployment+Service from
+  [Virtual MCP](https://docs.solo.io/agentgateway/latest/mcp/virtual/)
+  (`mcp-server-everything`, `node:20-alpine` +
+  `npx @modelcontextprotocol/server-everything streamableHttp`, port
+  3001, `appProtocol: agentgateway.dev/mcp`)
+- **Deploy website fetcher** — exact `mcp-website-fetcher`
+  Deployment+Service (`ghcr.io/peterj/mcp-website-fetcher:main`)
+- **Deploy virtual MCP** — `EnterpriseAgentgatewayBackend` that
+  federates both targets + HTTPRoute `/mcp` to Gateway
+  `agentgateway-proxy` in `agentgateway-system`, with
+  `failureMode: FailOpen`
+- **Deploy OpenAPI-as-MCP** — Petstore + ConfigMap schema + OpenAPI
+  backend + `/mcp` route
+- **Deploy JWT auth** — JWT Strict policy on the Gateway (inline JWKS
+  from the docs; no minted tokens)
+- **Deploy tool access** — CEL RBAC policy from the tool-access guide
+- **Deploy rate limiting** — local rate limit on HTTPRoute `mcp`
+- **Deploy search mode** / **code mode** / **guardrails** — documented
+  backends, routes, and the sample ExtMCP server
+- Docs-only topics (MCP auth, token exchange, MCP Apps, composable,
+  HTTPS, spec compatibility, stateful MCP, code+search mode) are
+  “see docs” cards — no invented CRDs
+
+Each deploy button shows deploying… → OK/fail and lists applied names.
+
+Tests use the same flow diagram, hop labels, and **Open in Solo UI**
+pattern as LLM tests:
+
+- **MCP initialize** — JSON-RPC `initialize` (GET fallback)
+- **List tools** — `tools/list` (session-aware)
+- **Call echo** — `tools/call` `mcp-server-everything-3001_echo` then
+  `echo` with `{message:"Hello world"}`
+- **Call fetch** — `tools/call` `mcp-website-fetcher_fetch` then
+  `fetch` with `{url:"https://example.com"}`
+- **JWT / unauth** — request without a token (expect deny) and with an
+  optional pasted bearer token. No JWT minting; the token is not stored
+- **Tool calling** — initialize + `tools/list` + one `tools/call`;
+  tool names appear in the result drawer
 
 The MCP builder follows
 [Solo MCP docs](https://docs.solo.io/agentgateway/latest/mcp/)

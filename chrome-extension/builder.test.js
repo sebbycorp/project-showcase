@@ -312,4 +312,110 @@ const streaming = AgwBuilder.generateLlmYaml({ preset: "streaming" });
 assert.match(streaming, /No gateway CRD/);
 assert.doesNotMatch(streaming, /kind: EnterpriseAgentgateway/);
 
+const everything = AgwBuilder.generateMcpDeployYaml("everything", {
+  namespace: "agentgateway-system",
+});
+assert.match(everything, /kind: Deployment/);
+assert.match(everything, /name: mcp-server-everything/);
+assert.match(everything, /image: "?node:20-alpine"?/);
+assert.match(everything, /@modelcontextprotocol\/server-everything/);
+assert.match(everything, /streamableHttp/);
+assert.match(everything, /containerPort: 3001/);
+assert.match(everything, /appProtocol: agentgateway.dev\/mcp/);
+assert.match(everything, /namespace: agentgateway-system/);
+
+const fetcher = AgwBuilder.generateMcpDeployYaml("fetcher", {
+  namespace: "demo",
+});
+assert.match(fetcher, /name: mcp-website-fetcher/);
+assert.match(fetcher, /ghcr.io\/peterj\/mcp-website-fetcher:main/);
+assert.match(fetcher, /targetPort: 8000/);
+assert.match(fetcher, /namespace: demo/);
+
+const virtualMcp = AgwBuilder.generateMcpDeployYaml("virtual", {
+  namespace: "agentgateway-system",
+});
+assert.match(virtualMcp, /apiVersion: agentgateway.dev\/v1alpha1/);
+assert.match(virtualMcp, /failureMode: FailOpen/);
+assert.match(virtualMcp, /app: mcp-server-everything/);
+assert.match(
+  virtualMcp,
+  /host: mcp-website-fetcher.agentgateway-system.svc.cluster.local/
+);
+assert.match(virtualMcp, /value: \/mcp/);
+assert.match(virtualMcp, /name: agentgateway-proxy/);
+assert.doesNotMatch(virtualMcp, /\.default\.svc\.cluster\.local/);
+
+const aligned = AgwBuilder.mcpDeployDocs("virtual", {
+  namespace: "agentgateway-system",
+  backendGroup: "enterpriseagentgateway.solo.io",
+});
+assert.strictEqual(
+  aligned[0].apiVersion,
+  "enterpriseagentgateway.solo.io/v1alpha1"
+);
+assert.strictEqual(
+  aligned[1].spec.rules[0].backendRefs[0].group,
+  "enterpriseagentgateway.solo.io"
+);
+
+const openapi = AgwBuilder.generateMcpDeployYaml("openapi", {
+  namespace: "default",
+});
+assert.match(openapi, /name: petstore/);
+assert.match(openapi, /kind: ConfigMap/);
+assert.match(openapi, /name: petstore-schema/);
+assert.match(openapi, /protocol: OpenAPI/);
+assert.match(openapi, /name: openapi-mcp/);
+assert.match(openapi, /findPets/);
+
+const jwt = AgwBuilder.generateMcpDeployYaml("jwt", {
+  namespace: "agentgateway-system",
+});
+assert.match(jwt, /kind: EnterpriseAgentgatewayPolicy/);
+assert.match(jwt, /jwtAuthentication:/);
+assert.match(jwt, /mode: Strict/);
+assert.match(jwt, /issuer: solo.io/);
+
+const toolAccess = AgwBuilder.generateMcpDeployYaml("tool-access", {
+  namespace: "agentgateway-system",
+});
+assert.match(toolAccess, /name: jwt-rbac/);
+assert.match(toolAccess, /github-mcp-backend/);
+assert.match(toolAccess, /mcp\.tool\.name == /);
+assert.match(toolAccess, /get_me/);
+
+const rateLimit = AgwBuilder.generateMcpDeployYaml("rate-limit", {
+  namespace: "agentgateway-system",
+});
+assert.match(rateLimit, /name: mcp-rate-limit/);
+assert.match(rateLimit, /requests: 5/);
+assert.match(rateLimit, /burst: 10/);
+
+const search = AgwBuilder.generateMcpDeployYaml("search-mode", {
+  namespace: "apps",
+});
+assert.match(search, /toolMode: Search/);
+assert.match(search, /value: \/mcp\/search/);
+assert.match(search, /mcp-website-fetcher.apps.svc.cluster.local/);
+
+const code = AgwBuilder.generateMcpDeployYaml("code-mode", {
+  namespace: "default",
+});
+assert.match(code, /toolMode: Code/);
+assert.match(code, /timeout: 7s/);
+assert.match(code, /value: \/mcp\/code/);
+
+const guardrails = AgwBuilder.generateMcpDeployYaml("guardrails", {
+  namespace: "default",
+});
+assert.match(guardrails, /name: ext-mcp-server/);
+assert.match(guardrails, /gcr.io\/solo-public\/docs\/testbox:latest/);
+assert.match(guardrails, /name: mcp-guardrails/);
+assert.match(guardrails, /"tools\/call": Request/);
+
+assert.ok(AgwBuilder.MCP_DEPLOYS.some((item) => item.id === "everything"));
+assert.ok(AgwBuilder.MCP_DEPLOYS.some((item) => item.apply === false));
+assert.strictEqual(AgwBuilder.generateMcpDeployYaml("auth"), "");
+
 console.log("builder.test.js: ok");
