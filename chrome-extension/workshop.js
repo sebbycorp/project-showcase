@@ -1320,6 +1320,52 @@ spec:
         },
       ],
     },
+    {
+      id: "entra-jwt",
+      tab: "api",
+      name: "Entra JWT on LLM",
+      hint: "Strict JWT on /openai-entra from Settings → Identity. No token → 401/403; paste Entra token → 200. Chat stays open.",
+      hops: { gateway: "Entra JWT", target: "401 | provider" },
+      yaml: function entraJwtYaml(ctx) {
+        if (!root.Identity || typeof root.Identity.entraYaml !== "function") {
+          return "";
+        }
+        return root.Identity.entraYaml(ctx || {});
+      },
+      run: "entraJwt",
+      targetKind: "security",
+      fields: [
+        {
+          id: "jwt",
+          label: "Bearer token",
+          type: "password",
+          placeholder: "optional — Entra access token from Settings → Identity",
+        },
+      ],
+    },
+    {
+      id: "keycloak-jwt",
+      tab: "api",
+      name: "Keycloak JWT on LLM",
+      hint: "Strict JWT on /openai-keycloak from Settings → Identity. No token → 401/403; paste Keycloak token → 200. Chat stays open.",
+      hops: { gateway: "Keycloak JWT", target: "401 | provider" },
+      yaml: function keycloakJwtYaml(ctx) {
+        if (!root.Identity || typeof root.Identity.keycloakYaml !== "function") {
+          return "";
+        }
+        return root.Identity.keycloakYaml(ctx || {});
+      },
+      run: "keycloakJwt",
+      targetKind: "security",
+      fields: [
+        {
+          id: "jwt",
+          label: "Bearer token",
+          type: "password",
+          placeholder: "optional — Keycloak access token from Settings → Identity",
+        },
+      ],
+    },
   ];
 
   root.WORKSHOP_DEMOS = WORKSHOP_DEMOS;
