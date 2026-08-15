@@ -242,6 +242,33 @@ Apply rewrites `agentgateway.dev` backends to match.
 
 Each deploy button shows deploying… → OK/fail and lists applied names.
 
+The three Virtual MCP examples (everything server, website fetcher,
+virtual MCP / HTTPRoute) also show a live **running status** chip and a
+**Run test** that proves the MCP path. After Deploy, and when the MCP
+tab opens with a connected cluster, the popup GETs the
+Deployment / Service / HTTPRoute / Backend with the existing kube
+helpers (it does not block the popup). The chip is **Running**,
+**Pending**, **Missing**, or **Error** — Deployments use ready vs
+desired replicas; HTTPRoute uses Accepted / Programmed when those
+conditions are present. After Deploy the chip polls for about 45s
+until Running or timeout. If the cluster is **Not connected**, the
+chip says that; **Run test** still talks to the saved MCP URL in case
+the servers were deployed elsewhere.
+
+- **Deploy everything server** — **Run test** is `tools/call` echo
+  (`Hello world`)
+- **Deploy website fetcher** — **Run test** is `tools/call` fetch
+  (`https://example.com`)
+- **Deploy virtual MCP** — **Run test** is JSON-RPC `initialize` on
+  the Chat gateway host + `/mcp` (or the saved MCP endpoint). **Run
+  all** runs initialize → `tools/list` → echo and stops on the first
+  fail, animating the Agent → Agentgateway → MCP diagram
+
+Each Run opens a result drawer with latency and **OK** / **Fail**,
+same as the LLM tests. `tools/list` shows tool names (echo / add /
+fetch, possibly prefixed). Calls use real MCP JSON-RPC over
+streamable HTTP — no invented tools.
+
 Tests use the same flow diagram, hop labels, and **Open in Solo UI**
 pattern as LLM tests:
 

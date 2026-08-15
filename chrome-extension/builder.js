@@ -422,6 +422,7 @@
       label: "Deploy everything server",
       blurb: "mcp-server-everything (npx @modelcontextprotocol/server-everything streamableHttp, port 3001).",
       docs: "https://docs.solo.io/agentgateway/latest/mcp/virtual/",
+      run: "echo",
     },
     {
       id: "fetcher",
@@ -429,6 +430,7 @@
       label: "Deploy website fetcher",
       blurb: "mcp-website-fetcher (ghcr.io/peterj/mcp-website-fetcher:main).",
       docs: "https://docs.solo.io/agentgateway/latest/mcp/virtual/",
+      run: "fetch",
     },
     {
       id: "virtual",
@@ -436,6 +438,8 @@
       label: "Deploy virtual MCP",
       blurb: "Federate both targets + HTTPRoute /mcp. failureMode: FailOpen.",
       docs: "https://docs.solo.io/agentgateway/latest/mcp/virtual/",
+      run: "initialize",
+      runAll: true,
     },
     {
       id: "openapi",
@@ -2260,6 +2264,122 @@
     return joinDocs(docs, `# Docs: ${recipe.docs}\n`);
   }
 
+  const MCP_STATUS_DEPLOYS = ["everything", "fetcher", "virtual"];
+  const MCP_STATUS_RANK = {
+    Error: 0,
+    Missing: 1,
+    Pending: 2,
+    Running: 3,
+  };
+
+  function conditionStatus(conditions, type) {
+    if (!Array.isArray(conditions)) {
+      return null;
+    }
+    const found = conditions.find((item) => item && item.type === type);
+    return found ? String(found.status || "") : null;
+  }
+
+  function parentConditions(resource) {
+    const parents = resource && resource.status && resource.status.parents;
+    if (!Array.isArray(parents)) {
+      return [];
+    }
+    return parents.flatMap((parent) =>
+      parent && Array.isArray(parent.conditions) ? parent.conditions : []
+    );
+  }
+
+  function resourceConditions(resource) {
+    const fromParents = parentConditions(resource);
+    if (fromParents.length) {
+      return fromParents;
+    }
+    const status = resource && resource.status;
+    return (status && Array.isArray(status.conditions) && status.conditions) || [];
+  }
+
+  function mcpResourceState(kind, getResult) {
+    if (getResult && getResult.error) {
+      return { state: "Error", detail: String(getResult.error) };
+    }
+    const status = getResult && getResult.status;
+    if (status == null) {
+      return { state: "Error", detail: "no response" };
+    }
+    if (status === 404) {
+      return { state: "Missing", detail: `${kind} not found` };
+    }
+    if (status >= 400) {
+      return { state: "Error", detail: `HTTP ${status}` };
+    }
+    const resource = (getResult && getResult.payload) || {};
+    if (kind === "Deployment") {
+      const desired =
+        (resource.spec && resource.spec.replicas) != null
+          ? resource.spec.replicas
+          : resource.status && resource.status.replicas != null
+            ? resource.status.replicas
+            : 1;
+      const ready =
+        resource.status && resource.status.readyReplicas != null
+          ? resource.status.readyReplicas
+          : 0;
+      const detail = `${ready}/${desired} ready`;
+      if (desired > 0 && ready >= desired) {
+        return { state: "Running", detail };
+      }
+      return { state: "Pending", detail };
+    }
+    if (kind === "HTTPRoute") {
+      const conditions = resourceConditions(resource);
+      const accepted = conditionStatus(conditions, "Accepted");
+      const programmed = conditionStatus(conditions, "Programmed");
+      const parts = [];
+      if (accepted != null) {
+        parts.push(`Accepted=${accepted}`);
+      }
+      if (programmed != null) {
+        parts.push(`Programmed=${programmed}`);
+      }
+      if (accepted === "False" || programmed === "False") {
+        return { state: "Pending", detail: parts.join(" ") || "not accepted" };
+      }
+      if (accepted === "True" && (programmed == null || programmed === "True")) {
+        return { state: "Running", detail: parts.join(" ") || "Accepted" };
+      }
+      return { state: "Pending", detail: parts.join(" ") || "no parent conditions" };
+    }
+    const conditions = resourceConditions(resource);
+    const ready =
+      conditionStatus(conditions, "Accepted") ||
+      conditionStatus(conditions, "Ready") ||
+      conditionStatus(conditions, "Programmed");
+    if (ready === "False") {
+      return { state: "Pending", detail: `${kind} not ready` };
+    }
+    return { state: "Running", detail: kind };
+  }
+
+  function mcpRollupState(parts) {
+    const listed = Array.isArray(parts) ? parts : [];
+    if (!listed.length) {
+      return { state: "Missing", detail: "no resources", parts: listed };
+    }
+    let worst = listed[0];
+    for (const part of listed) {
+      const rank = MCP_STATUS_RANK[part.state];
+      const worstRank = MCP_STATUS_RANK[worst.state];
+      if (rank != null && (worstRank == null || rank < worstRank)) {
+        worst = part;
+      }
+    }
+    const detail = listed
+      .map((part) => `${part.kind}/${part.name}: ${part.detail || part.state}`)
+      .join(" · ");
+    return { state: worst.state, detail, parts: listed };
+  }
+
   function llmDefaults(provider) {
     const spec = LLM_DEFAULTS[provider] || LLM_DEFAULTS.openai;
     const fallbackProvider = provider === "openai" ? "claude" : "openai";
@@ -2579,6 +2699,9 @@
     mcpDeployRecipe,
     mcpDeployDocs,
     generateMcpDeployYaml,
+    MCP_STATUS_DEPLOYS,
+    mcpResourceState,
+    mcpRollupState,
     alignAgwGroup,
     isFailoverPreset,
     normalizeFailoverPreset,
