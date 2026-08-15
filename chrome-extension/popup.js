@@ -94,6 +94,11 @@ const STORAGE_KEYS = [
   "hooray",
   "soloUi",
   "demoStage",
+  "settingsFocus",
+  "llmDeployOpen",
+  "mcpDeployOpen",
+  "a2aDeployOpen",
+  "apiDeployOpen",
 ];
 const PROVIDERS = {
   openai: {
@@ -479,12 +484,18 @@ const els = {
   hooray: document.getElementById("hooray"),
   demoStage: document.getElementById("demo-stage"),
   demoToggle: document.getElementById("demo-toggle"),
+  clusterChip: document.getElementById("cluster-chip"),
+  clusterChipLabel: document.getElementById("cluster-chip-label"),
+  clusterChipHint: document.getElementById("cluster-chip-hint"),
+  clusterPanel: document.getElementById("cluster-panel"),
   confetti: document.getElementById("confetti"),
 };
 
 let hoorayOn = true;
 let demoStageOn = false;
 let clusterConnected = false;
+let settingsFocus = "";
+let clusterProbeToken = 0;
 
 function seqStepMs() {
   return demoStageOn ? 840 : 560;
@@ -508,6 +519,92 @@ function setDemoStage(on, persistIt = false) {
   if (persistIt) {
     persist({ demoStage: demoStageOn });
   }
+}
+
+function clusterHintLabel() {
+  const settings = currentClusterSettings();
+  if (settings.clusterSource === "omni") {
+    const name =
+      settings.omniContext ||
+      (els.clusterContext && els.clusterContext.value) ||
+      "";
+    if (name) {
+      return name;
+    }
+  }
+  const server = settings.clusterApiServer;
+  if (!server) {
+    return "";
+  }
+  try {
+    return new URL(server).host;
+  } catch {
+    return "";
+  }
+}
+
+function setClusterChip(state) {
+  const chip = els.clusterChip;
+  if (!chip) {
+    return;
+  }
+  const label =
+    state === "checking"
+      ? "Checking"
+      : state === "connected"
+        ? "Connected"
+        : "Not connected";
+  const hint = clusterHintLabel();
+  chip.classList.toggle("is-checking", state === "checking");
+  chip.classList.toggle("is-connected", state === "connected");
+  chip.classList.toggle("is-disconnected", state === "disconnected");
+  if (els.clusterChipLabel) {
+    els.clusterChipLabel.textContent = label;
+  }
+  if (els.clusterChipHint) {
+    els.clusterChipHint.textContent = hint;
+    els.clusterChipHint.hidden = !hint;
+  }
+  chip.title = hint
+    ? `${label} — ${hint}. Open Settings → Cluster.`
+    : `${label}. Open Settings → Cluster.`;
+}
+
+function scrollToCluster() {
+  const panel = els.clusterPanel;
+  if (!panel) {
+    return;
+  }
+  requestAnimationFrame(() => {
+    panel.scrollIntoView({ block: "start" });
+  });
+}
+
+function openClusterSettings() {
+  settingsFocus = "cluster";
+  switchArea("settings");
+  persist({ settingsFocus: "cluster" });
+  scrollToCluster();
+}
+
+function restoreDeployViews(stored) {
+  document.querySelectorAll("details.deploy[data-deploy-key]").forEach((node) => {
+    const key = node.dataset.deployKey;
+    if (key && stored[key] === true) {
+      node.open = true;
+    }
+  });
+}
+
+function bindDeployViews() {
+  document.querySelectorAll("details.deploy[data-deploy-key]").forEach((node) => {
+    node.addEventListener("toggle", () => {
+      const key = node.dataset.deployKey;
+      if (key) {
+        persist({ [key]: node.open });
+      }
+    });
+  });
 }
 
 function celebrate() {
@@ -2026,6 +2123,8 @@ async function loadSettings() {
   hoorayOn = stored.hooray !== false;
   els.hooray.checked = hoorayOn;
   setDemoStage(stored.demoStage === true);
+  settingsFocus = stored.settingsFocus === "cluster" ? "cluster" : "";
+  restoreDeployViews(stored);
   const area = normalizeArea(stored.area, stored.scenario);
   setArea(area);
   if (area !== stored.area) {
@@ -2033,16 +2132,24 @@ async function loadSettings() {
   }
   updateEndpointHints();
   updateDeployHints();
+  setClusterChip(clusterConnected ? "connected" : "disconnected");
+  if (area === "settings" && settingsFocus === "cluster") {
+    scrollToCluster();
+  }
   if (
     clusterIsReady() &&
     (area === "llm" || area === "mcp" || area === "settings")
   ) {
     refreshInventory(area === "settings" ? "cluster" : area);
   }
+  probeClusterConnection({ interactive: false });
 }
 
 function switchArea(area) {
   setArea(area);
+  if (area !== "settings") {
+    settingsFocus = "";
+  }
   if (area !== "chat" && area !== "settings") {
     updateEndpointHints();
     updateDeployHints();
@@ -2054,7 +2161,7 @@ function switchArea(area) {
       refreshInventory(area === "settings" ? "cluster" : area);
     }
   }
-  persist({ area });
+  persist({ area, settingsFocus });
 }
 
 els.tabChat.addEventListener("click", () => {
@@ -2078,8 +2185,15 @@ els.tabApi.addEventListener("click", () => {
 });
 
 els.tabSettings.addEventListener("click", () => {
+  settingsFocus = "";
   switchArea("settings");
 });
+
+if (els.clusterChip) {
+  els.clusterChip.addEventListener("click", () => {
+    openClusterSettings();
+  });
+}
 
 els.hooray.addEventListener("change", () => {
   hoorayOn = els.hooray.checked;
@@ -4213,6 +4327,11 @@ function updateDeployHints() {
     showInventoryDisconnected(els.mcpInventory);
     showInventoryDisconnected(els.clusterInventory);
   }
+  if (els.clusterChip && els.clusterChip.classList.contains("is-checking")) {
+    setClusterChip("checking");
+  } else {
+    setClusterChip(clusterConnected ? "connected" : "disconnected");
+  }
 }
 
 async function applyYamlDocuments(yaml, resultEl, applyBtn, onDone) {
@@ -5143,24 +5262,36 @@ els.parseKubeconfig.addEventListener("click", async () => {
   updateDeployHints();
 });
 
-els.testCluster.addEventListener("click", async () => {
-  const settings = await saveClusterSettings();
+async function probeClusterConnection({ interactive = false } = {}) {
+  const token = ++clusterProbeToken;
+  const settings = interactive
+    ? await saveClusterSettings()
+    : currentClusterSettings();
   const targetError = clusterTargetError(settings);
   if (targetError) {
-    showBox(els.clusterTestResult, {
-      status: null,
-      latencyMs: 0,
-      body: targetError,
-      isError: true,
-    });
+    if (token !== clusterProbeToken) {
+      return false;
+    }
     clusterConnected = false;
     await persist({ clusterConnected: false });
+    setClusterChip("disconnected");
+    if (interactive) {
+      showBox(els.clusterTestResult, {
+        status: null,
+        latencyMs: 0,
+        body: targetError,
+        isError: true,
+      });
+    }
     updateDeployHints();
-    return;
+    return false;
   }
 
-  els.testCluster.disabled = true;
-  showPending(els.clusterTestResult, "Testing…");
+  setClusterChip("checking");
+  if (interactive && els.testCluster) {
+    els.testCluster.disabled = true;
+    showPending(els.clusterTestResult, "Testing…");
+  }
 
   const headers = k8sHeaders(settings.clusterToken);
   let result = await timedFetch(k8sUrl(settings.clusterApiServer, "/version"), {
@@ -5180,6 +5311,10 @@ els.testCluster.addEventListener("click", async () => {
     }
   }
 
+  if (token !== clusterProbeToken) {
+    return false;
+  }
+
   const ok = !result.error && result.response && result.response.ok;
   let body = k8sStatusMessage(result);
   if (ok && probe === "/version" && result.payload) {
@@ -5193,20 +5328,30 @@ els.testCluster.addEventListener("click", async () => {
     body = "Connected via GET /apis/gateway.networking.k8s.io/v1.";
   }
 
-  showBox(els.clusterTestResult, {
-    status: result.status,
-    latencyMs: result.latencyMs,
-    body,
-    isError: !ok,
-  });
   clusterConnected = ok;
   await persist({ clusterConnected: ok });
+  setClusterChip(ok ? "connected" : "disconnected");
+  if (interactive || (els.clusterTestResult && !els.clusterTestResult.hidden)) {
+    showBox(els.clusterTestResult, {
+      status: result.status,
+      latencyMs: result.latencyMs,
+      body,
+      isError: !ok,
+    });
+  }
   updateDeployHints();
-  if (ok) {
+  if (interactive && ok) {
     celebrate();
     refreshInventory("cluster");
   }
-  els.testCluster.disabled = false;
+  if (interactive && els.testCluster) {
+    els.testCluster.disabled = false;
+  }
+  return ok;
+}
+
+els.testCluster.addEventListener("click", () => {
+  return probeClusterConnection({ interactive: true });
 });
 
 els.listCrds.addEventListener("click", () => {
@@ -5468,4 +5613,5 @@ els.applyCrds.addEventListener("click", async () => {
   refreshInventory("cluster");
 });
 
+bindDeployViews();
 loadSettings();

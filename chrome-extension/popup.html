@@ -22,6 +22,19 @@
         <div class="header-actions">
           <button
             type="button"
+            id="cluster-chip"
+            class="cluster-chip is-disconnected"
+            aria-live="polite"
+            title="Cluster connection — open Settings"
+          >
+            <span class="cluster-chip-dot" aria-hidden="true"></span>
+            <span class="cluster-chip-copy">
+              <span id="cluster-chip-label">Not connected</span>
+              <span id="cluster-chip-hint" class="cluster-chip-hint" hidden></span>
+            </span>
+          </button>
+          <button
+            type="button"
             id="demo-toggle"
             class="demo-btn"
             aria-pressed="false"
@@ -360,7 +373,7 @@
           ></div>
         </article>
 
-        <details class="deploy">
+        <details class="deploy" id="llm-deploy" data-deploy-key="llmDeployOpen">
           <summary>Build &amp; apply config</summary>
           <div class="deploy-body">
             <p class="hint" data-deploy-hint></p>
@@ -1210,7 +1223,7 @@
           ></div>
         </article>
 
-        <details class="deploy">
+        <details class="deploy" id="mcp-deploy" data-deploy-key="mcpDeployOpen">
           <summary>Build &amp; apply config</summary>
           <div class="deploy-body">
             <p class="hint" data-deploy-hint></p>
@@ -1424,7 +1437,7 @@
           <div id="result-a2a" class="test-drawer" hidden aria-live="polite"></div>
         </article>
 
-        <details class="deploy">
+        <details class="deploy" id="a2a-deploy" data-deploy-key="a2aDeployOpen">
           <summary>Deploy config</summary>
           <div class="deploy-body">
             <p class="hint" data-deploy-hint></p>
@@ -1617,7 +1630,7 @@
           <div id="result-junk" class="test-drawer" hidden aria-live="polite"></div>
         </article>
 
-        <details class="deploy">
+        <details class="deploy" id="api-deploy" data-deploy-key="apiDeployOpen">
           <summary>Deploy config</summary>
           <div class="deploy-body">
             <p class="hint" data-deploy-hint></p>
@@ -1675,7 +1688,7 @@
         </label>
       </div>
 
-      <div class="panel cluster-panel">
+      <div class="panel cluster-panel" id="cluster-panel">
         <h2 class="cluster-heading">Cluster</h2>
         <p class="hint">
           API server, token, and Apply for Gateway / Agentgateway CRDs. Used by

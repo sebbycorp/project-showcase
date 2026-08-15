@@ -55,7 +55,18 @@ estimate.
 The header **Demo** control (also a Settings toggle, persisted in
 `chrome.storage.local`, default **off**) grows the popup to 480×640,
 enlarges test tiles, slows the arrows, and makes hop labels easier
-to read on a projector. Normal mode stays 448×600.
+to read on a projector. Normal mode stays 448×600. The last top-level
+tab (Chat / LLM / MCP / A2A / API/HTTP / Settings) and builder
+accordions (LLM/MCP catalog vs tests, A2A/API deploy) are also saved
+in `chrome.storage.local`, so reopening the popup lands where you left
+off.
+
+A compact **cluster chip** sits next to Demo/gear: **Checking**,
+**Connected**, or **Not connected**, plus a short host or cluster-name
+hint (never a token). On open, the popup re-runs the existing Test
+connection (`GET /version`, fallback Gateway API) against saved Manual
+or Omni settings without blocking the UI. Click the chip to jump to
+Settings → Cluster.
 
 The header gear opens **Settings**. **Hooray** (default on, stored in
 `chrome.storage.local`) plays a short canvas confetti burst after a
@@ -296,7 +307,8 @@ The gear in the header opens **Settings**.
   kubeconfig parse with a context picker, Test connection, a short
   **Resources** list (Gateway / Backend / HTTPRoute / Policy / Model /
   RateLimit / Budget), and freeform Apply YAML. LLM and MCP builders use
-  whatever cluster is connected.
+  whatever cluster is connected. The header chip shows the same
+  connection state and re-checks it when the popup opens.
 
 ## Cluster
 
