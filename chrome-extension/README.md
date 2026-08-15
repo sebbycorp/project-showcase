@@ -242,10 +242,11 @@ The gear in the header opens **Settings**.
 - **Hooray** — “Confetti on a successful test.” Persisted in
   `chrome.storage.local`; default **on**. One ~1s canvas burst, not a
   loop. Honors `prefers-reduced-motion`.
-- **Cluster** — API server, token, namespace, kubeconfig parse, Test
-  connection, a short **Resources** list (Gateway / Backend / HTTPRoute /
-  Policy / Model / RateLimit / Budget), and freeform Apply YAML. LLM and
-  MCP builders use these fields.
+- **Cluster** — source (Manual or Omni), API server, token, namespace,
+  kubeconfig parse with a context picker, Test connection, a short
+  **Resources** list (Gateway / Backend / HTTPRoute / Policy / Model /
+  RateLimit / Budget), and freeform Apply YAML. LLM and MCP builders use
+  whatever cluster is connected.
 
 ## Cluster
 
@@ -253,20 +254,30 @@ Cluster is in **Settings**, not a top-level tab. Connect to a Kubernetes
 API and apply Agentgateway CRDs. Manifest V3 `host_permissions` let the
 extension `fetch` the API server directly (browser CORS does not apply).
 Settings are stored only in `chrome.storage.local` — never `sync`.
-Tokens are not logged.
+Tokens and `OMNI_SERVICE_ACCOUNT_KEY` are not logged.
 
 ### Tokens and exec plugins
 
 Chrome **cannot** run kubeconfig exec plugins. That includes
-`gke-gcloud-auth-plugin`, `kubelogin` / Azure exec, and
-`aws eks get-token`. Pasting an exec-only kubeconfig is not enough. You must
-paste a bearer token from the matching command (or a service-account token).
+`gke-gcloud-auth-plugin`, `kubelogin` / Azure exec,
+`aws eks get-token`, and Omni’s `kubectl oidc-login` human kubeconfigs.
+Pasting an exec-only kubeconfig is not enough. You must paste a bearer
+token from the matching command, or a **token kubeconfig** (service
+account).
 
 Client-certificate kubeconfigs are also unsupported. Chrome will reject
 untrusted or self-signed API server CAs (common with kind / minikube /
 k3d) unless the CA is trusted by the OS/browser.
 
-### Cluster type
+### Source
+
+**Source** is **Manual** or **Omni**. Apply and inventory on the LLM and
+MCP tabs keep using the connected API server + bearer token either way.
+
+#### Manual
+
+Same fields as before: cluster type, API server, token, namespace, and
+optional kubeconfig parse.
 
 The help text under **Cluster type** changes with the selection:
 
@@ -280,15 +291,55 @@ The help text under **Cluster type** changes with the selection:
 - **Local** — API server + token (for example `kubectl create token`).
   Chrome rejects self-signed CAs.
 
+#### Omni (Sidero Labs)
+
+Omni’s management API is **gRPC**. There is no documented HTTP API the
+extension can `fetch()` to list clusters, so the popup does **not**
+invent a REST list. Connect with a token kubeconfig instead.
+
+1. In a terminal (not Chrome), generate a service-account kubeconfig:
+
+   ```bash
+   omnictl kubeconfig --service-account --cluster <name> --user <username> ./omni.kubeconfig
+   ```
+
+   A token-based kubeconfig downloaded from Omni also works. The
+   `cluster.server` value is Omni’s Kubernetes proxy URL for that
+   cluster.
+
+2. In Settings → Cluster, set **Source** to **Omni**.
+3. Confirm **Omni URL** (default
+   `https://maniak.na-west-1.omni.siderolabs.io`). Last-used URL is
+   persisted.
+4. Optionally paste `OMNI_SERVICE_ACCOUNT_KEY` (password field, stored
+   in `chrome.storage.local` only). This key authenticates to Omni’s
+   gRPC API, not to Kubernetes, so the extension cannot use it to list
+   clusters from the browser.
+5. Paste the kubeconfig. If it has multiple contexts or clusters, pick
+   one from **Context / cluster**. The last-used context is persisted.
+6. **Parse kubeconfig** (or changing the textarea / context) fills
+   `cluster.server` and `user.token` (or a token from `auth-provider`).
+7. **Test connection** runs the same Kubernetes `GET /version` (fallback
+   `GET /apis/gateway.networking.k8s.io/v1`) as Manual.
+
+A human Omni kubeconfig from `omnictl kubeconfig` (without
+`--service-account`) or **Download kubeconfig** in the Omni UI uses
+`exec` / `oidc-login`. Chrome cannot run `omnictl` or that plugin. The
+popup shows:
+
+> Need a token kubeconfig (omnictl kubeconfig --service-account). Chrome cannot run omnictl.
+
 ### Connection fields
 
-- **API server URL**
-- **Bearer token** (password field)
+- **API server URL** (Manual; Omni fills this from the selected context)
+- **Bearer token** (Manual password field; Omni fills this from the
+  kubeconfig and does not display it)
 - **Namespace** (default `agentgateway-system`)
-- **Kubeconfig YAML** (optional) — **Parse kubeconfig** reads
-  `current-context`, then fills `cluster.server` and `user.token` when
-  present. If the user block is exec-only, the popup tells you to paste a
-  token.
+- **Kubeconfig YAML** — parsed with the bundled `yaml.js` subset.
+  **Parse kubeconfig** (and Omni paste / context change) reads
+  contexts, then fills `cluster.server` and `user.token` or an
+  `auth-provider` token. Multiple contexts show a picker. Exec-only or
+  client-cert users need a token kubeconfig.
 
 **Test connection** GETs `/version`, and falls back to
 `GET /apis/gateway.networking.k8s.io/v1`. Status, latency, and the

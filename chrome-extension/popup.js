@@ -4,6 +4,7 @@ const DEFAULT_FALLBACK_MODEL = "gpt-4o";
 const DEFAULT_MCP_ENDPOINT = "http://35.226.209.32/mcp";
 const DEFAULT_A2A_ENDPOINT = "http://35.226.209.32/.well-known/agent-card.json";
 const DEFAULT_CLUSTER_NAMESPACE = "agentgateway-system";
+const DEFAULT_OMNI_URL = "https://maniak.na-west-1.omni.siderolabs.io";
 const DEFAULT_SOLO_UI = "http://35.225.111.45/age/";
 const CHAT_PATH = "/v1/chat/completions";
 const TEST_MESSAGE = { role: "user", content: "Reply with the word pong." };
@@ -79,10 +80,14 @@ const STORAGE_KEYS = [
   "securityYaml",
   "apiYaml",
   "clusterType",
+  "clusterSource",
   "clusterApiServer",
   "clusterToken",
   "clusterNamespace",
   "clusterKubeconfig",
+  "omniUrl",
+  "omniServiceAccountKey",
+  "omniContext",
   "clusterConnected",
   "clusterKind",
   "clusterManifest",
@@ -160,6 +165,12 @@ const CLUSTER_HELP = {
   eks: "API server from aws eks describe-cluster. Token from aws eks get-token --cluster-name …. Chrome cannot run the AWS exec plugin.",
   local:
     "API server + bearer token (for example kubectl create token). Chrome rejects self-signed CAs, so kind/minikube often fail unless the CA is trusted.",
+};
+const CLUSTER_SOURCE_HELP = {
+  manual:
+    "API server + bearer token. Chrome cannot run kubeconfig exec plugins.",
+  omni:
+    "Paste a service-account kubeconfig from omnictl. Human/OIDC kubeconfigs use exec and will not work in Chrome.",
 };
 const K8S_KINDS = {
   Gateway: {
@@ -398,12 +409,21 @@ const els = {
   seqHttp: document.getElementById("seq-http"),
   seqUnauth: document.getElementById("seq-unauth"),
   seqJunk: document.getElementById("seq-junk"),
+  clusterSource: document.getElementById("cluster-source"),
+  clusterSourceHelp: document.getElementById("cluster-source-help"),
+  clusterManualFields: document.getElementById("cluster-manual-fields"),
+  clusterOmniFields: document.getElementById("cluster-omni-fields"),
   clusterType: document.getElementById("cluster-type"),
   clusterHelp: document.getElementById("cluster-help"),
   clusterApiServer: document.getElementById("cluster-api-server"),
   clusterToken: document.getElementById("cluster-token"),
+  omniUrl: document.getElementById("omni-url"),
+  omniSaKey: document.getElementById("omni-sa-key"),
   clusterNamespace: document.getElementById("cluster-namespace"),
   clusterKubeconfig: document.getElementById("cluster-kubeconfig"),
+  clusterKubeconfigLabel: document.getElementById("cluster-kubeconfig-label"),
+  clusterContext: document.getElementById("cluster-context"),
+  clusterContextLabel: document.getElementById("cluster-context-label"),
   parseKubeconfig: document.getElementById("parse-kubeconfig"),
   kubeconfigResult: document.getElementById("kubeconfig-result"),
   testCluster: document.getElementById("test-cluster"),
@@ -1899,20 +1919,35 @@ async function loadSettings() {
       ? stored.httpMethod
       : "GET";
   els.httpUrl.value = stored.httpUrl || stored.endpoint || DEFAULT_ENDPOINT;
+  els.clusterSource.value =
+    stored.clusterSource === "omni" ? "omni" : "manual";
   els.clusterType.value = CLUSTER_HELP[stored.clusterType]
     ? stored.clusterType
     : "gke";
   els.clusterApiServer.value = stored.clusterApiServer || "";
   els.clusterToken.value = stored.clusterToken || "";
+  els.omniUrl.value = stored.omniUrl || DEFAULT_OMNI_URL;
+  els.omniSaKey.value = stored.omniServiceAccountKey || "";
   els.clusterNamespace.value =
     stored.clusterNamespace || DEFAULT_CLUSTER_NAMESPACE;
   els.clusterKubeconfig.value = stored.clusterKubeconfig || "";
+  els.clusterContext.dataset.preferred = stored.omniContext || "";
   els.crdKind.value = K8S_KINDS[stored.clusterKind]
     ? stored.clusterKind
     : "Gateway";
   els.crdYaml.value = stored.clusterManifest || EXAMPLE_MANIFEST;
   loadDeployExamples(stored);
   updateClusterHelp();
+  updateClusterSourceUi();
+  if (els.clusterKubeconfig.value.trim()) {
+    try {
+      const parsed = Kubeconfig.parse(els.clusterKubeconfig.value);
+      const selected = Kubeconfig.pickContext(parsed, stored.omniContext || "");
+      fillContextOptions(parsed, selected);
+    } catch {
+      fillContextOptions({ contexts: [] }, "");
+    }
+  }
   clusterConnected = Boolean(stored.clusterConnected);
   if (clusterConnected) {
     els.clusterTestResult.hidden = false;
@@ -2444,7 +2479,7 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.9.4" },
+      clientInfo: { name: "agentgateway-extension", version: "0.9.5" },
     },
   };
 
@@ -2692,23 +2727,171 @@ els.runHttp.addEventListener("click", async () => {
   els.runHttp.disabled = false;
 });
 
+function currentClusterSource() {
+  return els.clusterSource.value === "omni" ? "omni" : "manual";
+}
+
 function updateClusterHelp() {
   const type = CLUSTER_HELP[els.clusterType.value] ? els.clusterType.value : "gke";
   els.clusterType.value = type;
   els.clusterHelp.textContent = CLUSTER_HELP[type];
 }
 
+function updateClusterSourceUi() {
+  const source = currentClusterSource();
+  const isOmni = source === "omni";
+  els.clusterSource.value = source;
+  els.clusterSourceHelp.textContent = CLUSTER_SOURCE_HELP[source];
+  els.clusterManualFields.hidden = isOmni;
+  els.clusterOmniFields.hidden = !isOmni;
+  if (!els.omniUrl.value.trim()) {
+    els.omniUrl.value = DEFAULT_OMNI_URL;
+  }
+  els.clusterKubeconfigLabel.textContent = isOmni
+    ? "Omni kubeconfig"
+    : "Kubeconfig YAML (optional)";
+  els.clusterKubeconfig.placeholder = isOmni
+    ? "Paste omnictl kubeconfig --service-account output"
+    : "Paste kubeconfig to fill server and token";
+  updateContextVisibility();
+}
+
+function updateContextVisibility() {
+  const hasOptions = els.clusterContext.options.length > 0;
+  const show =
+    hasOptions &&
+    (currentClusterSource() === "omni" || els.clusterContext.options.length > 1);
+  els.clusterContext.hidden = !show;
+  els.clusterContextLabel.hidden = !show;
+}
+
+function fillContextOptions(parsed, selected) {
+  els.clusterContext.replaceChildren();
+  for (const entry of parsed.contexts) {
+    const option = document.createElement("option");
+    option.value = entry.context;
+    option.textContent = entry.cluster
+      ? `${entry.context} · ${entry.cluster}`
+      : entry.context;
+    els.clusterContext.append(option);
+  }
+  if (selected && parsed.contexts.some((item) => item.context === selected)) {
+    els.clusterContext.value = selected;
+  }
+  updateContextVisibility();
+}
+
+function applyContextEntry(entry) {
+  if (entry.server) {
+    els.clusterApiServer.value = normalizeApiServer(entry.server);
+  }
+  if (entry.token) {
+    els.clusterToken.value = entry.token;
+  } else if (currentClusterSource() === "omni") {
+    els.clusterToken.value = "";
+  }
+  if (entry.namespace) {
+    els.clusterNamespace.value = entry.namespace;
+  }
+  els.clusterContext.dataset.preferred = entry.context || "";
+}
+
+function kubeconfigParseMessage(entry, source) {
+  const lines = [];
+  if (!entry) {
+    lines.push("Select a context / cluster.");
+    return { body: lines.join(" "), isError: true };
+  }
+  lines.push(`Parsed context ${entry.context}.`);
+  if (entry.server) {
+    lines.push("API server filled from the selected cluster.");
+  } else {
+    lines.push("No cluster.server found for this context.");
+  }
+  const authError = Kubeconfig.authError(entry, source);
+  if (entry.token) {
+    lines.push(
+      entry.authProvider
+        ? "Bearer token filled from the auth-provider."
+        : "Bearer token filled from the user block."
+    );
+  } else if (authError) {
+    lines.push(authError);
+  }
+  return { body: lines.join(" "), isError: !entry.token };
+}
+
+function applyKubeconfigText(text, preferredContext, options = {}) {
+  const persistSettings = options.persistSettings !== false;
+  const quiet = options.quiet === true;
+  const source = currentClusterSource();
+  try {
+    const parsed = Kubeconfig.parse(text);
+    const selected = Kubeconfig.pickContext(
+      parsed,
+      preferredContext || els.clusterContext.dataset.preferred || ""
+    );
+    fillContextOptions(parsed, selected);
+    if (!selected) {
+      if (!quiet) {
+        showBox(els.kubeconfigResult, {
+          status: null,
+          latencyMs: 0,
+          body: "Multiple contexts found. Choose one from Context / cluster.",
+          isError: true,
+        });
+      }
+      return null;
+    }
+    const entry = Kubeconfig.contextEntry(parsed, selected);
+    applyContextEntry(entry);
+    if (persistSettings) {
+      saveClusterSettings({ omniContext: selected });
+    }
+    if (!quiet) {
+      const message = kubeconfigParseMessage(entry, source);
+      showBox(els.kubeconfigResult, {
+        status: entry.token ? 200 : null,
+        latencyMs: 0,
+        body: message.body,
+        isError: message.isError,
+      });
+    }
+    return entry;
+  } catch (error) {
+    fillContextOptions({ contexts: [] }, "");
+    if (!quiet) {
+      showBox(els.kubeconfigResult, {
+        status: null,
+        latencyMs: 0,
+        body: error.message || String(error),
+        isError: true,
+      });
+    }
+    return null;
+  }
+}
+
 function normalizeApiServer(raw) {
   return (raw || "").trim().replace(/\/+$/, "");
 }
 
+function normalizeOmniUrl(raw) {
+  return (raw || "").trim().replace(/\/+$/, "") || DEFAULT_OMNI_URL;
+}
+
 function currentClusterSettings() {
   return {
+    clusterSource: currentClusterSource(),
     clusterType: CLUSTER_HELP[els.clusterType.value]
       ? els.clusterType.value
       : "gke",
     clusterApiServer: normalizeApiServer(els.clusterApiServer.value),
     clusterToken: (els.clusterToken.value || "").trim(),
+    omniUrl: normalizeOmniUrl(els.omniUrl.value),
+    omniServiceAccountKey: (els.omniSaKey.value || "").trim(),
+    omniContext:
+      els.clusterContext.value || els.clusterContext.dataset.preferred || "",
     clusterNamespace:
       (els.clusterNamespace.value || "").trim() || DEFAULT_CLUSTER_NAMESPACE,
     clusterKubeconfig: els.clusterKubeconfig.value,
@@ -3580,6 +3763,7 @@ async function saveClusterSettings(extra = {}) {
   const settings = currentClusterSettings();
   els.clusterApiServer.value = settings.clusterApiServer;
   els.clusterNamespace.value = settings.clusterNamespace;
+  els.omniUrl.value = settings.omniUrl;
   await persist({ ...settings, ...extra });
   return settings;
 }
@@ -3691,51 +3875,6 @@ function showPending(target, text) {
   pending.className = "result-body";
   pending.textContent = text;
   target.append(pending);
-}
-
-function parseKubeconfigText(text) {
-  const docs = parseYamlDocuments(text);
-  const config = docs.find((doc) => doc && (doc["current-context"] || doc.clusters));
-  if (!config) {
-    throw new Error("No kubeconfig document found.");
-  }
-
-  const current = config["current-context"];
-  if (!current) {
-    throw new Error("Kubeconfig has no current-context.");
-  }
-
-  const contexts = Array.isArray(config.contexts) ? config.contexts : [];
-  const clusters = Array.isArray(config.clusters) ? config.clusters : [];
-  const users = Array.isArray(config.users) ? config.users : [];
-  const ctxEntry = contexts.find((item) => item && item.name === current);
-  if (!ctxEntry || !ctxEntry.context) {
-    throw new Error(`Context ${current} was not found.`);
-  }
-
-  const clusterName = ctxEntry.context.cluster;
-  const userName = ctxEntry.context.user;
-  const namespace = ctxEntry.context.namespace;
-  const clusterEntry = clusters.find((item) => item && item.name === clusterName);
-  const userEntry = users.find((item) => item && item.name === userName);
-  const server =
-    clusterEntry && clusterEntry.cluster && clusterEntry.cluster.server;
-  const user = (userEntry && userEntry.user) || {};
-  const token = typeof user.token === "string" ? user.token.trim() : "";
-  const execCommand =
-    user.exec && typeof user.exec.command === "string" ? user.exec.command : "";
-
-  return {
-    context: current,
-    server: server ? String(server).trim() : "",
-    token,
-    namespace: namespace ? String(namespace).trim() : "",
-    execCommand,
-    execOnly: Boolean(user.exec && !token),
-    hasClientCert: Boolean(
-      user["client-certificate"] || user["client-certificate-data"]
-    ),
-  };
 }
 
 function parseManifestText(text) {
@@ -4192,6 +4331,18 @@ async function confirmDelete(kind, item, which) {
   await refreshInventory(which);
 }
 
+els.clusterSource.addEventListener("change", () => {
+  updateClusterSourceUi();
+  saveClusterSettings();
+  if (currentClusterSource() === "omni" && els.clusterKubeconfig.value.trim()) {
+    applyKubeconfigText(
+      els.clusterKubeconfig.value,
+      els.clusterContext.dataset.preferred || ""
+    );
+  }
+  updateDeployHints();
+});
+
 els.clusterType.addEventListener("change", () => {
   updateClusterHelp();
   saveClusterSettings();
@@ -4205,6 +4356,24 @@ els.clusterApiServer.addEventListener("change", () => {
 
 els.clusterToken.addEventListener("change", () => {
   saveClusterSettings();
+  updateDeployHints();
+});
+
+els.omniUrl.addEventListener("change", () => {
+  saveClusterSettings();
+});
+
+els.omniSaKey.addEventListener("change", () => {
+  saveClusterSettings();
+});
+
+els.clusterContext.addEventListener("change", () => {
+  const text = els.clusterKubeconfig.value.trim();
+  if (!text) {
+    saveClusterSettings({ omniContext: els.clusterContext.value });
+    return;
+  }
+  applyKubeconfigText(text, els.clusterContext.value);
   updateDeployHints();
 });
 
@@ -4223,7 +4392,14 @@ els.clusterNamespace.addEventListener("change", () => {
 });
 
 els.clusterKubeconfig.addEventListener("change", () => {
-  saveClusterSettings();
+  const text = els.clusterKubeconfig.value.trim();
+  if (text) {
+    applyKubeconfigText(text, els.clusterContext.dataset.preferred || "");
+  } else {
+    fillContextOptions({ contexts: [] }, "");
+    saveClusterSettings();
+  }
+  updateDeployHints();
 });
 
 els.crdKind.addEventListener("change", () => {
@@ -4245,54 +4421,8 @@ els.parseKubeconfig.addEventListener("click", async () => {
     });
     return;
   }
-
-  try {
-    const parsed = parseKubeconfigText(text);
-    if (parsed.server) {
-      els.clusterApiServer.value = normalizeApiServer(parsed.server);
-    }
-    if (parsed.token) {
-      els.clusterToken.value = parsed.token;
-    }
-    if (parsed.namespace) {
-      els.clusterNamespace.value = parsed.namespace;
-    }
-    await saveClusterSettings();
-
-    const lines = [`Parsed context ${parsed.context}.`];
-    if (parsed.server) {
-      lines.push("API server filled from the current cluster.");
-    } else {
-      lines.push("No cluster.server found for this context.");
-    }
-    if (parsed.execOnly) {
-      lines.push(
-        `This user is exec-only (${parsed.execCommand || "exec plugin"}). Chrome cannot run gke-gcloud-auth-plugin, kubelogin, or aws eks get-token. Paste a bearer token from the matching command.`
-      );
-    } else if (parsed.token) {
-      lines.push("Bearer token filled from the user block.");
-    } else if (parsed.hasClientCert) {
-      lines.push(
-        "No bearer token in this kubeconfig. Client-certificate auth is not supported here; paste a token."
-      );
-    } else {
-      lines.push("No user.token found. Paste a bearer token.");
-    }
-
-    showBox(els.kubeconfigResult, {
-      status: parsed.token ? 200 : null,
-      latencyMs: 0,
-      body: lines.join(" "),
-      isError: !parsed.token,
-    });
-  } catch (error) {
-    showBox(els.kubeconfigResult, {
-      status: null,
-      latencyMs: 0,
-      body: error.message || String(error),
-      isError: true,
-    });
-  }
+  applyKubeconfigText(text, els.clusterContext.value);
+  updateDeployHints();
 });
 
 els.testCluster.addEventListener("click", async () => {
