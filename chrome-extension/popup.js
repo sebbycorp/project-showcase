@@ -94,6 +94,11 @@ const STORAGE_KEYS = [
   "hooray",
   "soloUi",
   "demoStage",
+  "settingsFocus",
+  "llmDeployOpen",
+  "mcpDeployOpen",
+  "a2aDeployOpen",
+  "apiDeployOpen",
 ];
 const PROVIDERS = {
   openai: {
@@ -207,6 +212,23 @@ const K8S_KINDS = {
     group: "enterpriseagentgateway.solo.io",
     version: "v1alpha1",
     plural: "enterpriseagentgatewaybudgets",
+  },
+  Deployment: {
+    group: "apps",
+    version: "v1",
+    plural: "deployments",
+  },
+  Service: {
+    core: true,
+    group: "",
+    version: "v1",
+    plural: "services",
+  },
+  ConfigMap: {
+    core: true,
+    group: "",
+    version: "v1",
+    plural: "configmaps",
   },
 };
 const EXAMPLE_MANIFEST = `apiVersion: gateway.networking.k8s.io/v1
@@ -356,7 +378,17 @@ const els = {
   applyLlm: document.getElementById("apply-llm"),
   llmApplyResult: document.getElementById("llm-apply-result"),
   mcpEndpoint: document.getElementById("mcp-endpoint"),
+  mcpJwtToken: document.getElementById("mcp-jwt-token"),
+  mcpDeployPrimary: document.getElementById("mcp-deploy-primary"),
+  mcpDeployMore: document.getElementById("mcp-deploy-more"),
+  mcpDocsCards: document.getElementById("mcp-docs-cards"),
+  mcpDeployResult: document.getElementById("mcp-deploy-result"),
   probeMcp: document.getElementById("probe-mcp"),
+  probeMcpList: document.getElementById("probe-mcp-list"),
+  probeMcpEcho: document.getElementById("probe-mcp-echo"),
+  probeMcpFetch: document.getElementById("probe-mcp-fetch"),
+  probeMcpJwt: document.getElementById("probe-mcp-jwt"),
+  probeMcpTools: document.getElementById("probe-mcp-tools"),
   a2aEndpoint: document.getElementById("a2a-endpoint"),
   probeA2a: document.getElementById("probe-a2a"),
   mcpExample: document.getElementById("mcp-example"),
@@ -396,6 +428,11 @@ const els = {
   resultFailover: document.getElementById("result-failover"),
   resultListCall: document.getElementById("result-list-call"),
   resultMcp: document.getElementById("result-mcp"),
+  resultMcpList: document.getElementById("result-mcp-list"),
+  resultMcpEcho: document.getElementById("result-mcp-echo"),
+  resultMcpFetch: document.getElementById("result-mcp-fetch"),
+  resultMcpJwt: document.getElementById("result-mcp-jwt"),
+  resultMcpTools: document.getElementById("result-mcp-tools"),
   resultA2a: document.getElementById("result-a2a"),
   resultHttp: document.getElementById("result-http"),
   resultUnauth: document.getElementById("result-unauth"),
@@ -405,6 +442,11 @@ const els = {
   seqFailover: document.getElementById("seq-failover"),
   seqListCall: document.getElementById("seq-list-call"),
   seqMcpInit: document.getElementById("seq-mcp-init"),
+  seqMcpList: document.getElementById("seq-mcp-list"),
+  seqMcpEcho: document.getElementById("seq-mcp-echo"),
+  seqMcpFetch: document.getElementById("seq-mcp-fetch"),
+  seqMcpJwt: document.getElementById("seq-mcp-jwt"),
+  seqMcpTools: document.getElementById("seq-mcp-tools"),
   seqA2a: document.getElementById("seq-a2a"),
   seqHttp: document.getElementById("seq-http"),
   seqUnauth: document.getElementById("seq-unauth"),
@@ -442,12 +484,18 @@ const els = {
   hooray: document.getElementById("hooray"),
   demoStage: document.getElementById("demo-stage"),
   demoToggle: document.getElementById("demo-toggle"),
+  clusterChip: document.getElementById("cluster-chip"),
+  clusterChipLabel: document.getElementById("cluster-chip-label"),
+  clusterChipHint: document.getElementById("cluster-chip-hint"),
+  clusterPanel: document.getElementById("cluster-panel"),
   confetti: document.getElementById("confetti"),
 };
 
 let hoorayOn = true;
 let demoStageOn = false;
 let clusterConnected = false;
+let settingsFocus = "";
+let clusterProbeToken = 0;
 
 function seqStepMs() {
   return demoStageOn ? 840 : 560;
@@ -471,6 +519,92 @@ function setDemoStage(on, persistIt = false) {
   if (persistIt) {
     persist({ demoStage: demoStageOn });
   }
+}
+
+function clusterHintLabel() {
+  const settings = currentClusterSettings();
+  if (settings.clusterSource === "omni") {
+    const name =
+      settings.omniContext ||
+      (els.clusterContext && els.clusterContext.value) ||
+      "";
+    if (name) {
+      return name;
+    }
+  }
+  const server = settings.clusterApiServer;
+  if (!server) {
+    return "";
+  }
+  try {
+    return new URL(server).host;
+  } catch {
+    return "";
+  }
+}
+
+function setClusterChip(state) {
+  const chip = els.clusterChip;
+  if (!chip) {
+    return;
+  }
+  const label =
+    state === "checking"
+      ? "Checking"
+      : state === "connected"
+        ? "Connected"
+        : "Not connected";
+  const hint = clusterHintLabel();
+  chip.classList.toggle("is-checking", state === "checking");
+  chip.classList.toggle("is-connected", state === "connected");
+  chip.classList.toggle("is-disconnected", state === "disconnected");
+  if (els.clusterChipLabel) {
+    els.clusterChipLabel.textContent = label;
+  }
+  if (els.clusterChipHint) {
+    els.clusterChipHint.textContent = hint;
+    els.clusterChipHint.hidden = !hint;
+  }
+  chip.title = hint
+    ? `${label} — ${hint}. Open Settings → Cluster.`
+    : `${label}. Open Settings → Cluster.`;
+}
+
+function scrollToCluster() {
+  const panel = els.clusterPanel;
+  if (!panel) {
+    return;
+  }
+  requestAnimationFrame(() => {
+    panel.scrollIntoView({ block: "start" });
+  });
+}
+
+function openClusterSettings() {
+  settingsFocus = "cluster";
+  switchArea("settings");
+  persist({ settingsFocus: "cluster" });
+  scrollToCluster();
+}
+
+function restoreDeployViews(stored) {
+  document.querySelectorAll("details.deploy[data-deploy-key]").forEach((node) => {
+    const key = node.dataset.deployKey;
+    if (key && stored[key] === true) {
+      node.open = true;
+    }
+  });
+}
+
+function bindDeployViews() {
+  document.querySelectorAll("details.deploy[data-deploy-key]").forEach((node) => {
+    node.addEventListener("toggle", () => {
+      const key = node.dataset.deployKey;
+      if (key) {
+        persist({ [key]: node.open });
+      }
+    });
+  });
 }
 
 function celebrate() {
@@ -516,6 +650,20 @@ function normalizeEndpoint(raw) {
   } catch {
     return trimmed;
   }
+}
+
+function defaultMcpEndpoint(chatUrl) {
+  try {
+    const raw = (chatUrl || "").trim() || DEFAULT_ENDPOINT;
+    const url = new URL(raw.includes("://") ? raw : `http://${raw}`);
+    return `${url.origin}/mcp`;
+  } catch {
+    return DEFAULT_MCP_ENDPOINT;
+  }
+}
+
+function currentMcpEndpoint() {
+  return (els.mcpEndpoint.value || "").trim() || defaultMcpEndpoint(els.endpoint.value);
 }
 
 function normalizeModel(raw, fallback = DEFAULT_MODEL) {
@@ -1264,7 +1412,7 @@ function llmSeqConfig(model) {
 }
 
 function mcpSeqConfig() {
-  const mcpUrl = els.mcpEndpoint.value.trim() || DEFAULT_MCP_ENDPOINT;
+  const mcpUrl = currentMcpEndpoint();
   const viaGateway = mcpUsesGateway(mcpUrl, els.endpoint.value);
   return { viaGateway, target: "MCP", targetKind: "mcp" };
 }
@@ -1343,6 +1491,17 @@ function refreshSeqDiagrams() {
   configureSeq(els.seqFailover, failoverSeqConfig());
   configureSeq(els.seqListCall, llmSeqConfig(els.chosenModel.value));
   configureSeq(els.seqMcpInit, mcpSeqConfig());
+  [
+    els.seqMcpList,
+    els.seqMcpEcho,
+    els.seqMcpFetch,
+    els.seqMcpJwt,
+    els.seqMcpTools,
+  ].forEach((seq) => {
+    if (seq) {
+      configureSeq(seq, mcpSeqConfig());
+    }
+  });
   configureSeq(els.seqA2a, a2aSeqConfig());
   configureSeq(els.seqHttp, httpSeqConfig());
   configureSeq(els.seqUnauth, securitySeqConfig());
@@ -1912,7 +2071,9 @@ async function loadSettings() {
   els.fallbackModel.value = stored.fallbackModel || DEFAULT_FALLBACK_MODEL;
   els.chosenModel.value = stored.chosenModel || stored.model || DEFAULT_MODEL;
   els.soloUi.value = stored.soloUi || DEFAULT_SOLO_UI;
-  els.mcpEndpoint.value = stored.mcpEndpoint || DEFAULT_MCP_ENDPOINT;
+  els.mcpEndpoint.value =
+    stored.mcpEndpoint || defaultMcpEndpoint(els.endpoint.value);
+  els.mcpEndpoint.dataset.fromChat = els.endpoint.value;
   els.a2aEndpoint.value = stored.a2aEndpoint || DEFAULT_A2A_ENDPOINT;
   els.httpMethod.value =
     stored.httpMethod === "POST" || stored.httpMethod === "GET"
@@ -1962,6 +2123,8 @@ async function loadSettings() {
   hoorayOn = stored.hooray !== false;
   els.hooray.checked = hoorayOn;
   setDemoStage(stored.demoStage === true);
+  settingsFocus = stored.settingsFocus === "cluster" ? "cluster" : "";
+  restoreDeployViews(stored);
   const area = normalizeArea(stored.area, stored.scenario);
   setArea(area);
   if (area !== stored.area) {
@@ -1969,16 +2132,24 @@ async function loadSettings() {
   }
   updateEndpointHints();
   updateDeployHints();
+  setClusterChip(clusterConnected ? "connected" : "disconnected");
+  if (area === "settings" && settingsFocus === "cluster") {
+    scrollToCluster();
+  }
   if (
     clusterIsReady() &&
     (area === "llm" || area === "mcp" || area === "settings")
   ) {
     refreshInventory(area === "settings" ? "cluster" : area);
   }
+  probeClusterConnection({ interactive: false });
 }
 
 function switchArea(area) {
   setArea(area);
+  if (area !== "settings") {
+    settingsFocus = "";
+  }
   if (area !== "chat" && area !== "settings") {
     updateEndpointHints();
     updateDeployHints();
@@ -1990,7 +2161,7 @@ function switchArea(area) {
       refreshInventory(area === "settings" ? "cluster" : area);
     }
   }
-  persist({ area });
+  persist({ area, settingsFocus });
 }
 
 els.tabChat.addEventListener("click", () => {
@@ -2014,8 +2185,15 @@ els.tabApi.addEventListener("click", () => {
 });
 
 els.tabSettings.addEventListener("click", () => {
+  settingsFocus = "";
   switchArea("settings");
 });
+
+if (els.clusterChip) {
+  els.clusterChip.addEventListener("click", () => {
+    openClusterSettings();
+  });
+}
 
 els.hooray.addEventListener("change", () => {
   hoorayOn = els.hooray.checked;
@@ -2075,7 +2253,20 @@ function onFallbackProviderChange(id) {
 }
 
 els.endpoint.addEventListener("change", () => {
+  const previousDefault = defaultMcpEndpoint(
+    els.mcpEndpoint.dataset.fromChat || DEFAULT_ENDPOINT
+  );
   saveChatSettings();
+  const nextDefault = defaultMcpEndpoint(els.endpoint.value);
+  if (
+    !els.mcpEndpoint.value.trim() ||
+    els.mcpEndpoint.value.trim() === previousDefault
+  ) {
+    els.mcpEndpoint.value = nextDefault;
+    persist({ mcpEndpoint: nextDefault });
+  }
+  els.mcpEndpoint.dataset.fromChat = els.endpoint.value;
+  refreshSeqDiagrams();
 });
 
 els.endpoint.addEventListener("input", () => {
@@ -2127,7 +2318,7 @@ els.chosenModel.addEventListener("input", () => {
 });
 
 els.mcpEndpoint.addEventListener("change", () => {
-  const mcpEndpoint = els.mcpEndpoint.value.trim() || DEFAULT_MCP_ENDPOINT;
+  const mcpEndpoint = currentMcpEndpoint();
   els.mcpEndpoint.value = mcpEndpoint;
   persist({ mcpEndpoint });
   refreshSeqDiagrams();
@@ -2465,57 +2656,202 @@ async function probeWithFallback(url, primary, secondary, secondaryNote) {
   return { ...second, method: secondary.method, note: secondaryNote };
 }
 
-els.probeMcp.addEventListener("click", async () => {
-  const url = els.mcpEndpoint.value.trim() || DEFAULT_MCP_ENDPOINT;
-  els.mcpEndpoint.value = url;
-  await persist({ mcpEndpoint: url });
-  els.probeMcp.disabled = true;
-  runningDrawer(els.resultMcp, "Probing…");
+function parseMcpPayload(raw, fallback) {
+  if (fallback && typeof fallback === "object") {
+    if (fallback.jsonrpc || fallback.result || fallback.error || fallback.tools) {
+      return fallback;
+    }
+  }
+  const text = String(raw || "").trim();
+  if (!text) {
+    return fallback || null;
+  }
+  const direct = parseJson(text);
+  if (direct) {
+    return direct;
+  }
+  for (const line of text.split(/\n/)) {
+    const trimmed = line.trim();
+    if (trimmed.toLowerCase().startsWith("data:")) {
+      const parsed = parseJson(trimmed.slice(5).trim());
+      if (parsed) {
+        return parsed;
+      }
+    }
+  }
+  return fallback || null;
+}
 
-  const initialize = {
+function mcpSessionId(result) {
+  const headers = (result && result.headers) || {};
+  return headers["mcp-session-id"] || headers["mcp-session-id"] || "";
+}
+
+function mcpClientInfo() {
+  return { name: "agentgateway-extension", version: "0.9.6" };
+}
+
+function mcpHeaders(sessionId, extra) {
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+    "MCP-Protocol-Version": "2024-11-05",
+  };
+  if (sessionId) {
+    headers["Mcp-Session-Id"] = sessionId;
+  }
+  if (extra) {
+    Object.assign(headers, extra);
+  }
+  return headers;
+}
+
+function mcpInitializeBody() {
+  return {
     jsonrpc: "2.0",
     id: 1,
     method: "initialize",
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.9.5" },
+      clientInfo: mcpClientInfo(),
     },
   };
+}
 
-  const result = await runWithSeq(
+function mcpRpcError(payload) {
+  return payload && payload.error && (payload.error.message || payload.error.code);
+}
+
+function mcpAuthDenied(result, payload) {
+  const status = result && result.status;
+  if (status === 401 || status === 403) {
+    return true;
+  }
+  const text = `${(result && result.raw) || ""} ${
+    (payload && payload.error && payload.error.message) || ""
+  }`.toLowerCase();
+  return /auth|unauthorized|unauthorised|no bearer|jwt|forbidden|denied/.test(
+    text
+  );
+}
+
+function mcpToolNames(payload) {
+  const tools =
+    (payload && payload.result && payload.result.tools) ||
+    (payload && payload.tools) ||
+    [];
+  if (!Array.isArray(tools)) {
+    return [];
+  }
+  return tools.map((tool) => tool && tool.name).filter(Boolean);
+}
+
+function mcpCallContent(payload) {
+  const result = payload && payload.result;
+  if (!result) {
+    return snippet(JSON.stringify(payload || {}, null, 2));
+  }
+  const content = result.content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => (part && (part.text || part.type)) || "")
+      .filter(Boolean)
+      .join("\n");
+  }
+  return snippet(JSON.stringify(result, null, 2));
+}
+
+async function saveMcpEndpoint() {
+  const url = currentMcpEndpoint();
+  els.mcpEndpoint.value = url;
+  await persist({ mcpEndpoint: url });
+  return url;
+}
+
+async function mcpInitializeSession(url, extraHeaders) {
+  const first = await timedFetch(url, {
+    method: "POST",
+    headers: mcpHeaders("", extraHeaders),
+    body: JSON.stringify(mcpInitializeBody()),
+  });
+  let result = first;
+  if (first.error || first.status === 405) {
+    const second = await timedFetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json, text/event-stream",
+        ...(extraHeaders || {}),
+      },
+    });
+    result = {
+      ...second,
+      method: "GET",
+      note: "POST initialize unavailable; used GET",
+    };
+  } else {
+    result = { ...first, method: "POST", note: null };
+  }
+  const sessionId = mcpSessionId(result);
+  if (sessionId && !result.error && result.status != null && result.status < 400) {
+    await timedFetch(url, {
+      method: "POST",
+      headers: mcpHeaders(sessionId, extraHeaders),
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "notifications/initialized",
+      }),
+    });
+  }
+  return {
+    result,
+    sessionId,
+    payload: parseMcpPayload(result.raw, result.payload),
+  };
+}
+
+async function mcpRpc(url, sessionId, id, method, params, extraHeaders) {
+  const result = await timedFetch(url, {
+    method: "POST",
+    headers: mcpHeaders(sessionId, extraHeaders),
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id,
+      method,
+      params: params || {},
+    }),
+  });
+  return {
+    result: { ...result, method: "POST" },
+    payload: parseMcpPayload(result.raw, result.payload),
+  };
+}
+
+function pickMcpTool(names, preferred) {
+  const have = new Set(names || []);
+  for (const name of preferred) {
+    if (have.has(name)) {
+      return name;
+    }
+  }
+  return preferred[0] || "";
+}
+
+els.probeMcp.addEventListener("click", async () => {
+  els.probeMcp.disabled = true;
+  const url = await saveMcpEndpoint();
+  runningDrawer(els.resultMcp, "Probing…");
+  const { result } = await runWithSeq(
     els.seqMcpInit,
-    () =>
-      probeWithFallback(
-        url,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json, text/event-stream",
-          },
-          body: JSON.stringify(initialize),
-        },
-        {
-          method: "GET",
-          headers: { Accept: "application/json, text/event-stream" },
-        },
-        "POST initialize unavailable; used GET"
-      ),
+    () => mcpInitializeSession(url).then((session) => session.result),
     { ...mcpSeqConfig(), ok: mcpRequestOk, path: requestPath(url) }
   );
-
-  const ok = !result.error && result.status != null && result.status < 400;
+  const ok = mcpRequestOk(result);
   const statusText = result.status == null ? "no response" : `HTTP ${result.status}`;
-  const meta = [
-    `MCP ${result.method}`,
-    statusText,
-    `${result.latencyMs} ms`,
-  ];
+  const meta = [`MCP ${result.method}`, statusText, `${result.latencyMs} ms`];
   if (result.note) {
     meta.push(result.note);
   }
-
   resultDrawer(els.resultMcp, {
     ok,
     meta: meta.join(" · "),
@@ -2533,6 +2869,315 @@ els.probeMcp.addEventListener("click", async () => {
     celebrate();
   }
   els.probeMcp.disabled = false;
+});
+
+els.probeMcpList.addEventListener("click", async () => {
+  const url = await saveMcpEndpoint();
+  els.probeMcpList.disabled = true;
+  runningDrawer(els.resultMcpList, "Listing tools…");
+  const listed = await runWithSeq(
+    els.seqMcpList,
+    async () => {
+      const session = await mcpInitializeSession(url);
+      if (!mcpRequestOk(session.result)) {
+        return session.result;
+      }
+      const call = await mcpRpc(url, session.sessionId, 2, "tools/list", {});
+      return {
+        ...call.result,
+        toolNames: mcpToolNames(call.payload),
+        rpcError: mcpRpcError(call.payload),
+      };
+    },
+    { ...mcpSeqConfig(), ok: mcpRequestOk, path: requestPath(url) }
+  );
+  const names = listed.toolNames || [];
+  const rpcError = listed.rpcError;
+  const ok = mcpRequestOk(listed) && !rpcError;
+  const statusText = listed.status == null ? "no response" : `HTTP ${listed.status}`;
+  resultDrawer(els.resultMcpList, {
+    ok,
+    meta: `tools/list · ${statusText} · ${listed.latencyMs} ms`,
+    result: listed,
+    nodes: [
+      card(
+        "check",
+        ok ? "is-ok" : "is-error",
+        names.length ? `${names.length} tool(s)` : "tools/list",
+        ok
+          ? names.join(", ") || "(no tools)"
+          : snippet(listed.error || rpcError || listed.raw || "(empty body)")
+      ),
+    ],
+  });
+  if (ok) {
+    celebrate();
+  }
+  els.probeMcpList.disabled = false;
+});
+
+async function runMcpToolCall({
+  button,
+  drawer,
+  seq,
+  preferredNames,
+  args,
+  label,
+}) {
+  const url = await saveMcpEndpoint();
+  button.disabled = true;
+  runningDrawer(drawer, label);
+  const called = await runWithSeq(
+    seq,
+    async () => {
+      const session = await mcpInitializeSession(url);
+      if (!mcpRequestOk(session.result)) {
+        return { ...session.result, attempted: [] };
+      }
+      const listed = await mcpRpc(url, session.sessionId, 2, "tools/list", {});
+      const names = mcpToolNames(listed.payload);
+      const attempts = names.length
+        ? preferredNames.filter((name) => names.includes(name))
+        : preferredNames.slice();
+      if (attempts.length === 0) {
+        attempts.push(...preferredNames);
+      }
+      let last = listed.result;
+      let lastPayload = listed.payload;
+      let used = attempts[0] || preferredNames[0];
+      for (const name of attempts) {
+        used = name;
+        const call = await mcpRpc(url, session.sessionId, 3, "tools/call", {
+          name,
+          arguments: args,
+        });
+        last = call.result;
+        lastPayload = call.payload;
+        if (mcpRequestOk(call.result) && !mcpRpcError(call.payload)) {
+          return {
+            ...call.result,
+            toolName: name,
+            toolNames: names,
+            payload: call.payload,
+            attempted: attempts,
+          };
+        }
+      }
+      return {
+        ...last,
+        toolName: used,
+        toolNames: names,
+        payload: lastPayload,
+        rpcError: mcpRpcError(lastPayload),
+        attempted: attempts,
+      };
+    },
+    { ...mcpSeqConfig(), ok: mcpRequestOk, path: requestPath(url) }
+  );
+  const rpcError = called.rpcError || mcpRpcError(called.payload);
+  const ok = mcpRequestOk(called) && !rpcError;
+  const statusText = called.status == null ? "no response" : `HTTP ${called.status}`;
+  const tool = called.toolName || preferredNames[0];
+  resultDrawer(drawer, {
+    ok,
+    meta: `tools/call ${tool} · ${statusText} · ${called.latencyMs} ms`,
+    result: called,
+    nodes: [
+      card(
+        "check",
+        ok ? "is-ok" : "is-error",
+        tool,
+        ok
+          ? snippet(mcpCallContent(called.payload) || "(empty result)")
+          : snippet(called.error || rpcError || called.raw || "(empty body)")
+      ),
+    ],
+  });
+  if (ok) {
+    celebrate();
+  }
+  button.disabled = false;
+}
+
+els.probeMcpEcho.addEventListener("click", () => {
+  return runMcpToolCall({
+    button: els.probeMcpEcho,
+    drawer: els.resultMcpEcho,
+    seq: els.seqMcpEcho,
+    preferredNames: ["mcp-server-everything-3001_echo", "echo"],
+    args: { message: "Hello world" },
+    label: "Calling echo…",
+  });
+});
+
+els.probeMcpFetch.addEventListener("click", () => {
+  return runMcpToolCall({
+    button: els.probeMcpFetch,
+    drawer: els.resultMcpFetch,
+    seq: els.seqMcpFetch,
+    preferredNames: ["mcp-website-fetcher_fetch", "fetch"],
+    args: { url: "https://example.com" },
+    label: "Calling fetch…",
+  });
+});
+
+els.probeMcpJwt.addEventListener("click", async () => {
+  const url = await saveMcpEndpoint();
+  const token = (els.mcpJwtToken && els.mcpJwtToken.value.trim()) || "";
+  els.probeMcpJwt.disabled = true;
+  runningDrawer(els.resultMcpJwt, "Probing unauthenticated…");
+  const unauth = await runWithSeq(
+    els.seqMcpJwt,
+    () => mcpInitializeSession(url).then((session) => session.result),
+    { ...mcpSeqConfig(), ok: () => true, path: requestPath(url) }
+  );
+  const unauthPayload = parseMcpPayload(unauth.raw, unauth.payload);
+  const denied = mcpAuthDenied(unauth, unauthPayload);
+  const nodes = [
+    card(
+      "check",
+      denied ? "is-ok" : "is-error",
+      `Without token · ${
+        unauth.status == null ? "no response" : `HTTP ${unauth.status}`
+      } · ${unauth.latencyMs} ms`,
+      denied
+        ? snippet(unauth.error || unauth.raw || "denied")
+        : "Expected deny (401/403 or auth failure). JWT policy may not be applied."
+    ),
+  ];
+  let tokenOk = true;
+  if (token) {
+    runningDrawer(els.resultMcpJwt, "Probing with token…");
+    const authed = await runWithSeq(
+      els.seqMcpJwt,
+      () =>
+        mcpInitializeSession(url, {
+          Authorization: `Bearer ${token}`,
+        }).then((session) => session.result),
+      { ...mcpSeqConfig(), ok: mcpRequestOk, path: requestPath(url) }
+    );
+    tokenOk = mcpRequestOk(authed);
+    nodes.push(
+      card(
+        "check",
+        tokenOk ? "is-ok" : "is-error",
+        `With token · ${
+          authed.status == null ? "no response" : `HTTP ${authed.status}`
+        } · ${authed.latencyMs} ms`,
+        snippet(authed.error || authed.raw || "(empty body)")
+      )
+    );
+  } else {
+    nodes.push(
+      card(
+        "check",
+        "is-ok",
+        "With token",
+        "No token pasted — skipped. Paste a bearer token to retry with Authorization."
+      )
+    );
+  }
+  const ok = denied && tokenOk;
+  resultDrawer(els.resultMcpJwt, {
+    ok,
+    meta: token
+      ? `Unauth ${denied ? "denied" : "allowed"} · token ${tokenOk ? "OK" : "fail"}`
+      : `Unauth ${denied ? "denied" : "allowed"}`,
+    result: unauth,
+    nodes,
+  });
+  if (ok) {
+    celebrate();
+  }
+  els.probeMcpJwt.disabled = false;
+});
+
+els.probeMcpTools.addEventListener("click", async () => {
+  const url = await saveMcpEndpoint();
+  els.probeMcpTools.disabled = true;
+  runningDrawer(els.resultMcpTools, "initialize + list + call…");
+  const outcome = await runWithSeq(
+    els.seqMcpTools,
+    async () => {
+      const session = await mcpInitializeSession(url);
+      if (!mcpRequestOk(session.result)) {
+        return {
+          ...session.result,
+          step: "initialize",
+          toolNames: [],
+        };
+      }
+      const listed = await mcpRpc(url, session.sessionId, 2, "tools/list", {});
+      const names = mcpToolNames(listed.payload);
+      if (!mcpRequestOk(listed.result) || mcpRpcError(listed.payload)) {
+        return {
+          ...listed.result,
+          step: "tools/list",
+          toolNames: names,
+          rpcError: mcpRpcError(listed.payload),
+        };
+      }
+      const echo = pickMcpTool(names, [
+        "mcp-server-everything-3001_echo",
+        "echo",
+      ]);
+      const fetchTool = pickMcpTool(names, [
+        "mcp-website-fetcher_fetch",
+        "fetch",
+      ]);
+      const toolName = names.includes(echo)
+        ? echo
+        : names.includes(fetchTool)
+          ? fetchTool
+          : names[0] || echo;
+      const args = /fetch/i.test(toolName)
+        ? { url: "https://example.com" }
+        : { message: "Hello world" };
+      const call = await mcpRpc(url, session.sessionId, 3, "tools/call", {
+        name: toolName,
+        arguments: args,
+      });
+      return {
+        ...call.result,
+        step: "tools/call",
+        toolName,
+        toolNames: names,
+        payload: call.payload,
+        rpcError: mcpRpcError(call.payload),
+      };
+    },
+    { ...mcpSeqConfig(), ok: mcpRequestOk, path: requestPath(url) }
+  );
+  const names = outcome.toolNames || [];
+  const rpcError = outcome.rpcError;
+  const ok = mcpRequestOk(outcome) && !rpcError;
+  const statusText =
+    outcome.status == null ? "no response" : `HTTP ${outcome.status}`;
+  resultDrawer(els.resultMcpTools, {
+    ok,
+    meta: `${outcome.step || "tool calling"} · ${statusText} · ${outcome.latencyMs} ms`,
+    result: outcome,
+    nodes: [
+      card(
+        "check",
+        names.length ? "is-ok" : "is-error",
+        names.length ? `${names.length} tool(s)` : "tools/list",
+        names.join(", ") || "(no tools)"
+      ),
+      card(
+        "check",
+        ok ? "is-ok" : "is-error",
+        outcome.toolName ? `tools/call ${outcome.toolName}` : "tools/call",
+        ok
+          ? snippet(mcpCallContent(outcome.payload) || "(empty result)")
+          : snippet(outcome.error || rpcError || outcome.raw || "(empty body)")
+      ),
+    ],
+  });
+  if (ok) {
+    celebrate();
+  }
+  els.probeMcpTools.disabled = false;
 });
 
 function a2aSeqConfig() {
@@ -3640,6 +4285,7 @@ function loadDeployExamples(stored) {
     exampleYaml("a2a", a2aKey);
   els.apiYaml.value =
     stored.apiYaml || stored.securityYaml || exampleYaml("api", apiKey);
+  renderMcpDeploys();
 }
 
 function clusterIsReady() {
@@ -3670,6 +4316,9 @@ function updateDeployHints() {
   if (els.mcpInvRefresh) {
     els.mcpInvRefresh.disabled = !connected;
   }
+  document.querySelectorAll("[data-mcp-deploy]").forEach((btn) => {
+    btn.disabled = !connected;
+  });
   if (els.listCrds) {
     els.listCrds.disabled = !connected;
   }
@@ -3677,6 +4326,11 @@ function updateDeployHints() {
     showInventoryDisconnected(els.llmInventory);
     showInventoryDisconnected(els.mcpInventory);
     showInventoryDisconnected(els.clusterInventory);
+  }
+  if (els.clusterChip && els.clusterChip.classList.contains("is-checking")) {
+    setClusterChip("checking");
+  } else {
+    setClusterChip(clusterConnected ? "connected" : "disconnected");
   }
 }
 
@@ -3759,6 +4413,173 @@ async function applyYamlDocuments(yaml, resultEl, applyBtn, onDone) {
   }
 }
 
+function mcpApplyBackendGroup() {
+  const groups = []
+    .concat(inventoryCache.mcp || [])
+    .concat(inventoryCache.cluster || []);
+  for (const group of groups) {
+    if (group.kind !== "EnterpriseAgentgatewayBackend") {
+      continue;
+    }
+    for (const item of group.items || []) {
+      const api = String(item.apiVersion || "");
+      if (api.startsWith("enterpriseagentgateway.solo.io")) {
+        return "enterpriseagentgateway.solo.io";
+      }
+      if (api.startsWith("agentgateway.dev")) {
+        return "agentgateway.dev";
+      }
+    }
+  }
+  return K8S_KINDS.EnterpriseAgentgatewayBackend.group;
+}
+
+function renderMcpDeploys() {
+  const recipes = (typeof AgwBuilder !== "undefined" && AgwBuilder.MCP_DEPLOYS) || [];
+  const connected = clusterIsReady();
+  const fill = (container, items, kind) => {
+    if (!container) {
+      return;
+    }
+    container.replaceChildren();
+    for (const item of items) {
+      if (kind === "docs") {
+        const link = document.createElement("a");
+        link.className = "mcp-docs-card";
+        link.href = item.docs;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        const title = document.createElement("strong");
+        title.textContent = `${item.label} — see docs`;
+        const blurb = document.createElement("span");
+        blurb.textContent = item.blurb || "";
+        link.append(title, blurb);
+        container.append(link);
+        continue;
+      }
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className =
+        kind === "virtual" ? "btn mcp-deploy-btn" : "btn btn-secondary mcp-deploy-btn";
+      btn.dataset.mcpDeploy = item.id;
+      btn.dataset.label = item.label;
+      btn.textContent = item.label;
+      btn.title = item.blurb || item.label;
+      btn.disabled = !connected;
+      btn.addEventListener("click", () => applyMcpDeploy(item.id, btn));
+      container.append(btn);
+    }
+  };
+  fill(
+    els.mcpDeployPrimary,
+    recipes.filter((item) => item.group === "virtual" && item.apply !== false),
+    "virtual"
+  );
+  fill(
+    els.mcpDeployMore,
+    recipes.filter((item) => item.group === "more" && item.apply !== false),
+    "more"
+  );
+  fill(
+    els.mcpDocsCards,
+    recipes.filter((item) => item.apply === false || item.group === "docs"),
+    "docs"
+  );
+}
+
+async function applyMcpDeploy(id, button) {
+  const resultEl = els.mcpDeployResult;
+  if (!clusterIsReady()) {
+    showBox(resultEl, {
+      status: null,
+      latencyMs: 0,
+      body: CONNECT_CLUSTER_MSG,
+      isError: true,
+    });
+    return;
+  }
+  const recipe = AgwBuilder.mcpDeployRecipe(id);
+  if (!recipe || recipe.apply === false) {
+    return;
+  }
+  const settings = await saveClusterSettings();
+  const docs = AgwBuilder.mcpDeployDocs(id, {
+    namespace: settings.clusterNamespace,
+    backendGroup: mcpApplyBackendGroup(),
+  });
+  if (!docs.length) {
+    showBox(resultEl, {
+      status: null,
+      latencyMs: 0,
+      body: "No documented YAML for this deploy.",
+      isError: true,
+    });
+    return;
+  }
+  const label = (button && button.dataset.label) || recipe.label;
+  if (button) {
+    button.disabled = true;
+    button.classList.add("is-busy");
+    button.classList.remove("is-ok", "is-fail");
+    button.textContent = `${label} — deploying…`;
+  }
+  showPending(resultEl, `Applying ${docs.length} document(s)…`);
+  const applied = [];
+  for (const doc of docs) {
+    try {
+      applied.push(await applyManifest(settings, doc));
+    } catch (error) {
+      applied.push({
+        name: (doc.metadata && doc.metadata.name) || "unknown",
+        kind: doc.kind || "Unknown",
+        method: "validate",
+        result: {
+          error: error.message || String(error),
+          status: null,
+          latencyMs: 0,
+          raw: "",
+          payload: null,
+          response: null,
+        },
+      });
+    }
+  }
+  const failed = applied.some(
+    (item) =>
+      item.result.error || !item.result.response || !item.result.response.ok
+  );
+  const names = applied.map((item) => `${item.kind}/${item.name}`).join(", ");
+  const nodes = applied.map((item) => {
+    const ok =
+      !item.result.error && item.result.response && item.result.response.ok;
+    const statusText =
+      item.result.status == null ? "no response" : `HTTP ${item.result.status}`;
+    return card(
+      "check",
+      ok ? "is-ok" : "is-error",
+      `${item.method} ${item.kind}/${item.name} · ${statusText} · ${item.result.latencyMs} ms`,
+      ok
+        ? `${item.kind} ${item.name} ${item.method === "POST" ? "created" : "updated"}`
+        : k8sStatusMessage(item.result)
+    );
+  });
+  resultEl.hidden = false;
+  resultEl.classList.toggle("is-error", failed);
+  resultEl.replaceChildren(...nodes);
+  if (button) {
+    button.classList.remove("is-busy");
+    button.classList.toggle("is-ok", !failed);
+    button.classList.toggle("is-fail", failed);
+    button.textContent = failed ? `${label} — fail` : `${label} — OK`;
+    button.title = names;
+    button.disabled = !clusterIsReady();
+  }
+  updateDeployHints();
+  if (!failed) {
+    refreshInventory("mcp");
+  }
+}
+
 async function saveClusterSettings(extra = {}) {
   const settings = currentClusterSettings();
   els.clusterApiServer.value = settings.clusterApiServer;
@@ -3812,8 +4633,13 @@ function manifestBody(doc, namespace, resourceVersion) {
       name: doc.metadata.name,
       namespace,
     },
-    spec: doc.spec,
   };
+  if (doc.spec !== undefined) {
+    body.spec = doc.spec;
+  }
+  if (doc.data !== undefined) {
+    body.data = doc.data;
+  }
   if (resourceVersion) {
     body.metadata.resourceVersion = resourceVersion;
   }
@@ -3837,6 +4663,15 @@ function kindSpecFromManifest(doc) {
   const apiVersion = String(doc.apiVersion || "");
   const slash = apiVersion.lastIndexOf("/");
   if (slash === -1) {
+    if (apiVersion === "v1") {
+      return {
+        kind: doc.kind,
+        core: true,
+        group: "",
+        version: "v1",
+        plural: `${String(doc.kind).toLowerCase()}s`,
+      };
+    }
     return null;
   }
   return {
@@ -3848,9 +4683,11 @@ function kindSpecFromManifest(doc) {
 }
 
 function collectionPath(spec, namespace) {
-  return `/apis/${spec.group}/${spec.version}/namespaces/${encodeURIComponent(
-    namespace
-  )}/${spec.plural}`;
+  const ns = encodeURIComponent(namespace);
+  if (spec.core || spec.group === "") {
+    return `/api/${spec.version}/namespaces/${ns}/${spec.plural}`;
+  }
+  return `/apis/${spec.group}/${spec.version}/namespaces/${ns}/${spec.plural}`;
 }
 
 function k8sStatusMessage(result) {
@@ -4425,24 +5262,36 @@ els.parseKubeconfig.addEventListener("click", async () => {
   updateDeployHints();
 });
 
-els.testCluster.addEventListener("click", async () => {
-  const settings = await saveClusterSettings();
+async function probeClusterConnection({ interactive = false } = {}) {
+  const token = ++clusterProbeToken;
+  const settings = interactive
+    ? await saveClusterSettings()
+    : currentClusterSettings();
   const targetError = clusterTargetError(settings);
   if (targetError) {
-    showBox(els.clusterTestResult, {
-      status: null,
-      latencyMs: 0,
-      body: targetError,
-      isError: true,
-    });
+    if (token !== clusterProbeToken) {
+      return false;
+    }
     clusterConnected = false;
     await persist({ clusterConnected: false });
+    setClusterChip("disconnected");
+    if (interactive) {
+      showBox(els.clusterTestResult, {
+        status: null,
+        latencyMs: 0,
+        body: targetError,
+        isError: true,
+      });
+    }
     updateDeployHints();
-    return;
+    return false;
   }
 
-  els.testCluster.disabled = true;
-  showPending(els.clusterTestResult, "Testing…");
+  setClusterChip("checking");
+  if (interactive && els.testCluster) {
+    els.testCluster.disabled = true;
+    showPending(els.clusterTestResult, "Testing…");
+  }
 
   const headers = k8sHeaders(settings.clusterToken);
   let result = await timedFetch(k8sUrl(settings.clusterApiServer, "/version"), {
@@ -4462,6 +5311,10 @@ els.testCluster.addEventListener("click", async () => {
     }
   }
 
+  if (token !== clusterProbeToken) {
+    return false;
+  }
+
   const ok = !result.error && result.response && result.response.ok;
   let body = k8sStatusMessage(result);
   if (ok && probe === "/version" && result.payload) {
@@ -4475,20 +5328,30 @@ els.testCluster.addEventListener("click", async () => {
     body = "Connected via GET /apis/gateway.networking.k8s.io/v1.";
   }
 
-  showBox(els.clusterTestResult, {
-    status: result.status,
-    latencyMs: result.latencyMs,
-    body,
-    isError: !ok,
-  });
   clusterConnected = ok;
   await persist({ clusterConnected: ok });
+  setClusterChip(ok ? "connected" : "disconnected");
+  if (interactive || (els.clusterTestResult && !els.clusterTestResult.hidden)) {
+    showBox(els.clusterTestResult, {
+      status: result.status,
+      latencyMs: result.latencyMs,
+      body,
+      isError: !ok,
+    });
+  }
   updateDeployHints();
-  if (ok) {
+  if (interactive && ok) {
     celebrate();
     refreshInventory("cluster");
   }
-  els.testCluster.disabled = false;
+  if (interactive && els.testCluster) {
+    els.testCluster.disabled = false;
+  }
+  return ok;
+}
+
+els.testCluster.addEventListener("click", () => {
+  return probeClusterConnection({ interactive: true });
 });
 
 els.listCrds.addEventListener("click", () => {
@@ -4750,4 +5613,5 @@ els.applyCrds.addEventListener("click", async () => {
   refreshInventory("cluster");
 });
 
+bindDeployViews();
 loadSettings();

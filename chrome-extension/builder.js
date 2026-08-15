@@ -338,6 +338,220 @@
     },
   };
 
+  const PETSTORE_OPENAPI_SCHEMA = {
+    openapi: "3.0.0",
+    info: { title: "Swagger Petstore", version: "1.0.0" },
+    servers: [{ url: "/" }],
+    paths: {
+      "/api/pets": {
+        get: {
+          operationId: "findPets",
+          summary: "Returns all pets from the system",
+          parameters: [
+            {
+              name: "limit",
+              in: "query",
+              description: "Maximum number of results to return",
+              required: false,
+              schema: { type: "integer" },
+            },
+          ],
+          responses: { "200": { description: "A list of pets" } },
+        },
+        post: {
+          operationId: "addPet",
+          summary: "Creates a new pet in the store",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    id: { type: "integer" },
+                    name: { type: "string" },
+                    tag: { type: "string" },
+                  },
+                  required: ["name"],
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "Pet created successfully" } },
+        },
+      },
+      "/api/pets/{id}": {
+        get: {
+          operationId: "findPetById",
+          summary: "Find pet by ID",
+          parameters: [
+            {
+              name: "id",
+              in: "path",
+              required: true,
+              schema: { type: "integer" },
+            },
+          ],
+          responses: { "200": { description: "Pet details" } },
+        },
+        delete: {
+          operationId: "deletePet",
+          summary: "Delete a pet",
+          parameters: [
+            {
+              name: "id",
+              in: "path",
+              required: true,
+              schema: { type: "integer" },
+            },
+          ],
+          responses: { "204": { description: "Pet deleted" } },
+        },
+      },
+    },
+  };
+
+  // Public JWKS from the JWT auth for services guide (not a secret).
+  const MCP_JWT_JWKS =
+    '{"keys":[{"use":"sig","kty":"RSA","kid":"5891645032159894383","n":"5Zb1l_vtAp7DhKPNbY5qLzHIxDEIm3lpFYhBTiZyGBcnre8Y8RtNAnHpVPKdWohqhbihbVdb6U7m1E0VhLq7CS7k2Ng1LcQtVN3ekaNyk09NHuhl9LCgqXT4pATt6fYTKtZ__tEw4XKt3QqVcw7hV0YaNVC5xXGYVBh5_2-K5aW9u2LQ7FSax0jPhWdoUB3KbOQfWNOA3RwOqYn4gmc9wVToVLv6bXCVhIYWKnAVcX89C00eM7uBHENvOydD14-ZnLb4pzz2VGbU6U65odpw_i4r_mWXvoUgwogXAXp80TsYwMzLHcFo4GVDNkaH0hjuLJCeISPfYtbUJK6fFaZGBw","e":"AQAB","x5c":["MIIC3jCCAcagAwIBAgIBJTANBgkqhkiG9w0BAQsFADAXMRUwEwYDVQQKEwxrZ2F0ZXdheS5kZXYwHhcNMjUxMjE4MTkzNDQyWhcNMjUxMjE4MjEzNDQyWjAXMRUwEwYDVQQKEwxrZ2F0ZXdheS5kZXYwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDllvWX++0CnsOEo81tjmovMcjEMQibeWkViEFOJnIYFyet7xjxG00CcelU8p1aiGqFuKFtV1vpTubUTRWEursJLuTY2DUtxC1U3d6Ro3KTT00e6GX0sKCpdPikBO3p9hMq1n/+0TDhcq3dCpVzDuFXRho1ULnFcZhUGHn/b4rlpb27YtDsVJrHSM+FZ2hQHcps5B9Y04DdHA6pifiCZz3BVOhUu/ptcJWEhhYqcBVxfz0LTR4zu4EcQ287J0PXj5mctvinPPZUZtTpTrmh2nD+Liv+ZZe+hSDCiBcBenzROxjAzMsdwWjgZUM2RofSGO4skJ4hI99i1tQkrp8VpkYHAgMBAAGjNTAzMA4GA1UdDwEB/wQEAwIFoDATBgNVHSUEDDAKBggrBgEFBQcDATAMBgNVHRMBAf8EAjAAMA0GCSqGSIb3DQEBCwUAA4IBAQBeA8lKrnfRjo18RkLBqVKuO441nZLFGKrJwpJu+G5cVOJ06txKsZEXE3qu2Yh9abeOJkC+SsWMELWHYNJlip4JGE0Oby7chol+ahrwBILUixBG/qvhwJG6YntoDZi0wbNFqQiQ6FZt89awcs2pdxL5thYR/Pqx4QXN8oKd4DNkcX5vWdz9P6nstLUmrEBV4EFs7fY0L/n3ssDvyZ3xfpM1Q/CQFz4OqB4U20+Qt6x7eap6qhTSBZt8rZWIiy57BsSww12gLYYU1x+Klg1AdPsVrcuvVdiZM1ru232Ihip0rYH7Mf7vcN+HLUrjpXvMoeyWRwbB61GPsXz+BTksqoql"]}]}';
+
+  const MCP_DEPLOYS = [
+    {
+      id: "everything",
+      group: "virtual",
+      label: "Deploy everything server",
+      blurb: "mcp-server-everything (npx @modelcontextprotocol/server-everything streamableHttp, port 3001).",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/virtual/",
+    },
+    {
+      id: "fetcher",
+      group: "virtual",
+      label: "Deploy website fetcher",
+      blurb: "mcp-website-fetcher (ghcr.io/peterj/mcp-website-fetcher:main).",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/virtual/",
+    },
+    {
+      id: "virtual",
+      group: "virtual",
+      label: "Deploy virtual MCP",
+      blurb: "Federate both targets + HTTPRoute /mcp. failureMode: FailOpen.",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/virtual/",
+    },
+    {
+      id: "openapi",
+      group: "more",
+      label: "Deploy OpenAPI-as-MCP",
+      blurb: "Petstore + ConfigMap schema + OpenAPI backend + /mcp route.",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/openapi/",
+    },
+    {
+      id: "jwt",
+      group: "more",
+      label: "Deploy JWT auth",
+      blurb: "JWT Strict on Gateway agentgateway-proxy (all routes). Inline JWKS from the docs.",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/mcp-access/",
+    },
+    {
+      id: "tool-access",
+      group: "more",
+      label: "Deploy tool access",
+      blurb: "CEL RBAC on github-mcp-backend: alice + get_me only.",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/tool-access/",
+    },
+    {
+      id: "rate-limit",
+      group: "more",
+      label: "Deploy rate limiting",
+      blurb: "Local rate limit on HTTPRoute mcp (5/s, burst 10).",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/rate-limit/",
+    },
+    {
+      id: "search-mode",
+      group: "more",
+      label: "Deploy search mode",
+      blurb: "entMcp toolMode Search + HTTPRoute /mcp/search.",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/tool-mode/search-mode/",
+    },
+    {
+      id: "code-mode",
+      group: "more",
+      label: "Deploy code mode",
+      blurb: "entMcp toolMode Code + HTTPRoute /mcp/code.",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/tool-mode/code-mode/",
+    },
+    {
+      id: "guardrails",
+      group: "more",
+      label: "Deploy guardrails",
+      blurb: "Sample ExtMCP server + mcp-guardrails policy on mcp-backend.",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/guardrails/setup/",
+    },
+    {
+      id: "auth",
+      group: "docs",
+      label: "MCP auth",
+      apply: false,
+      blurb: "OAuth / Keycloak / Entra — needs an IdP. See docs.",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/auth/",
+    },
+    {
+      id: "token-exchange",
+      group: "docs",
+      label: "Token exchange",
+      apply: false,
+      blurb: "OBO, elicitations, and proxy-side OAuth. See docs.",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/token-exchange/overview/",
+    },
+    {
+      id: "apps",
+      group: "docs",
+      label: "MCP Apps",
+      apply: false,
+      blurb: "Interactive MCP UI resources. See docs.",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/apps/",
+    },
+    {
+      id: "composable",
+      group: "docs",
+      label: "Composable MCP",
+      apply: false,
+      blurb: "Multi-step tool pipelines. See docs.",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/composable/",
+    },
+    {
+      id: "https",
+      group: "docs",
+      label: "Connect via HTTPS",
+      apply: false,
+      blurb: "TLS to an upstream MCP server. See docs.",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/https/",
+    },
+    {
+      id: "code-search-mode",
+      group: "docs",
+      label: "Code and search mode",
+      apply: false,
+      blurb: "Combined meta tools. See docs.",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/tool-mode/code-search-mode/",
+    },
+    {
+      id: "spec",
+      group: "docs",
+      label: "MCP spec compatibility",
+      apply: false,
+      blurb: "Version translation. See docs.",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/spec-compatibility/",
+    },
+    {
+      id: "session",
+      group: "docs",
+      label: "Stateful MCP",
+      apply: false,
+      blurb: "Session routing. See docs.",
+      docs: "https://docs.solo.io/agentgateway/latest/mcp/session/",
+    },
+  ];
+
   function quoteKey(key) {
     const s = String(key);
     if (/^[A-Za-z_][A-Za-z0-9_-]*$/.test(s)) {
@@ -1359,6 +1573,693 @@
     return joinDocs([mcpBackendDoc(fields), httpRouteDoc(fields)], header);
   }
 
+  function svcHost(name, namespace) {
+    return `${name}.${cleanNs(namespace)}.svc.cluster.local`;
+  }
+
+  function cloneDoc(doc) {
+    return JSON.parse(JSON.stringify(doc));
+  }
+
+  function walkReplaceDefaultSvc(value, namespace) {
+    if (typeof value === "string") {
+      return value.replace(/\.default\.svc\.cluster\.local/g, `.${namespace}.svc.cluster.local`);
+    }
+    if (Array.isArray(value)) {
+      return value.map((item) => walkReplaceDefaultSvc(item, namespace));
+    }
+    if (isPlainObject(value)) {
+      const out = {};
+      for (const key of Object.keys(value)) {
+        out[key] = walkReplaceDefaultSvc(value[key], namespace);
+      }
+      return out;
+    }
+    return value;
+  }
+
+  function alignAgwGroup(docs, group) {
+    const apiVersion = `${group}/v1alpha1`;
+    return docs.map((doc) => {
+      const next = cloneDoc(doc);
+      if (
+        next.kind === KIND_BACKEND ||
+        next.kind === KIND_POLICY
+      ) {
+        if (
+          next.apiVersion === "agentgateway.dev/v1alpha1" ||
+          next.apiVersion === AGW_API
+        ) {
+          next.apiVersion = apiVersion;
+        }
+      }
+      const rules = pick(next, ["spec", "rules"]) || [];
+      rules.forEach((rule) => {
+        (rule.backendRefs || []).forEach((ref) => {
+          if (
+            ref &&
+            ref.kind === KIND_BACKEND &&
+            (ref.group === "agentgateway.dev" || ref.group === AGW_GROUP)
+          ) {
+            ref.group = group;
+          }
+        });
+      });
+      (pick(next, ["spec", "targetRefs"]) || []).forEach((ref) => {
+        if (
+          ref &&
+          ref.kind === KIND_BACKEND &&
+          (ref.group === "agentgateway.dev" || ref.group === AGW_GROUP)
+        ) {
+          ref.group = group;
+        }
+      });
+      return next;
+    });
+  }
+
+  function everythingServerDocs(namespace) {
+    const ns = cleanNs(namespace);
+    return [
+      {
+        apiVersion: "apps/v1",
+        kind: "Deployment",
+        metadata: {
+          name: "mcp-server-everything",
+          namespace: ns,
+          labels: { app: "mcp-server-everything" },
+        },
+        spec: {
+          replicas: 1,
+          selector: { matchLabels: { app: "mcp-server-everything" } },
+          template: {
+            metadata: { labels: { app: "mcp-server-everything" } },
+            spec: {
+              containers: [
+                {
+                  name: "mcp-server-everything",
+                  image: "node:20-alpine",
+                  command: ["npx"],
+                  args: [
+                    "-y",
+                    "@modelcontextprotocol/server-everything",
+                    "streamableHttp",
+                  ],
+                  ports: [{ containerPort: 3001 }],
+                  readinessProbe: {
+                    tcpSocket: { port: 3001 },
+                    initialDelaySeconds: 2,
+                    periodSeconds: 2,
+                    failureThreshold: 30,
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+      {
+        apiVersion: "v1",
+        kind: "Service",
+        metadata: {
+          name: "mcp-server-everything",
+          namespace: ns,
+          labels: { app: "mcp-server-everything" },
+        },
+        spec: {
+          selector: { app: "mcp-server-everything" },
+          ports: [
+            {
+              protocol: "TCP",
+              port: 3001,
+              targetPort: 3001,
+              appProtocol: "agentgateway.dev/mcp",
+            },
+          ],
+          type: "ClusterIP",
+        },
+      },
+    ];
+  }
+
+  function websiteFetcherDocs(namespace) {
+    const ns = cleanNs(namespace);
+    return [
+      {
+        apiVersion: "apps/v1",
+        kind: "Deployment",
+        metadata: { name: "mcp-website-fetcher", namespace: ns },
+        spec: {
+          selector: { matchLabels: { app: "mcp-website-fetcher" } },
+          template: {
+            metadata: { labels: { app: "mcp-website-fetcher" } },
+            spec: {
+              containers: [
+                {
+                  name: "mcp-website-fetcher",
+                  image: "ghcr.io/peterj/mcp-website-fetcher:main",
+                  imagePullPolicy: "Always",
+                },
+              ],
+            },
+          },
+        },
+      },
+      {
+        apiVersion: "v1",
+        kind: "Service",
+        metadata: {
+          name: "mcp-website-fetcher",
+          namespace: ns,
+          labels: { app: "mcp-website-fetcher" },
+        },
+        spec: {
+          selector: { app: "mcp-website-fetcher" },
+          ports: [
+            {
+              port: 80,
+              targetPort: 8000,
+              appProtocol: "agentgateway.dev/mcp",
+            },
+          ],
+        },
+      },
+    ];
+  }
+
+  function virtualMcpDocs(namespace) {
+    const ns = cleanNs(namespace);
+    return [
+      {
+        apiVersion: "agentgateway.dev/v1alpha1",
+        kind: KIND_BACKEND,
+        metadata: { name: "mcp", namespace: ns },
+        spec: {
+          mcp: {
+            failureMode: "FailOpen",
+            targets: [
+              {
+                name: "mcp-server-everything",
+                selector: {
+                  services: { matchLabels: { app: "mcp-server-everything" } },
+                },
+              },
+              {
+                name: "mcp-website-fetcher",
+                static: {
+                  host: svcHost("mcp-website-fetcher", ns),
+                  port: 80,
+                  protocol: "SSE",
+                },
+              },
+            ],
+          },
+        },
+      },
+      {
+        apiVersion: GW_API,
+        kind: KIND_ROUTE,
+        metadata: { name: "mcp", namespace: ns },
+        spec: {
+          parentRefs: [
+            { name: DEFAULT_GATEWAY, namespace: DEFAULT_NS },
+          ],
+          rules: [
+            {
+              backendRefs: [
+                {
+                  name: "mcp",
+                  group: "agentgateway.dev",
+                  kind: KIND_BACKEND,
+                },
+              ],
+              matches: [{ path: { type: "PathPrefix", value: "/mcp" } }],
+            },
+          ],
+        },
+      },
+    ];
+  }
+
+  function openapiMcpDocs(namespace) {
+    const ns = cleanNs(namespace);
+    return [
+      {
+        apiVersion: "apps/v1",
+        kind: "Deployment",
+        metadata: { name: "petstore", namespace: ns },
+        spec: {
+          replicas: 1,
+          selector: { matchLabels: { app: "petstore" } },
+          template: {
+            metadata: { labels: { app: "petstore" } },
+            spec: {
+              containers: [
+                {
+                  name: "petstore",
+                  image: "soloio/petstore-example:latest",
+                  ports: [{ containerPort: 8080 }],
+                },
+              ],
+            },
+          },
+        },
+      },
+      {
+        apiVersion: "v1",
+        kind: "Service",
+        metadata: { name: "petstore", namespace: ns },
+        spec: {
+          selector: { app: "petstore" },
+          ports: [{ port: 8080, targetPort: 8080 }],
+        },
+      },
+      {
+        apiVersion: "v1",
+        kind: "ConfigMap",
+        metadata: { name: "petstore-schema", namespace: ns },
+        data: { schema: JSON.stringify(PETSTORE_OPENAPI_SCHEMA, null, 2) },
+      },
+      {
+        apiVersion: AGW_API,
+        kind: KIND_BACKEND,
+        metadata: { name: "petstore-openapi", namespace: ns },
+        spec: {
+          entMcp: {
+            targets: [
+              {
+                name: "petstore",
+                static: {
+                  host: svcHost("petstore", ns),
+                  port: 8080,
+                  protocol: "OpenAPI",
+                  openAPI: { schemaRef: { name: "petstore-schema" } },
+                },
+              },
+            ],
+          },
+        },
+      },
+      {
+        apiVersion: GW_API,
+        kind: KIND_ROUTE,
+        metadata: { name: "openapi-mcp", namespace: ns },
+        spec: {
+          parentRefs: [
+            { name: DEFAULT_GATEWAY, namespace: DEFAULT_NS },
+          ],
+          rules: [
+            {
+              matches: [{ path: { type: "PathPrefix", value: "/mcp" } }],
+              backendRefs: [
+                {
+                  name: "petstore-openapi",
+                  group: AGW_GROUP,
+                  kind: KIND_BACKEND,
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ];
+  }
+
+  function jwtAuthDocs(namespace) {
+    const ns = cleanNs(namespace);
+    return [
+      {
+        apiVersion: AGW_API,
+        kind: KIND_POLICY,
+        metadata: { name: "jwt", namespace: ns },
+        spec: {
+          targetRefs: [
+            {
+              group: "gateway.networking.k8s.io",
+              kind: KIND_GATEWAY,
+              name: DEFAULT_GATEWAY,
+            },
+          ],
+          traffic: {
+            jwtAuthentication: {
+              mode: "Strict",
+              providers: [
+                { issuer: "solo.io", jwks: { inline: MCP_JWT_JWKS } },
+              ],
+            },
+          },
+        },
+      },
+    ];
+  }
+
+  function toolAccessDocs(namespace) {
+    const ns = cleanNs(namespace);
+    return [
+      {
+        apiVersion: AGW_API,
+        kind: KIND_POLICY,
+        metadata: { name: "jwt-rbac", namespace: ns },
+        spec: {
+          targetRefs: [
+            {
+              group: "agentgateway.dev",
+              kind: KIND_BACKEND,
+              name: "github-mcp-backend",
+            },
+          ],
+          backend: {
+            mcp: {
+              authorization: {
+                action: "Allow",
+                policy: {
+                  matchExpressions: [
+                    'jwt.sub == "alice" && mcp.tool.name == "get_me"',
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+    ];
+  }
+
+  function mcpRateLimitDocs(namespace) {
+    const ns = cleanNs(namespace);
+    return [
+      {
+        apiVersion: AGW_API,
+        kind: KIND_POLICY,
+        metadata: { name: "mcp-rate-limit", namespace: ns },
+        spec: {
+          targetRefs: [
+            {
+              group: "gateway.networking.k8s.io",
+              kind: KIND_ROUTE,
+              name: "mcp",
+            },
+          ],
+          traffic: {
+            rateLimit: {
+              local: [{ requests: 5, unit: "Seconds", burst: 10 }],
+            },
+          },
+        },
+      },
+    ];
+  }
+
+  function searchModeDocs(namespace) {
+    const ns = cleanNs(namespace);
+    return [
+      {
+        apiVersion: AGW_API,
+        kind: KIND_BACKEND,
+        metadata: { name: "mcp-search-backend", namespace: ns },
+        spec: {
+          entMcp: {
+            toolMode: "Search",
+            targets: [
+              {
+                name: "fetcher",
+                static: {
+                  host: svcHost("mcp-website-fetcher", ns),
+                  port: 80,
+                  protocol: "SSE",
+                },
+              },
+            ],
+          },
+        },
+      },
+      {
+        apiVersion: GW_API,
+        kind: KIND_ROUTE,
+        metadata: { name: "mcp-search", namespace: ns },
+        spec: {
+          parentRefs: [
+            { name: DEFAULT_GATEWAY, namespace: DEFAULT_NS },
+          ],
+          rules: [
+            {
+              matches: [
+                { path: { type: "PathPrefix", value: "/mcp/search" } },
+              ],
+              filters: [
+                {
+                  type: "URLRewrite",
+                  urlRewrite: {
+                    path: {
+                      type: "ReplacePrefixMatch",
+                      replacePrefixMatch: "/mcp",
+                    },
+                  },
+                },
+              ],
+              backendRefs: [
+                {
+                  name: "mcp-search-backend",
+                  group: AGW_GROUP,
+                  kind: KIND_BACKEND,
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ];
+  }
+
+  function codeModeDocs(namespace) {
+    const ns = cleanNs(namespace);
+    return [
+      {
+        apiVersion: AGW_API,
+        kind: KIND_BACKEND,
+        metadata: { name: "mcp-code-backend", namespace: ns },
+        spec: {
+          entMcp: {
+            toolMode: "Code",
+            codeMode: { timeout: "7s" },
+            targets: [
+              {
+                name: "fetcher",
+                static: {
+                  host: svcHost("mcp-website-fetcher", ns),
+                  port: 80,
+                  protocol: "SSE",
+                },
+              },
+            ],
+          },
+        },
+      },
+      {
+        apiVersion: GW_API,
+        kind: KIND_ROUTE,
+        metadata: { name: "mcp-code", namespace: ns },
+        spec: {
+          parentRefs: [
+            { name: DEFAULT_GATEWAY, namespace: DEFAULT_NS },
+          ],
+          rules: [
+            {
+              matches: [{ path: { type: "PathPrefix", value: "/mcp/code" } }],
+              filters: [
+                {
+                  type: "URLRewrite",
+                  urlRewrite: {
+                    path: {
+                      type: "ReplacePrefixMatch",
+                      replacePrefixMatch: "/mcp",
+                    },
+                  },
+                },
+              ],
+              backendRefs: [
+                {
+                  name: "mcp-code-backend",
+                  group: AGW_GROUP,
+                  kind: KIND_BACKEND,
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ];
+  }
+
+  function guardrailsDocs(namespace) {
+    const ns = cleanNs(namespace);
+    return [
+      {
+        apiVersion: "apps/v1",
+        kind: "Deployment",
+        metadata: { name: "ext-mcp-server", namespace: ns },
+        spec: {
+          selector: { matchLabels: { app: "ext-mcp-server" } },
+          template: {
+            metadata: { labels: { app: "ext-mcp-server" } },
+            spec: {
+              securityContext: {
+                sysctls: [
+                  {
+                    name: "net.ipv4.ip_unprivileged_port_start",
+                    value: "0",
+                  },
+                ],
+              },
+              containers: [
+                {
+                  name: "ext-mcp-server",
+                  image: "gcr.io/solo-public/docs/testbox:latest",
+                  readinessProbe: {
+                    httpGet: { path: "/", port: 80 },
+                    periodSeconds: 5,
+                    failureThreshold: 3,
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+      {
+        apiVersion: "v1",
+        kind: "Service",
+        metadata: { name: "ext-mcp", namespace: ns, labels: { app: "ext-mcp" } },
+        spec: {
+          selector: { app: "ext-mcp-server" },
+          ports: [
+            {
+              port: 4445,
+              targetPort: 9001,
+              protocol: "TCP",
+              appProtocol: "kubernetes.io/h2c",
+            },
+          ],
+        },
+      },
+      {
+        apiVersion: AGW_API,
+        kind: KIND_BACKEND,
+        metadata: { name: "mcp-backend", namespace: ns },
+        spec: {
+          mcp: {
+            targets: [
+              {
+                name: "mcp-target",
+                static: {
+                  host: svcHost("mcp-website-fetcher", ns),
+                  port: 80,
+                  protocol: "SSE",
+                },
+              },
+            ],
+          },
+        },
+      },
+      {
+        apiVersion: GW_API,
+        kind: KIND_ROUTE,
+        metadata: { name: "mcp", namespace: ns },
+        spec: {
+          parentRefs: [
+            { name: DEFAULT_GATEWAY, namespace: DEFAULT_NS },
+          ],
+          rules: [
+            {
+              matches: [{ path: { type: "PathPrefix", value: "/mcp" } }],
+              backendRefs: [
+                {
+                  name: "mcp-backend",
+                  group: AGW_GROUP,
+                  kind: KIND_BACKEND,
+                },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        apiVersion: AGW_API,
+        kind: KIND_POLICY,
+        metadata: { name: "mcp-guardrails", namespace: ns },
+        spec: {
+          targetRefs: [
+            {
+              group: AGW_GROUP,
+              kind: KIND_BACKEND,
+              name: "mcp-backend",
+            },
+          ],
+          backend: {
+            mcp: {
+              guardrails: {
+                processors: [
+                  {
+                    remote: {
+                      backendRef: { name: "ext-mcp", port: 4445 },
+                      failureMode: "FailClosed",
+                    },
+                    methods: {
+                      "tools/call": "Request",
+                      "tools/list": "Response",
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    ];
+  }
+
+  const MCP_DEPLOY_BUILDERS = {
+    everything: everythingServerDocs,
+    fetcher: websiteFetcherDocs,
+    virtual: virtualMcpDocs,
+    openapi: openapiMcpDocs,
+    jwt: jwtAuthDocs,
+    "tool-access": toolAccessDocs,
+    "rate-limit": mcpRateLimitDocs,
+    "search-mode": searchModeDocs,
+    "code-mode": codeModeDocs,
+    guardrails: guardrailsDocs,
+  };
+
+  function mcpDeployRecipe(id) {
+    return MCP_DEPLOYS.find((item) => item.id === id) || null;
+  }
+
+  function mcpDeployDocs(id, options) {
+    const build = MCP_DEPLOY_BUILDERS[id];
+    if (!build) {
+      return [];
+    }
+    const namespace = cleanNs(options && options.namespace);
+    let docs = build(namespace).map(cloneDoc);
+    if (namespace !== "default") {
+      docs = docs.map((doc) => walkReplaceDefaultSvc(doc, namespace));
+    }
+    if (options && options.backendGroup) {
+      docs = alignAgwGroup(docs, options.backendGroup);
+    }
+    return docs;
+  }
+
+  function generateMcpDeployYaml(id, options) {
+    const recipe = mcpDeployRecipe(id);
+    const docs = mcpDeployDocs(id, options);
+    if (!recipe || docs.length === 0) {
+      return "";
+    }
+    return joinDocs(docs, `# Docs: ${recipe.docs}\n`);
+  }
+
   function llmDefaults(provider) {
     const spec = LLM_DEFAULTS[provider] || LLM_DEFAULTS.openai;
     const fallbackProvider = provider === "openai" ? "claude" : "openai";
@@ -1669,11 +2570,16 @@
     LLM_CATALOG,
     catalogRecipe,
     MCP_PRESETS,
+    MCP_DEPLOYS,
     HEALTH_DEFAULTS,
     llmDefaults,
     mcpDefaults,
     generateLlmYaml,
     generateMcpYaml,
+    mcpDeployRecipe,
+    mcpDeployDocs,
+    generateMcpDeployYaml,
+    alignAgwGroup,
     isFailoverPreset,
     normalizeFailoverPreset,
     parseModelList,

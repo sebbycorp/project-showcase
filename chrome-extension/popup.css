@@ -109,6 +109,84 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+}
+
+.cluster-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 154px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+}
+
+.cluster-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: 0 0 auto;
+}
+
+.cluster-chip-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+}
+
+.cluster-chip-hint {
+  max-width: 118px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9.5px;
+  font-weight: 500;
+}
+
+.cluster-chip:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.cluster-chip.is-checking {
+  color: var(--running);
+  background: var(--running-bg);
+  border-color: rgb(138 106 18 / 28%);
+}
+
+.cluster-chip.is-checking .cluster-chip-dot {
+  background: var(--running);
+}
+
+.cluster-chip.is-connected {
+  color: var(--ok-fg);
+  background: var(--ok);
+  border-color: rgb(12 116 105 / 28%);
+}
+
+.cluster-chip.is-connected .cluster-chip-dot {
+  background: var(--ok-fg);
+}
+
+.cluster-chip.is-disconnected {
+  color: var(--muted);
+}
+
+.cluster-chip.is-disconnected .cluster-chip-dot {
+  background: var(--error-fg);
 }
 
 .demo-btn,
@@ -1457,6 +1535,81 @@ html.demo-stage .seq-wire {
 .catalog-item.is-docs {
   font-weight: 500;
   color: var(--muted);
+}
+
+.mcp-deploys {
+  margin: 0 0 14px;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.mcp-deploys-head .hint {
+  margin: 4px 0 8px;
+}
+
+.mcp-deploy-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.mcp-deploy-primary .btn {
+  width: 100%;
+  justify-content: center;
+  font-weight: 650;
+}
+
+.mcp-deploy-more-label {
+  margin-top: 12px;
+}
+
+.mcp-deploy-more .btn,
+.mcp-docs-card {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.mcp-docs-cards {
+  display: grid;
+  gap: 6px;
+}
+
+.mcp-docs-card {
+  display: block;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.mcp-docs-card:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.mcp-docs-card strong {
+  display: block;
+  color: var(--text);
+  font-weight: 650;
+}
+
+.mcp-deploy-btn.is-busy {
+  opacity: 0.8;
+}
+
+.mcp-deploy-btn.is-ok {
+  border-color: var(--ok-fg);
+}
+
+.mcp-deploy-btn.is-fail {
+  border-color: #b42318;
 }
 
 .catalog-selected {

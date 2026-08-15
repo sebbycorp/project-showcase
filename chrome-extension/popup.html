@@ -22,6 +22,19 @@
         <div class="header-actions">
           <button
             type="button"
+            id="cluster-chip"
+            class="cluster-chip is-disconnected"
+            aria-live="polite"
+            title="Cluster connection — open Settings"
+          >
+            <span class="cluster-chip-dot" aria-hidden="true"></span>
+            <span class="cluster-chip-copy">
+              <span id="cluster-chip-label">Not connected</span>
+              <span id="cluster-chip-hint" class="cluster-chip-hint" hidden></span>
+            </span>
+          </button>
+          <button
+            type="button"
             id="demo-toggle"
             class="demo-btn"
             aria-pressed="false"
@@ -360,7 +373,7 @@
           ></div>
         </article>
 
-        <details class="deploy">
+        <details class="deploy" id="llm-deploy" data-deploy-key="llmDeployOpen">
           <summary>Build &amp; apply config</summary>
           <div class="deploy-body">
             <p class="hint" data-deploy-hint></p>
@@ -846,8 +859,39 @@
       <div class="area-body">
         <div class="service-intro">
           <h2 class="service-title">MCP</h2>
-          <p class="hint">Probe MCP initialize through the gateway.</p>
+          <p class="hint">
+            One-click deploys from the Solo MCP docs, then probe initialize,
+            tools, and JWT through the gateway.
+          </p>
         </div>
+
+        <div class="mcp-deploys" id="mcp-deploys">
+          <div class="mcp-deploys-head">
+            <span class="field-label">One-click deploys</span>
+            <p class="hint" data-deploy-hint></p>
+          </div>
+          <div
+            class="mcp-deploy-grid mcp-deploy-primary"
+            id="mcp-deploy-primary"
+          ></div>
+          <div class="field-label mcp-deploy-more-label">More from the docs</div>
+          <div class="mcp-deploy-grid mcp-deploy-more" id="mcp-deploy-more"></div>
+          <div class="field-label mcp-deploy-more-label">See docs</div>
+          <div class="mcp-docs-cards" id="mcp-docs-cards"></div>
+          <div id="mcp-deploy-result" class="result-box" hidden></div>
+        </div>
+
+        <label class="field-label" for="mcp-endpoint">MCP endpoint</label>
+        <input
+          id="mcp-endpoint"
+          type="url"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="http://host/mcp"
+        />
+        <p class="hint">
+          Defaults to the Chat gateway host + <code>/mcp</code>.
+        </p>
 
         <article class="test-card" id="test-mcp">
           <div class="test-head">
@@ -859,14 +903,6 @@
               Run
             </button>
           </div>
-          <label class="field-label" for="mcp-endpoint">MCP endpoint</label>
-          <input
-            id="mcp-endpoint"
-            type="url"
-            spellcheck="false"
-            autocomplete="off"
-            placeholder="http://host/mcp"
-          />
           <figure
             class="seq seq-compact"
             id="seq-mcp-init"
@@ -905,7 +941,289 @@
           <div id="result-mcp" class="test-drawer" hidden aria-live="polite"></div>
         </article>
 
-        <details class="deploy">
+        <article class="test-card" id="test-mcp-list">
+          <div class="test-head">
+            <div class="test-copy">
+              <div class="test-name">List tools</div>
+              <p class="hint">MCP tools/list on the configured endpoint.</p>
+            </div>
+            <button id="probe-mcp-list" type="button" class="btn btn-run">
+              Run
+            </button>
+          </div>
+          <figure
+            class="seq seq-compact"
+            id="seq-mcp-list"
+            aria-live="polite"
+            data-mode="via-gw"
+            aria-label="Request path"
+          >
+            <div class="seq-fwd">
+              <div class="seq-col">
+                <div class="seq-box" data-role="client" title="AI Agent">
+                  <img class="seq-icon" src="icons/ai-agent.svg" alt="" />
+                </div>
+                <span class="seq-hop" data-hop="client" hidden></span>
+              </div>
+              <div class="seq-arrow" data-step="1" aria-hidden="true">
+                <span class="seq-ms" hidden></span>
+              </div>
+              <div class="seq-col" data-slot="gateway">
+                <div class="seq-box seq-gw" data-role="gateway" title="Agentgateway">
+                  <img class="seq-logo" src="icons/agw-mark-color.svg" alt="" />
+                </div>
+                <span class="seq-hop" data-hop="gateway" hidden></span>
+              </div>
+              <div class="seq-arrow" data-step="2" aria-hidden="true">
+                <span class="seq-ms" hidden></span>
+                <span class="seq-wire" hidden></span>
+              </div>
+              <div class="seq-col">
+                <div class="seq-box" data-role="target" title="MCP">
+                  <img class="seq-icon" src="icons/mcp.svg" alt="" data-target-icon />
+                </div>
+                <span class="seq-hop" data-hop="target" hidden></span>
+              </div>
+            </div>
+          </figure>
+          <div
+            id="result-mcp-list"
+            class="test-drawer"
+            hidden
+            aria-live="polite"
+          ></div>
+        </article>
+
+        <article class="test-card" id="test-mcp-echo">
+          <div class="test-head">
+            <div class="test-copy">
+              <div class="test-name">Call echo</div>
+              <p class="hint">
+                tools/call echo or mcp-server-everything-3001_echo.
+              </p>
+            </div>
+            <button id="probe-mcp-echo" type="button" class="btn btn-run">
+              Run
+            </button>
+          </div>
+          <figure
+            class="seq seq-compact"
+            id="seq-mcp-echo"
+            aria-live="polite"
+            data-mode="via-gw"
+            aria-label="Request path"
+          >
+            <div class="seq-fwd">
+              <div class="seq-col">
+                <div class="seq-box" data-role="client" title="AI Agent">
+                  <img class="seq-icon" src="icons/ai-agent.svg" alt="" />
+                </div>
+                <span class="seq-hop" data-hop="client" hidden></span>
+              </div>
+              <div class="seq-arrow" data-step="1" aria-hidden="true">
+                <span class="seq-ms" hidden></span>
+              </div>
+              <div class="seq-col" data-slot="gateway">
+                <div class="seq-box seq-gw" data-role="gateway" title="Agentgateway">
+                  <img class="seq-logo" src="icons/agw-mark-color.svg" alt="" />
+                </div>
+                <span class="seq-hop" data-hop="gateway" hidden></span>
+              </div>
+              <div class="seq-arrow" data-step="2" aria-hidden="true">
+                <span class="seq-ms" hidden></span>
+                <span class="seq-wire" hidden></span>
+              </div>
+              <div class="seq-col">
+                <div class="seq-box" data-role="target" title="MCP">
+                  <img class="seq-icon" src="icons/mcp.svg" alt="" data-target-icon />
+                </div>
+                <span class="seq-hop" data-hop="target" hidden></span>
+              </div>
+            </div>
+          </figure>
+          <div
+            id="result-mcp-echo"
+            class="test-drawer"
+            hidden
+            aria-live="polite"
+          ></div>
+        </article>
+
+        <article class="test-card" id="test-mcp-fetch">
+          <div class="test-head">
+            <div class="test-copy">
+              <div class="test-name">Call fetch</div>
+              <p class="hint">
+                tools/call fetch or mcp-website-fetcher_fetch on example.com.
+              </p>
+            </div>
+            <button id="probe-mcp-fetch" type="button" class="btn btn-run">
+              Run
+            </button>
+          </div>
+          <figure
+            class="seq seq-compact"
+            id="seq-mcp-fetch"
+            aria-live="polite"
+            data-mode="via-gw"
+            aria-label="Request path"
+          >
+            <div class="seq-fwd">
+              <div class="seq-col">
+                <div class="seq-box" data-role="client" title="AI Agent">
+                  <img class="seq-icon" src="icons/ai-agent.svg" alt="" />
+                </div>
+                <span class="seq-hop" data-hop="client" hidden></span>
+              </div>
+              <div class="seq-arrow" data-step="1" aria-hidden="true">
+                <span class="seq-ms" hidden></span>
+              </div>
+              <div class="seq-col" data-slot="gateway">
+                <div class="seq-box seq-gw" data-role="gateway" title="Agentgateway">
+                  <img class="seq-logo" src="icons/agw-mark-color.svg" alt="" />
+                </div>
+                <span class="seq-hop" data-hop="gateway" hidden></span>
+              </div>
+              <div class="seq-arrow" data-step="2" aria-hidden="true">
+                <span class="seq-ms" hidden></span>
+                <span class="seq-wire" hidden></span>
+              </div>
+              <div class="seq-col">
+                <div class="seq-box" data-role="target" title="MCP">
+                  <img class="seq-icon" src="icons/mcp.svg" alt="" data-target-icon />
+                </div>
+                <span class="seq-hop" data-hop="target" hidden></span>
+              </div>
+            </div>
+          </figure>
+          <div
+            id="result-mcp-fetch"
+            class="test-drawer"
+            hidden
+            aria-live="polite"
+          ></div>
+        </article>
+
+        <article class="test-card" id="test-mcp-jwt">
+          <div class="test-head">
+            <div class="test-copy">
+              <div class="test-name">JWT / unauth</div>
+              <p class="hint">
+                Probe without a token (expect deny), then with a pasted token.
+                No JWT minting.
+              </p>
+            </div>
+            <button id="probe-mcp-jwt" type="button" class="btn btn-run">
+              Run
+            </button>
+          </div>
+          <label class="field-label" for="mcp-jwt-token">Bearer token</label>
+          <input
+            id="mcp-jwt-token"
+            type="password"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="optional — paste a token to retry with Authorization"
+          />
+          <figure
+            class="seq seq-compact"
+            id="seq-mcp-jwt"
+            aria-live="polite"
+            data-mode="via-gw"
+            aria-label="Request path"
+          >
+            <div class="seq-fwd">
+              <div class="seq-col">
+                <div class="seq-box" data-role="client" title="AI Agent">
+                  <img class="seq-icon" src="icons/ai-agent.svg" alt="" />
+                </div>
+                <span class="seq-hop" data-hop="client" hidden></span>
+              </div>
+              <div class="seq-arrow" data-step="1" aria-hidden="true">
+                <span class="seq-ms" hidden></span>
+              </div>
+              <div class="seq-col" data-slot="gateway">
+                <div class="seq-box seq-gw" data-role="gateway" title="Agentgateway">
+                  <img class="seq-logo" src="icons/agw-mark-color.svg" alt="" />
+                </div>
+                <span class="seq-hop" data-hop="gateway" hidden></span>
+              </div>
+              <div class="seq-arrow" data-step="2" aria-hidden="true">
+                <span class="seq-ms" hidden></span>
+                <span class="seq-wire" hidden></span>
+              </div>
+              <div class="seq-col">
+                <div class="seq-box" data-role="target" title="MCP">
+                  <img class="seq-icon" src="icons/mcp.svg" alt="" data-target-icon />
+                </div>
+                <span class="seq-hop" data-hop="target" hidden></span>
+              </div>
+            </div>
+          </figure>
+          <div
+            id="result-mcp-jwt"
+            class="test-drawer"
+            hidden
+            aria-live="polite"
+          ></div>
+        </article>
+
+        <article class="test-card" id="test-mcp-tools">
+          <div class="test-head">
+            <div class="test-copy">
+              <div class="test-name">Tool calling</div>
+              <p class="hint">
+                initialize + tools/list + one tools/call. Shows tool names.
+              </p>
+            </div>
+            <button id="probe-mcp-tools" type="button" class="btn btn-run">
+              Run
+            </button>
+          </div>
+          <figure
+            class="seq seq-compact"
+            id="seq-mcp-tools"
+            aria-live="polite"
+            data-mode="via-gw"
+            aria-label="Request path"
+          >
+            <div class="seq-fwd">
+              <div class="seq-col">
+                <div class="seq-box" data-role="client" title="AI Agent">
+                  <img class="seq-icon" src="icons/ai-agent.svg" alt="" />
+                </div>
+                <span class="seq-hop" data-hop="client" hidden></span>
+              </div>
+              <div class="seq-arrow" data-step="1" aria-hidden="true">
+                <span class="seq-ms" hidden></span>
+              </div>
+              <div class="seq-col" data-slot="gateway">
+                <div class="seq-box seq-gw" data-role="gateway" title="Agentgateway">
+                  <img class="seq-logo" src="icons/agw-mark-color.svg" alt="" />
+                </div>
+                <span class="seq-hop" data-hop="gateway" hidden></span>
+              </div>
+              <div class="seq-arrow" data-step="2" aria-hidden="true">
+                <span class="seq-ms" hidden></span>
+                <span class="seq-wire" hidden></span>
+              </div>
+              <div class="seq-col">
+                <div class="seq-box" data-role="target" title="MCP">
+                  <img class="seq-icon" src="icons/mcp.svg" alt="" data-target-icon />
+                </div>
+                <span class="seq-hop" data-hop="target" hidden></span>
+              </div>
+            </div>
+          </figure>
+          <div
+            id="result-mcp-tools"
+            class="test-drawer"
+            hidden
+            aria-live="polite"
+          ></div>
+        </article>
+
+        <details class="deploy" id="mcp-deploy" data-deploy-key="mcpDeployOpen">
           <summary>Build &amp; apply config</summary>
           <div class="deploy-body">
             <p class="hint" data-deploy-hint></p>
@@ -1119,7 +1437,7 @@
           <div id="result-a2a" class="test-drawer" hidden aria-live="polite"></div>
         </article>
 
-        <details class="deploy">
+        <details class="deploy" id="a2a-deploy" data-deploy-key="a2aDeployOpen">
           <summary>Deploy config</summary>
           <div class="deploy-body">
             <p class="hint" data-deploy-hint></p>
@@ -1312,7 +1630,7 @@
           <div id="result-junk" class="test-drawer" hidden aria-live="polite"></div>
         </article>
 
-        <details class="deploy">
+        <details class="deploy" id="api-deploy" data-deploy-key="apiDeployOpen">
           <summary>Deploy config</summary>
           <div class="deploy-body">
             <p class="hint" data-deploy-hint></p>
@@ -1370,11 +1688,12 @@
         </label>
       </div>
 
-      <div class="panel cluster-panel">
+      <div class="panel cluster-panel" id="cluster-panel">
         <h2 class="cluster-heading">Cluster</h2>
         <p class="hint">
           API server, token, and Apply for Gateway / Agentgateway CRDs. Used by
-          the LLM and MCP builders and each tab’s Deploy accordion.
+          the LLM and MCP builders, MCP one-click deploys, and each tab’s
+          Deploy accordion.
         </p>
         <label class="field-label" for="cluster-source">Source</label>
         <select id="cluster-source">
