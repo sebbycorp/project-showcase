@@ -358,24 +358,175 @@
         </article>
 
         <details class="deploy">
-          <summary>Deploy config</summary>
+          <summary>Build &amp; apply config</summary>
           <div class="deploy-body">
             <p class="hint" data-deploy-hint></p>
-            <label class="field-label" for="llm-example">Prebuilt example</label>
-            <select id="llm-example">
-              <option value="gateway">Gateway (HTTP :80)</option>
-              <option value="openai">OpenAI backend + HTTPRoute</option>
-              <option value="failover">Failover backend (primary + fallback)</option>
-              <option value="httproute">HTTPRoute add-on (/openai)</option>
-            </select>
-            <label class="field-label" for="llm-yaml">YAML</label>
+            <div class="builder-section-head">
+              <span class="field-label">Inventory</span>
+              <button
+                id="llm-inv-refresh"
+                type="button"
+                class="btn btn-secondary btn-tiny"
+              >
+                Refresh
+              </button>
+            </div>
+            <div id="llm-inventory" class="inventory" hidden></div>
+            <label class="field-label" for="llm-preset">Preset</label>
+            <select id="llm-preset"></select>
+            <span class="field-label" id="llm-builder-provider-label">
+              Provider
+            </span>
+            <div
+              class="provider-switch"
+              id="llm-builder-provider"
+              role="radiogroup"
+              aria-labelledby="llm-builder-provider-label"
+            ></div>
+            <div class="field-grid">
+              <div>
+                <label class="field-label" for="llm-name">Name</label>
+                <input
+                  id="llm-name"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="openai"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="llm-namespace">Namespace</label>
+                <input
+                  id="llm-namespace"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="agentgateway-system"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="llm-model">Model</label>
+                <input
+                  id="llm-model"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="gpt-4o-mini"
+                />
+              </div>
+              <div id="llm-fallback-wrap" hidden>
+                <label class="field-label" for="llm-fallback">
+                  Fallback model
+                </label>
+                <input
+                  id="llm-fallback"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="gpt-4o"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="llm-secret">
+                  secretRef name
+                </label>
+                <input
+                  id="llm-secret"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="openai-secret"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="llm-path">Route path</label>
+                <input
+                  id="llm-path"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="/v1/chat/completions or /openai"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="llm-gateway">
+                  Parent Gateway
+                </label>
+                <input
+                  id="llm-gateway"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="agentgateway-proxy"
+                />
+              </div>
+              <div id="llm-host-wrap" hidden>
+                <label class="field-label" for="llm-host">Compat host</label>
+                <input
+                  id="llm-host"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="api.x.ai"
+                />
+              </div>
+              <div id="llm-port-wrap" hidden>
+                <label class="field-label" for="llm-port">Port</label>
+                <input
+                  id="llm-port"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="443"
+                />
+              </div>
+              <div id="llm-provider-path-wrap" hidden>
+                <label class="field-label" for="llm-provider-path">
+                  Provider path
+                </label>
+                <input
+                  id="llm-provider-path"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="/v1/chat/completions"
+                />
+              </div>
+              <div id="llm-region-wrap" hidden>
+                <label class="field-label" for="llm-region">Region</label>
+                <input
+                  id="llm-region"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="us-east-1"
+                />
+              </div>
+            </div>
+            <label class="field-label" for="llm-yaml">YAML preview</label>
             <textarea
               id="llm-yaml"
-              rows="8"
+              rows="10"
               spellcheck="false"
               autocomplete="off"
             ></textarea>
-            <button id="apply-llm" type="button" class="btn">Apply</button>
+            <div class="button-row">
+              <button id="llm-regen" type="button" class="btn btn-secondary">
+                Regenerate
+              </button>
+              <button id="apply-llm" type="button" class="btn">Apply</button>
+            </div>
             <div id="llm-apply-result" class="result-box" hidden></div>
           </div>
         </details>
@@ -446,21 +597,150 @@
         </article>
 
         <details class="deploy">
-          <summary>Deploy config</summary>
+          <summary>Build &amp; apply config</summary>
           <div class="deploy-body">
             <p class="hint" data-deploy-hint></p>
-            <label class="field-label" for="mcp-example">Prebuilt example</label>
-            <select id="mcp-example">
-              <option value="mcp">MCP backend + HTTPRoute</option>
-            </select>
-            <label class="field-label" for="mcp-yaml">YAML</label>
+            <div class="builder-section-head">
+              <span class="field-label">Inventory</span>
+              <button
+                id="mcp-inv-refresh"
+                type="button"
+                class="btn btn-secondary btn-tiny"
+              >
+                Refresh
+              </button>
+            </div>
+            <div id="mcp-inventory" class="inventory" hidden></div>
+            <label class="field-label" for="mcp-preset">Preset</label>
+            <select id="mcp-preset"></select>
+            <div class="field-grid">
+              <div>
+                <label class="field-label" for="mcp-name">Name</label>
+                <input
+                  id="mcp-name"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="mcp-backend"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="mcp-namespace">Namespace</label>
+                <input
+                  id="mcp-namespace"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="agentgateway-system"
+                />
+              </div>
+              <div class="field-span">
+                <label class="field-label" for="mcp-host">
+                  Target host / URL
+                </label>
+                <input
+                  id="mcp-host"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="mcp-website-fetcher.default.svc.cluster.local"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="mcp-port">Port</label>
+                <input
+                  id="mcp-port"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="80"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="mcp-protocol">Protocol</label>
+                <select id="mcp-protocol" class="builder-field">
+                  <option value="SSE">SSE</option>
+                  <option value="StreamableHTTP">StreamableHTTP</option>
+                  <option value="OpenAPI">OpenAPI</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label" for="mcp-path">Route path</label>
+                <input
+                  id="mcp-path"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="/mcp"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="mcp-gateway">
+                  Parent Gateway
+                </label>
+                <input
+                  id="mcp-gateway"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="agentgateway-proxy"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="mcp-tool-mode">Tool mode</label>
+                <select id="mcp-tool-mode" class="builder-field">
+                  <option value="Standard">Standard</option>
+                  <option value="Search">Search</option>
+                  <option value="Code">Code</option>
+                  <option value="CodeSearch">CodeSearch</option>
+                </select>
+              </div>
+              <div>
+                <label class="field-label" for="mcp-secret">
+                  secretRef name
+                </label>
+                <input
+                  id="mcp-secret"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="optional"
+                />
+              </div>
+              <div id="mcp-schema-wrap" hidden>
+                <label class="field-label" for="mcp-schema">
+                  OpenAPI ConfigMap
+                </label>
+                <input
+                  id="mcp-schema"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="petstore-schema"
+                />
+              </div>
+            </div>
+            <label class="field-label" for="mcp-yaml">YAML preview</label>
             <textarea
               id="mcp-yaml"
-              rows="8"
+              rows="10"
               spellcheck="false"
               autocomplete="off"
             ></textarea>
-            <button id="apply-mcp" type="button" class="btn">Apply</button>
+            <div class="button-row">
+              <button id="mcp-regen" type="button" class="btn btn-secondary">
+                Regenerate
+              </button>
+              <button id="apply-mcp" type="button" class="btn">Apply</button>
+            </div>
             <div id="mcp-apply-result" class="result-box" hidden></div>
           </div>
         </details>
@@ -785,7 +1065,7 @@
         <h2 class="cluster-heading">Cluster</h2>
         <p class="hint">
           API server, token, and Apply for Gateway / Agentgateway CRDs. Used by
-          each tab’s Deploy config accordion.
+          the LLM and MCP builders and each tab’s Deploy accordion.
         </p>
         <label class="field-label" for="cluster-type">Cluster type</label>
         <select id="cluster-type">
@@ -843,14 +1123,25 @@
         </button>
         <div id="cluster-test-result" class="result-box" hidden></div>
 
-        <h2 class="cluster-heading">CRDs</h2>
+        <h2 class="cluster-heading">Resources</h2>
         <p class="hint">
-          List or apply Gateway API and Agentgateway resources in the namespace
-          above. Apply accepts YAML (or JSON) and may contain multiple documents.
+          Gateway, Backend, HTTPRoute, and Policy in the namespace above. Load
+          one into the YAML box or delete it. Apply still accepts freeform YAML
+          (or JSON) with multiple documents.
         </p>
-
-        <label class="field-label" for="crd-kind">Kind</label>
-        <select id="crd-kind">
+        <div class="builder-section-head">
+          <span class="field-label">In cluster</span>
+          <button
+            id="list-crds"
+            type="button"
+            class="btn btn-secondary btn-tiny"
+          >
+            Refresh
+          </button>
+        </div>
+        <div id="cluster-inventory" class="inventory" hidden></div>
+        <div id="crd-list-result" class="result-box" hidden></div>
+        <select id="crd-kind" hidden>
           <option value="Gateway">Gateway</option>
           <option value="HTTPRoute">HTTPRoute</option>
           <option value="EnterpriseAgentgatewayBackend">
@@ -860,8 +1151,6 @@
             EnterpriseAgentgatewayPolicy
           </option>
         </select>
-        <button id="list-crds" type="button" class="btn">List</button>
-        <div id="crd-list-result" class="result-box" hidden></div>
 
         <label class="field-label" for="crd-yaml">YAML</label>
         <textarea
@@ -883,6 +1172,7 @@
     <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
     <script src="yaml.js"></script>
     <script src="examples.js"></script>
+    <script src="builder.js"></script>
     <script src="confetti.js"></script>
     <script src="popup.js"></script>
   </body>

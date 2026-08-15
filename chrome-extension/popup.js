@@ -28,6 +28,29 @@ const STORAGE_KEYS = [
   "a2aExample",
   "securityExample",
   "apiExample",
+  "llmPreset",
+  "llmName",
+  "llmBuilderNamespace",
+  "llmBuilderModel",
+  "llmBuilderFallback",
+  "llmSecret",
+  "llmPath",
+  "llmGateway",
+  "llmHost",
+  "llmPort",
+  "llmProviderPath",
+  "llmRegion",
+  "mcpPreset",
+  "mcpName",
+  "mcpBuilderNamespace",
+  "mcpHost",
+  "mcpPort",
+  "mcpProtocol",
+  "mcpPath",
+  "mcpGateway",
+  "mcpToolMode",
+  "mcpSecret",
+  "mcpSchema",
   "llmYaml",
   "mcpYaml",
   "a2aYaml",
@@ -219,6 +242,27 @@ const els = {
   runListCall: document.getElementById("run-list-call"),
   llmHint: document.getElementById("llm-endpoint-hint"),
   llmExample: document.getElementById("llm-example"),
+  llmPreset: document.getElementById("llm-preset"),
+  llmBuilderProvider: document.getElementById("llm-builder-provider"),
+  llmName: document.getElementById("llm-name"),
+  llmNamespace: document.getElementById("llm-namespace"),
+  llmBuilderModel: document.getElementById("llm-model"),
+  llmFallbackWrap: document.getElementById("llm-fallback-wrap"),
+  llmBuilderFallback: document.getElementById("llm-fallback"),
+  llmSecret: document.getElementById("llm-secret"),
+  llmPath: document.getElementById("llm-path"),
+  llmGateway: document.getElementById("llm-gateway"),
+  llmHostWrap: document.getElementById("llm-host-wrap"),
+  llmHost: document.getElementById("llm-host"),
+  llmPortWrap: document.getElementById("llm-port-wrap"),
+  llmPort: document.getElementById("llm-port"),
+  llmProviderPathWrap: document.getElementById("llm-provider-path-wrap"),
+  llmProviderPath: document.getElementById("llm-provider-path"),
+  llmRegionWrap: document.getElementById("llm-region-wrap"),
+  llmRegion: document.getElementById("llm-region"),
+  llmRegen: document.getElementById("llm-regen"),
+  llmInvRefresh: document.getElementById("llm-inv-refresh"),
+  llmInventory: document.getElementById("llm-inventory"),
   llmYaml: document.getElementById("llm-yaml"),
   applyLlm: document.getElementById("apply-llm"),
   llmApplyResult: document.getElementById("llm-apply-result"),
@@ -227,6 +271,21 @@ const els = {
   a2aEndpoint: document.getElementById("a2a-endpoint"),
   probeA2a: document.getElementById("probe-a2a"),
   mcpExample: document.getElementById("mcp-example"),
+  mcpPreset: document.getElementById("mcp-preset"),
+  mcpName: document.getElementById("mcp-name"),
+  mcpNamespace: document.getElementById("mcp-namespace"),
+  mcpHost: document.getElementById("mcp-host"),
+  mcpPort: document.getElementById("mcp-port"),
+  mcpProtocol: document.getElementById("mcp-protocol"),
+  mcpPath: document.getElementById("mcp-path"),
+  mcpGateway: document.getElementById("mcp-gateway"),
+  mcpToolMode: document.getElementById("mcp-tool-mode"),
+  mcpSecret: document.getElementById("mcp-secret"),
+  mcpSchemaWrap: document.getElementById("mcp-schema-wrap"),
+  mcpSchema: document.getElementById("mcp-schema"),
+  mcpRegen: document.getElementById("mcp-regen"),
+  mcpInvRefresh: document.getElementById("mcp-inv-refresh"),
+  mcpInventory: document.getElementById("mcp-inventory"),
   mcpYaml: document.getElementById("mcp-yaml"),
   applyMcp: document.getElementById("apply-mcp"),
   mcpApplyResult: document.getElementById("mcp-apply-result"),
@@ -273,6 +332,7 @@ const els = {
   clusterTestResult: document.getElementById("cluster-test-result"),
   crdKind: document.getElementById("crd-kind"),
   listCrds: document.getElementById("list-crds"),
+  clusterInventory: document.getElementById("cluster-inventory"),
   crdListResult: document.getElementById("crd-list-result"),
   crdYaml: document.getElementById("crd-yaml"),
   loadExample: document.getElementById("load-example"),
@@ -511,11 +571,13 @@ function applyProvider(id, { setModels = true, loadYaml = true } = {}) {
   }
   const exampleKey = refreshLlmExampleOptions(
     spec.id,
-    loadYaml ? spec.example : els.llmExample.value
+    loadYaml ? spec.example : (els.llmExample && els.llmExample.value) || spec.example
   );
   if (loadYaml) {
-    els.llmExample.value = spec.example;
-    els.llmYaml.value = exampleYaml("llm", spec.example);
+    if (els.llmExample) {
+      els.llmExample.value = spec.example;
+    }
+    applyLlmProviderDefaults(spec.id);
   }
   refreshSeqDiagrams();
   persist({
@@ -1728,6 +1790,12 @@ async function loadSettings() {
   }
   updateEndpointHints();
   updateDeployHints();
+  if (
+    clusterIsReady() &&
+    (area === "llm" || area === "mcp" || area === "settings")
+  ) {
+    refreshInventory(area === "settings" ? "cluster" : area);
+  }
 }
 
 function switchArea(area) {
@@ -1736,6 +1804,12 @@ function switchArea(area) {
     updateEndpointHints();
     updateDeployHints();
     refreshSeqDiagrams();
+  }
+  if (area === "llm" || area === "mcp" || area === "settings") {
+    updateDeployHints();
+    if (clusterIsReady()) {
+      refreshInventory(area === "settings" ? "cluster" : area);
+    }
   }
   persist({ area });
 }
@@ -2190,7 +2264,7 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.9.2" },
+      clientInfo: { name: "agentgateway-extension", version: "0.9.3" },
     },
   };
 
@@ -2464,6 +2538,20 @@ function currentClusterSettings() {
 }
 
 const CONNECT_CLUSTER_MSG = "Connect a cluster in Settings first.";
+const INVENTORY_KINDS = [
+  "Gateway",
+  "EnterpriseAgentgatewayBackend",
+  "HTTPRoute",
+  "EnterpriseAgentgatewayPolicy",
+];
+const KIND_LABELS = {
+  Gateway: "Gateway",
+  HTTPRoute: "HTTPRoute",
+  EnterpriseAgentgatewayBackend: "Backend",
+  EnterpriseAgentgatewayPolicy: "Policy",
+};
+const inventoryCache = { llm: [], mcp: [], cluster: [] };
+let mcpTargetName = "mcp-target";
 
 function exampleYaml(section, key) {
   const group = DEPLOY_EXAMPLES[section] || {};
@@ -2471,30 +2559,301 @@ function exampleYaml(section, key) {
   return item ? item.yaml : "";
 }
 
+function clusterNamespaceOrDefault() {
+  return (els.clusterNamespace.value || "").trim() || DEFAULT_CLUSTER_NAMESPACE;
+}
+
+function fillPresetSelect(select, presets, selected) {
+  if (!select) {
+    return;
+  }
+  select.replaceChildren();
+  for (const preset of presets) {
+    const option = document.createElement("option");
+    option.value = preset.id;
+    option.textContent = preset.label;
+    select.append(option);
+  }
+  const valid = presets.some((preset) => preset.id === selected);
+  select.value = valid ? selected : presets[0].id;
+}
+
+function currentBuilderProvider() {
+  const active =
+    els.llmBuilderProvider &&
+    els.llmBuilderProvider.querySelector(".provider-pill.is-active");
+  const raw = (active && active.dataset.provider) || "";
+  return PROVIDERS[raw] ? raw : currentProvider();
+}
+
+function fillLlmBuilder(fields) {
+  if (!els.llmName) {
+    return;
+  }
+  els.llmName.value = fields.name || "";
+  els.llmNamespace.value = fields.namespace || clusterNamespaceOrDefault();
+  els.llmBuilderModel.value = fields.model || "";
+  els.llmBuilderFallback.value = fields.fallbackModel || "";
+  els.llmSecret.value = fields.secretRef || "";
+  els.llmPath.value = fields.routePath || "";
+  els.llmGateway.value = fields.gateway || AgwBuilder.DEFAULT_GATEWAY;
+  els.llmHost.value = fields.host || "";
+  els.llmPort.value = fields.port || "";
+  els.llmProviderPath.value = fields.providerPath || "";
+  els.llmRegion.value = fields.region || "";
+  if (fields.preset && els.llmPreset) {
+    const known = AgwBuilder.LLM_PRESETS.some((preset) => preset.id === fields.preset);
+    if (known) {
+      els.llmPreset.value = fields.preset;
+    }
+  }
+}
+
+function currentLlmBuilderFields() {
+  const provider = currentBuilderProvider();
+  const preset = (els.llmPreset && els.llmPreset.value) || provider;
+  return {
+    provider,
+    preset,
+    failover: preset === "failover",
+    name: els.llmName.value,
+    namespace: els.llmNamespace.value || clusterNamespaceOrDefault(),
+    model: els.llmBuilderModel.value,
+    fallbackModel: els.llmBuilderFallback.value,
+    secretRef: els.llmSecret.value,
+    routePath: els.llmPath.value,
+    gateway: els.llmGateway.value || AgwBuilder.DEFAULT_GATEWAY,
+    host: els.llmHost.value,
+    port: els.llmPort.value,
+    providerPath: els.llmProviderPath.value,
+    region: els.llmRegion.value,
+    rewriteTo: preset === "httproute" ? "/v1/chat/completions" : "",
+  };
+}
+
+function updateLlmBuilderVisibility() {
+  if (!els.llmFallbackWrap) {
+    return;
+  }
+  const provider = currentBuilderProvider();
+  const preset = (els.llmPreset && els.llmPreset.value) || provider;
+  const compat = provider === "grok" && preset !== "gateway";
+  const bedrock = provider === "bedrock" && preset !== "gateway";
+  els.llmFallbackWrap.hidden = preset !== "failover";
+  els.llmHostWrap.hidden = !compat;
+  els.llmPortWrap.hidden = !compat;
+  els.llmProviderPathWrap.hidden = !compat;
+  els.llmRegionWrap.hidden = !bedrock;
+}
+
+function persistLlmBuilder() {
+  persist({
+    llmPreset: els.llmPreset ? els.llmPreset.value : "",
+    llmName: els.llmName.value,
+    llmBuilderNamespace: els.llmNamespace.value,
+    llmBuilderModel: els.llmBuilderModel.value,
+    llmBuilderFallback: els.llmBuilderFallback.value,
+    llmSecret: els.llmSecret.value,
+    llmPath: els.llmPath.value,
+    llmGateway: els.llmGateway.value,
+    llmHost: els.llmHost.value,
+    llmPort: els.llmPort.value,
+    llmProviderPath: els.llmProviderPath.value,
+    llmRegion: els.llmRegion.value,
+    llmYaml: els.llmYaml.value,
+  });
+}
+
+function regenLlmYaml() {
+  els.llmYaml.value = AgwBuilder.generateLlmYaml(currentLlmBuilderFields());
+  persistLlmBuilder();
+}
+
+function applyLlmProviderDefaults(provider) {
+  const fields = AgwBuilder.llmDefaults(provider);
+  fields.namespace = clusterNamespaceOrDefault();
+  fields.preset = provider;
+  fillLlmBuilder(fields);
+  updateLlmBuilderVisibility();
+  regenLlmYaml();
+}
+
+function applyLlmPreset(presetId) {
+  const preset =
+    AgwBuilder.LLM_PRESETS.find((item) => item.id === presetId) ||
+    AgwBuilder.LLM_PRESETS[0];
+  els.llmPreset.value = preset.id;
+  if (preset.provider) {
+    applyProvider(preset.provider, { setModels: true, loadYaml: true });
+    return;
+  }
+  if (preset.id === "failover") {
+    const fields = AgwBuilder.llmDefaults(currentBuilderProvider());
+    fields.namespace = clusterNamespaceOrDefault();
+    fields.failover = true;
+    fields.preset = "failover";
+    fillLlmBuilder(fields);
+  } else if (preset.id === "httproute") {
+    const fields = AgwBuilder.llmDefaults(currentBuilderProvider());
+    fields.namespace = clusterNamespaceOrDefault();
+    fields.preset = "httproute";
+    fields.rewriteTo = "/v1/chat/completions";
+    if (!fields.routePath) {
+      fields.routePath = `/${fields.name}`;
+    }
+    fillLlmBuilder(fields);
+  } else if (preset.id === "gateway") {
+    const fields = currentLlmBuilderFields();
+    fields.preset = "gateway";
+    fields.gateway = fields.gateway || AgwBuilder.DEFAULT_GATEWAY;
+    fillLlmBuilder(fields);
+  }
+  updateLlmBuilderVisibility();
+  regenLlmYaml();
+}
+
+function fillMcpBuilder(fields) {
+  if (!els.mcpName) {
+    return;
+  }
+  els.mcpName.value = fields.name || "";
+  els.mcpNamespace.value = fields.namespace || clusterNamespaceOrDefault();
+  els.mcpHost.value = fields.host || "";
+  els.mcpPort.value = fields.port || "";
+  els.mcpProtocol.value = fields.protocol || "SSE";
+  els.mcpPath.value = fields.routePath || "/mcp";
+  els.mcpGateway.value = fields.gateway || AgwBuilder.DEFAULT_GATEWAY;
+  els.mcpToolMode.value = fields.toolMode || "Standard";
+  els.mcpSecret.value = fields.secretRef || "";
+  els.mcpSchema.value = fields.schemaRef || "";
+  mcpTargetName = fields.targetName || "mcp-target";
+  if (fields.preset && els.mcpPreset) {
+    const known = AgwBuilder.MCP_PRESETS.some((preset) => preset.id === fields.preset);
+    if (known) {
+      els.mcpPreset.value = fields.preset;
+    }
+  }
+}
+
+function currentMcpBuilderFields() {
+  const parsed = AgwBuilder.parseTargetUrl(els.mcpHost.value);
+  return {
+    preset: (els.mcpPreset && els.mcpPreset.value) || "remote",
+    name: els.mcpName.value,
+    namespace: els.mcpNamespace.value || clusterNamespaceOrDefault(),
+    targetName: mcpTargetName,
+    host: parsed.host || els.mcpHost.value,
+    port: els.mcpPort.value || parsed.port,
+    protocol: els.mcpProtocol.value || "SSE",
+    targetPath: parsed.path || "",
+    routePath: els.mcpPath.value || "/mcp",
+    gateway: els.mcpGateway.value || AgwBuilder.DEFAULT_GATEWAY,
+    toolMode: els.mcpToolMode.value || "Standard",
+    secretRef: els.mcpSecret.value,
+    schemaRef: els.mcpSchema.value,
+  };
+}
+
+function updateMcpBuilderVisibility() {
+  if (!els.mcpSchemaWrap) {
+    return;
+  }
+  els.mcpSchemaWrap.hidden = els.mcpProtocol.value !== "OpenAPI";
+}
+
+function persistMcpBuilder() {
+  persist({
+    mcpPreset: els.mcpPreset ? els.mcpPreset.value : "",
+    mcpName: els.mcpName.value,
+    mcpBuilderNamespace: els.mcpNamespace.value,
+    mcpHost: els.mcpHost.value,
+    mcpPort: els.mcpPort.value,
+    mcpProtocol: els.mcpProtocol.value,
+    mcpPath: els.mcpPath.value,
+    mcpGateway: els.mcpGateway.value,
+    mcpToolMode: els.mcpToolMode.value,
+    mcpSecret: els.mcpSecret.value,
+    mcpSchema: els.mcpSchema.value,
+    mcpYaml: els.mcpYaml.value,
+  });
+}
+
+function regenMcpYaml() {
+  els.mcpYaml.value = AgwBuilder.generateMcpYaml(currentMcpBuilderFields());
+  persistMcpBuilder();
+}
+
+function applyMcpPreset(presetId) {
+  const fields = AgwBuilder.mcpDefaults(presetId);
+  fields.namespace = clusterNamespaceOrDefault();
+  fillMcpBuilder(fields);
+  updateMcpBuilderVisibility();
+  regenMcpYaml();
+}
+
 function loadDeployExamples(stored) {
   const provider = currentProvider();
-  const preferred = DEPLOY_EXAMPLES.llm[stored.llmExample]
-    ? stored.llmExample
-    : providerSpec(provider).example;
-  const llmKey = refreshLlmExampleOptions(provider, preferred);
-  const mcpKey = DEPLOY_EXAMPLES.mcp[stored.mcpExample]
-    ? stored.mcpExample
-    : "mcp";
+  fillPresetSelect(
+    els.llmPreset,
+    AgwBuilder.LLM_PRESETS,
+    stored.llmPreset || provider
+  );
+  fillPresetSelect(
+    els.mcpPreset,
+    AgwBuilder.MCP_PRESETS,
+    stored.mcpPreset || "remote"
+  );
   const a2aStored =
-    stored.a2aExample ||
-    (stored.mcpExample === "a2a" ? "a2a" : "a2a");
+    stored.a2aExample || (stored.mcpExample === "a2a" ? "a2a" : "a2a");
   const a2aKey = DEPLOY_EXAMPLES.a2a[a2aStored] ? a2aStored : "a2a";
   const apiStored = stored.apiExample || stored.securityExample;
   const apiKey = DEPLOY_EXAMPLES.api[apiStored] ? apiStored : "policy";
-  els.llmExample.value = llmKey;
-  els.mcpExample.value = mcpKey;
-  els.a2aExample.value = a2aKey;
-  els.apiExample.value = apiKey;
-  els.llmYaml.value = stored.llmYaml || exampleYaml("llm", llmKey);
+  if (els.a2aExample) {
+    els.a2aExample.value = a2aKey;
+  }
+  if (els.apiExample) {
+    els.apiExample.value = apiKey;
+  }
+  const llmFields = AgwBuilder.llmDefaults(provider);
+  llmFields.namespace = stored.llmBuilderNamespace || clusterNamespaceOrDefault();
+  llmFields.name = stored.llmName || llmFields.name;
+  llmFields.model = stored.llmBuilderModel || llmFields.model;
+  llmFields.fallbackModel = stored.llmBuilderFallback || llmFields.fallbackModel;
+  llmFields.secretRef = stored.llmSecret || llmFields.secretRef;
+  llmFields.routePath =
+    stored.llmPath !== undefined && stored.llmPath !== null
+      ? stored.llmPath
+      : llmFields.routePath;
+  llmFields.gateway = stored.llmGateway || llmFields.gateway;
+  llmFields.host = stored.llmHost || llmFields.host;
+  llmFields.port = stored.llmPort || llmFields.port;
+  llmFields.providerPath = stored.llmProviderPath || llmFields.providerPath;
+  llmFields.region = stored.llmRegion || llmFields.region;
+  llmFields.preset = (els.llmPreset && els.llmPreset.value) || provider;
+  llmFields.failover = llmFields.preset === "failover";
+  fillLlmBuilder(llmFields);
+  updateLlmBuilderVisibility();
+  els.llmYaml.value =
+    stored.llmYaml || AgwBuilder.generateLlmYaml(currentLlmBuilderFields());
+
+  const mcpFields = AgwBuilder.mcpDefaults(
+    (els.mcpPreset && els.mcpPreset.value) || "remote"
+  );
+  mcpFields.namespace = stored.mcpBuilderNamespace || clusterNamespaceOrDefault();
+  mcpFields.name = stored.mcpName || mcpFields.name;
+  mcpFields.host = stored.mcpHost || mcpFields.host;
+  mcpFields.port = stored.mcpPort || mcpFields.port;
+  mcpFields.protocol = stored.mcpProtocol || mcpFields.protocol;
+  mcpFields.routePath = stored.mcpPath || mcpFields.routePath;
+  mcpFields.gateway = stored.mcpGateway || mcpFields.gateway;
+  mcpFields.toolMode = stored.mcpToolMode || mcpFields.toolMode;
+  mcpFields.secretRef = stored.mcpSecret || "";
+  mcpFields.schemaRef = stored.mcpSchema || mcpFields.schemaRef;
+  fillMcpBuilder(mcpFields);
+  updateMcpBuilderVisibility();
   els.mcpYaml.value =
-    stored.mcpExample === "a2a"
-      ? exampleYaml("mcp", "mcp")
-      : stored.mcpYaml || exampleYaml("mcp", mcpKey);
+    stored.mcpYaml || AgwBuilder.generateMcpYaml(currentMcpBuilderFields());
+
   els.a2aYaml.value =
     stored.a2aYaml ||
     (stored.mcpExample === "a2a" ? stored.mcpYaml : "") ||
@@ -2522,9 +2881,23 @@ function updateDeployHints() {
   els.applyMcp.disabled = !connected;
   els.applyA2a.disabled = !connected;
   els.applyApi.disabled = !connected;
+  if (els.llmInvRefresh) {
+    els.llmInvRefresh.disabled = !connected;
+  }
+  if (els.mcpInvRefresh) {
+    els.mcpInvRefresh.disabled = !connected;
+  }
+  if (els.listCrds) {
+    els.listCrds.disabled = !connected;
+  }
+  if (!connected) {
+    showInventoryDisconnected(els.llmInventory);
+    showInventoryDisconnected(els.mcpInventory);
+    showInventoryDisconnected(els.clusterInventory);
+  }
 }
 
-async function applyYamlDocuments(yaml, resultEl, applyBtn) {
+async function applyYamlDocuments(yaml, resultEl, applyBtn, onDone) {
   if (!clusterIsReady()) {
     showBox(resultEl, {
       status: null,
@@ -2598,6 +2971,9 @@ async function applyYamlDocuments(yaml, resultEl, applyBtn) {
   );
   resultEl.replaceChildren(...nodes);
   updateDeployHints();
+  if (typeof onDone === "function") {
+    onDone();
+  }
 }
 
 async function saveClusterSettings(extra = {}) {
@@ -2831,6 +3207,296 @@ async function applyManifest(settings, doc) {
   return { name, kind: spec.kind, result: updated, method: "PUT" };
 }
 
+async function listKind(settings, kind) {
+  const spec = K8S_KINDS[kind];
+  const result = await timedFetch(
+    k8sUrl(
+      settings.clusterApiServer,
+      collectionPath(spec, settings.clusterNamespace)
+    ),
+    { method: "GET", headers: k8sHeaders(settings.clusterToken) }
+  );
+  const items =
+    result.payload && Array.isArray(result.payload.items)
+      ? result.payload.items
+      : [];
+  return { kind, label: KIND_LABELS[kind] || kind, result, items };
+}
+
+async function deleteResource(settings, kind, name, namespace) {
+  const spec = K8S_KINDS[kind];
+  const item = k8sUrl(
+    settings.clusterApiServer,
+    `${collectionPath(spec, namespace)}/${encodeURIComponent(name)}`
+  );
+  return timedFetch(item, {
+    method: "DELETE",
+    headers: k8sHeaders(settings.clusterToken),
+  });
+}
+
+function showInventoryDisconnected(container) {
+  if (!container) {
+    return;
+  }
+  container.hidden = false;
+  container.replaceChildren();
+  const empty = document.createElement("div");
+  empty.className = "inventory-error";
+  empty.textContent = CONNECT_CLUSTER_MSG;
+  container.append(empty);
+}
+
+function renderInventory(container, groups, options) {
+  if (!container) {
+    return;
+  }
+  container.hidden = false;
+  container.replaceChildren();
+  if (!clusterIsReady()) {
+    showInventoryDisconnected(container);
+    return;
+  }
+  let total = 0;
+  for (const group of groups) {
+    const failed =
+      group.result &&
+      (group.result.error || !group.result.response || !group.result.response.ok);
+    if (failed) {
+      const err = document.createElement("div");
+      err.className = "inventory-error";
+      err.textContent = `${group.label || group.kind}: ${k8sStatusMessage(group.result)}`;
+      container.append(err);
+      continue;
+    }
+    const items = group.items || [];
+    if (items.length === 0) {
+      continue;
+    }
+    const heading = document.createElement("div");
+    heading.className = "inventory-group";
+    heading.textContent = group.label || group.kind;
+    container.append(heading);
+    for (const item of items) {
+      total += 1;
+      const row = document.createElement("div");
+      row.className = "inventory-row";
+      const name = document.createElement("span");
+      name.className = "inventory-name";
+      const itemName = (item.metadata && item.metadata.name) || "(unnamed)";
+      name.textContent = itemName;
+      name.title = itemName;
+      const actions = document.createElement("div");
+      actions.className = "inventory-actions";
+      if (options && options.onLoad) {
+        const load = document.createElement("button");
+        load.type = "button";
+        load.className = "btn btn-secondary btn-tiny";
+        load.textContent = "Load";
+        load.addEventListener("click", () => options.onLoad(group.kind, item, groups));
+        actions.append(load);
+      }
+      if (options && options.onDelete) {
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "btn btn-secondary btn-tiny";
+        del.textContent = "Delete";
+        del.addEventListener("click", () => options.onDelete(group.kind, item));
+        actions.append(del);
+      }
+      row.append(name, actions);
+      container.append(row);
+    }
+  }
+  if (total === 0 && !container.querySelector(".inventory-error")) {
+    const empty = document.createElement("div");
+    empty.className = "inventory-empty";
+    empty.textContent = "No resources found.";
+    container.append(empty);
+  }
+}
+
+function filterInventoryGroups(groups, mode) {
+  return groups
+    .map((group) => {
+      if (group.kind !== "EnterpriseAgentgatewayBackend") {
+        return group;
+      }
+      const items = (group.items || []).filter((item) =>
+        mode === "mcp" ? AgwBuilder.isMcpBackend(item) : AgwBuilder.isAiBackend(item)
+      );
+      return { ...group, items };
+    })
+    .filter((group) => group.kind !== "EnterpriseAgentgatewayPolicy" || mode === "cluster");
+}
+
+async function refreshInventory(which) {
+  if (!clusterIsReady()) {
+    const target =
+      which === "llm"
+        ? els.llmInventory
+        : which === "mcp"
+          ? els.mcpInventory
+          : els.clusterInventory;
+    showInventoryDisconnected(target);
+    return;
+  }
+  const settings = await saveClusterSettings();
+  const kinds =
+    which === "cluster"
+      ? INVENTORY_KINDS
+      : ["Gateway", "HTTPRoute", "EnterpriseAgentgatewayBackend"];
+  const groups = [];
+  for (const kind of kinds) {
+    groups.push(await listKind(settings, kind));
+  }
+  inventoryCache[which] = groups;
+  if (which === "llm") {
+    renderInventory(els.llmInventory, filterInventoryGroups(groups, "llm"), {
+      onLoad: loadLlmInventoryItem,
+      onDelete: (kind, item) => confirmDelete(kind, item, "llm"),
+    });
+  } else if (which === "mcp") {
+    renderInventory(els.mcpInventory, filterInventoryGroups(groups, "mcp"), {
+      onLoad: loadMcpInventoryItem,
+      onDelete: (kind, item) => confirmDelete(kind, item, "mcp"),
+    });
+  } else {
+    renderInventory(els.clusterInventory, groups, {
+      onLoad: loadClusterInventoryItem,
+      onDelete: (kind, item) => confirmDelete(kind, item, "cluster"),
+    });
+    if (els.crdListResult) {
+      els.crdListResult.hidden = true;
+    }
+  }
+}
+
+function routesFromGroups(groups) {
+  const routeGroup = (groups || []).find((group) => group.kind === "HTTPRoute");
+  return (routeGroup && routeGroup.items) || [];
+}
+
+function backendsFromGroups(groups) {
+  const backendGroup = (groups || []).find(
+    (group) => group.kind === "EnterpriseAgentgatewayBackend"
+  );
+  return (backendGroup && backendGroup.items) || [];
+}
+
+function loadLlmInventoryItem(kind, item, groups) {
+  const routes = routesFromGroups(groups);
+  if (kind === "Gateway") {
+    els.llmGateway.value = (item.metadata && item.metadata.name) || AgwBuilder.DEFAULT_GATEWAY;
+    els.llmNamespace.value =
+      (item.metadata && item.metadata.namespace) || clusterNamespaceOrDefault();
+    els.llmPreset.value = "gateway";
+    updateLlmBuilderVisibility();
+    regenLlmYaml();
+    return;
+  }
+  if (kind === "HTTPRoute") {
+    const routeFields = AgwBuilder.fieldsFromRoute(item);
+    const backend = backendsFromGroups(groups).find(
+      (entry) =>
+        entry.metadata &&
+        entry.metadata.name === routeFields.backendName &&
+        AgwBuilder.isAiBackend(entry)
+    );
+    if (backend) {
+      const fields = AgwBuilder.fieldsFromLlmResource(backend, item);
+      if (PROVIDERS[fields.provider]) {
+        setProviderSelects(fields.provider);
+      }
+      fillLlmBuilder(fields);
+    } else {
+      fillLlmBuilder({
+        ...currentLlmBuilderFields(),
+        ...routeFields,
+        preset: "httproute",
+      });
+      els.llmPreset.value = "httproute";
+    }
+    updateLlmBuilderVisibility();
+    regenLlmYaml();
+    return;
+  }
+  const route = AgwBuilder.matchingRoute(routes, item.metadata && item.metadata.name);
+  const fields = AgwBuilder.fieldsFromLlmResource(item, route);
+  if (PROVIDERS[fields.provider]) {
+    setProviderSelects(fields.provider);
+  }
+  fillLlmBuilder(fields);
+  updateLlmBuilderVisibility();
+  regenLlmYaml();
+}
+
+function loadMcpInventoryItem(kind, item, groups) {
+  const routes = routesFromGroups(groups);
+  if (kind === "Gateway") {
+    els.mcpGateway.value = (item.metadata && item.metadata.name) || AgwBuilder.DEFAULT_GATEWAY;
+    els.mcpNamespace.value =
+      (item.metadata && item.metadata.namespace) || clusterNamespaceOrDefault();
+    persistMcpBuilder();
+    regenMcpYaml();
+    return;
+  }
+  if (kind === "HTTPRoute") {
+    const routeFields = AgwBuilder.fieldsFromRoute(item);
+    const backend = backendsFromGroups(groups).find(
+      (entry) =>
+        entry.metadata &&
+        entry.metadata.name === routeFields.backendName &&
+        AgwBuilder.isMcpBackend(entry)
+    );
+    if (backend) {
+      fillMcpBuilder(AgwBuilder.fieldsFromMcpResource(backend, item));
+    } else {
+      fillMcpBuilder({
+        ...currentMcpBuilderFields(),
+        name: routeFields.name,
+        namespace: routeFields.namespace,
+        routePath: routeFields.routePath,
+        gateway: routeFields.gateway,
+      });
+    }
+    updateMcpBuilderVisibility();
+    regenMcpYaml();
+    return;
+  }
+  const route = AgwBuilder.matchingRoute(routes, item.metadata && item.metadata.name);
+  fillMcpBuilder(AgwBuilder.fieldsFromMcpResource(item, route));
+  updateMcpBuilderVisibility();
+  regenMcpYaml();
+}
+
+function loadClusterInventoryItem(kind, item) {
+  els.crdKind.value = K8S_KINDS[kind] ? kind : els.crdKind.value;
+  els.crdYaml.value = AgwBuilder.resourceToYaml(item);
+  saveClusterSettings();
+}
+
+async function confirmDelete(kind, item, which) {
+  if (!clusterIsReady()) {
+    return;
+  }
+  const name = (item.metadata && item.metadata.name) || "";
+  const namespace =
+    (item.metadata && item.metadata.namespace) || clusterNamespaceOrDefault();
+  const label = KIND_LABELS[kind] || kind;
+  if (!name || !window.confirm(`Delete ${label} ${name} from ${namespace}?`)) {
+    return;
+  }
+  const settings = await saveClusterSettings();
+  const result = await deleteResource(settings, kind, name, namespace);
+  const ok = !result.error && result.response && result.response.ok;
+  if (!ok) {
+    window.alert(k8sStatusMessage(result));
+    return;
+  }
+  await refreshInventory(which);
+}
+
 els.clusterType.addEventListener("change", () => {
   updateClusterHelp();
   saveClusterSettings();
@@ -2849,6 +3515,16 @@ els.clusterToken.addEventListener("change", () => {
 
 els.clusterNamespace.addEventListener("change", () => {
   saveClusterSettings();
+  const ns = clusterNamespaceOrDefault();
+  if (els.llmNamespace && !els.llmNamespace.value.trim()) {
+    els.llmNamespace.value = ns;
+    regenLlmYaml();
+  }
+  if (els.mcpNamespace && !els.mcpNamespace.value.trim()) {
+    els.mcpNamespace.value = ns;
+    regenMcpYaml();
+  }
+  updateDeployHints();
 });
 
 els.clusterKubeconfig.addEventListener("change", () => {
@@ -2985,77 +3661,19 @@ els.testCluster.addEventListener("click", async () => {
   updateDeployHints();
   if (ok) {
     celebrate();
+    refreshInventory("cluster");
   }
   els.testCluster.disabled = false;
 });
 
-els.listCrds.addEventListener("click", async () => {
-  const settings = await saveClusterSettings();
-  const targetError = clusterTargetError(settings);
-  if (targetError) {
-    showBox(els.crdListResult, {
-      status: null,
-      latencyMs: 0,
-      body: targetError,
-      isError: true,
-    });
-    return;
-  }
-
-  const spec = K8S_KINDS[settings.clusterKind];
-  els.listCrds.disabled = true;
-  showPending(els.crdListResult, `Listing ${settings.clusterKind}…`);
-
-  const result = await timedFetch(
-    k8sUrl(
-      settings.clusterApiServer,
-      collectionPath(spec, settings.clusterNamespace)
-    ),
-    { method: "GET", headers: k8sHeaders(settings.clusterToken) }
-  );
-  const ok = !result.error && result.response && result.response.ok;
-  els.crdListResult.hidden = false;
-  els.crdListResult.classList.toggle("is-error", !ok);
-  els.crdListResult.replaceChildren();
-
-  const meta = document.createElement("div");
-  meta.className = "result-meta";
-  const statusText =
-    result.status == null ? "no response" : `HTTP ${result.status}`;
-  meta.textContent = `${settings.clusterKind} · ${settings.clusterNamespace} · ${statusText} · ${result.latencyMs} ms`;
-  els.crdListResult.append(meta);
-
-  if (!ok) {
-    const detail = document.createElement("div");
-    detail.className = "result-body";
-    detail.textContent = k8sStatusMessage(result);
-    els.crdListResult.append(detail);
-  } else {
-    const items =
-      result.payload && Array.isArray(result.payload.items)
-        ? result.payload.items
-        : [];
-    if (items.length === 0) {
-      const detail = document.createElement("div");
-      detail.className = "result-body";
-      detail.textContent = "No resources found.";
-      els.crdListResult.append(detail);
-    } else {
-      const list = document.createElement("ul");
-      list.className = "crd-names";
-      for (const item of items) {
-        const li = document.createElement("li");
-        li.textContent = (item.metadata && item.metadata.name) || "(unnamed)";
-        list.append(li);
-      }
-      els.crdListResult.append(list);
-    }
-  }
-
-  els.listCrds.disabled = false;
+els.listCrds.addEventListener("click", () => {
+  refreshInventory("cluster");
 });
 
 function bindExampleSelect(select, textarea, section, storageKey, yamlKey) {
+  if (!select || !textarea) {
+    return;
+  }
   select.addEventListener("change", () => {
     const key = select.value;
     textarea.value = exampleYaml(section, key);
@@ -3066,17 +3684,128 @@ function bindExampleSelect(select, textarea, section, storageKey, yamlKey) {
   });
 }
 
-bindExampleSelect(els.llmExample, els.llmYaml, "llm", "llmExample", "llmYaml");
-bindExampleSelect(els.mcpExample, els.mcpYaml, "mcp", "mcpExample", "mcpYaml");
 bindExampleSelect(els.a2aExample, els.a2aYaml, "a2a", "a2aExample", "a2aYaml");
 bindExampleSelect(els.apiExample, els.apiYaml, "api", "apiExample", "apiYaml");
 
+function bindBuilderFields(ids, onChange) {
+  for (const id of ids) {
+    const node = document.getElementById(id);
+    if (!node) {
+      continue;
+    }
+    node.addEventListener("input", onChange);
+    node.addEventListener("change", onChange);
+  }
+}
+
+if (els.llmPreset) {
+  els.llmPreset.addEventListener("change", () => {
+    applyLlmPreset(els.llmPreset.value);
+  });
+}
+bindBuilderFields(
+  [
+    "llm-name",
+    "llm-namespace",
+    "llm-model",
+    "llm-fallback",
+    "llm-secret",
+    "llm-path",
+    "llm-gateway",
+    "llm-host",
+    "llm-port",
+    "llm-provider-path",
+    "llm-region",
+  ],
+  () => {
+    updateLlmBuilderVisibility();
+    regenLlmYaml();
+  }
+);
+els.llmYaml.addEventListener("change", () => {
+  persist({ llmYaml: els.llmYaml.value });
+});
+if (els.llmRegen) {
+  els.llmRegen.addEventListener("click", () => {
+    regenLlmYaml();
+  });
+}
+if (els.llmInvRefresh) {
+  els.llmInvRefresh.addEventListener("click", () => {
+    refreshInventory("llm");
+  });
+}
+
+if (els.mcpPreset) {
+  els.mcpPreset.addEventListener("change", () => {
+    applyMcpPreset(els.mcpPreset.value);
+  });
+}
+if (els.mcpProtocol) {
+  els.mcpProtocol.addEventListener("change", () => {
+    if (els.mcpProtocol.value === "OpenAPI") {
+      els.mcpPreset.value = "openapi";
+      if (!els.mcpSchema.value) {
+        els.mcpSchema.value = "petstore-schema";
+      }
+    }
+    updateMcpBuilderVisibility();
+    regenMcpYaml();
+  });
+}
+if (els.mcpHost) {
+  els.mcpHost.addEventListener("change", () => {
+    const parsed = AgwBuilder.parseTargetUrl(els.mcpHost.value);
+    if (parsed.host) {
+      els.mcpHost.value = parsed.host;
+    }
+    if (parsed.port && !els.mcpPort.value.trim()) {
+      els.mcpPort.value = parsed.port;
+    }
+    regenMcpYaml();
+  });
+}
+bindBuilderFields(
+  [
+    "mcp-name",
+    "mcp-namespace",
+    "mcp-host",
+    "mcp-port",
+    "mcp-path",
+    "mcp-gateway",
+    "mcp-tool-mode",
+    "mcp-secret",
+    "mcp-schema",
+  ],
+  () => {
+    updateMcpBuilderVisibility();
+    regenMcpYaml();
+  }
+);
+els.mcpYaml.addEventListener("change", () => {
+  persist({ mcpYaml: els.mcpYaml.value });
+});
+if (els.mcpRegen) {
+  els.mcpRegen.addEventListener("click", () => {
+    regenMcpYaml();
+  });
+}
+if (els.mcpInvRefresh) {
+  els.mcpInvRefresh.addEventListener("click", () => {
+    refreshInventory("mcp");
+  });
+}
+
 els.applyLlm.addEventListener("click", () => {
-  applyYamlDocuments(els.llmYaml.value, els.llmApplyResult, els.applyLlm);
+  applyYamlDocuments(els.llmYaml.value, els.llmApplyResult, els.applyLlm, () => {
+    refreshInventory("llm");
+  });
 });
 
 els.applyMcp.addEventListener("click", () => {
-  applyYamlDocuments(els.mcpYaml.value, els.mcpApplyResult, els.applyMcp);
+  applyYamlDocuments(els.mcpYaml.value, els.mcpApplyResult, els.applyMcp, () => {
+    refreshInventory("mcp");
+  });
 });
 
 els.applyA2a.addEventListener("click", () => {
@@ -3167,6 +3896,7 @@ els.applyCrds.addEventListener("click", async () => {
   );
   els.crdApplyResult.replaceChildren(...nodes);
   els.applyCrds.disabled = false;
+  refreshInventory("cluster");
 });
 
 loadSettings();

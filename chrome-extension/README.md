@@ -6,8 +6,8 @@ Hooray, and Cluster).
 Chat and the test tabs talk to a user-configured Agentgateway. The
 gateway injects backend auth, so those areas do **not** store or send an
 API key or license key. Cluster lives in Settings and talks to a
-Kubernetes API server so you can list and apply Agentgateway CRDs from
-the popup.
+Kubernetes API server so you can build, list, and apply Agentgateway
+CRDs from the popup.
 
 The popup is a light console: off-white surfaces (`#F3F5F6`, `#FFFFFF`),
 soft gray borders, a refined teal accent (`#0C7469`), tighter system type,
@@ -123,19 +123,21 @@ shows cost per attempt when both responses include usage. **Collapse**
 hides the drawer; run again to reopen it. There is no shared Run control
 at the bottom of the page.
 
-**Deploy config** is a secondary accordion on each test tab so
-tests stay primary. It loads a prebuilt YAML example you can edit, then
-**Apply**s it with the Settings cluster API server, token, and namespace.
-If the cluster is not connected, the hint and Apply state say
-“Connect a cluster in Settings first.” No API keys are stored
-or sent. `secretRef` uses a name only.
+**Build & apply config** is a secondary accordion on **LLM** and **MCP**
+so tests stay primary. A form generates documented Agentgateway CRDs
+(`EnterpriseAgentgatewayBackend` + `HTTPRoute`, optional Gateway name),
+with a live YAML preview you can edit before **Apply**. **A2A** and
+**API/HTTP** still use a prebuilt YAML example. Apply uses the Settings
+cluster API server, token, and namespace. If the cluster is not
+connected, the hint and Apply state say “Connect a cluster in Settings
+first.” No API keys are stored or sent. `secretRef` uses a name only.
 
 ### LLM
 
 The provider switcher matches Chat. Changing it updates LLM flow icons,
-default models (including failover primary/fallback), and the Deploy
-accordion’s prebuilt backend / HTTPRoute YAML for that provider
-(`secretRef` name only).
+default models (including failover primary/fallback), and the builder
+form (name, model, `secretRef`, route path, and provider-specific host
+or region).
 
 Tests run against the Chat endpoint. Each result shows HTTP status,
 latency, model, and reply or error.
@@ -149,29 +151,35 @@ latency, model, and reply or error.
 - **List / call model** — `GET /v1/models`, then chat with the chosen
   model
 
-Prebuilt deploys (from `manifests/` and
-[Solo LLM docs](https://docs.solo.io/agentgateway/latest/llm/)):
+The LLM builder (from `manifests/` and
+[Solo LLM docs](https://docs.solo.io/agentgateway/latest/llm/))
+creates or updates an `EnterpriseAgentgatewayBackend` plus `HTTPRoute`:
 
-- Gateway (`enterprise-agentgateway`, HTTP :80) — `manifests/gateway.yaml`
-- OpenAI `EnterpriseAgentgatewayBackend` + HTTPRoute (Completions /
-  Models / Responses / Passthrough) — `manifests/openai-backend.yaml`
-- Failover backend — priority groups for `gpt-4o-mini` then `gpt-4o`,
-  plus HTTPRoute and a health policy
-- HTTPRoute add-on — `/openai` rewrite you can tweak
-- Claude `EnterpriseAgentgatewayBackend` + HTTPRoute (`anthropic-secret`)
-- Grok OpenAI-compatible backend (`api.x.ai`) + HTTPRoute (`grok-secret`)
-- Bedrock backend + HTTPRoute (`bedrock-secret`, documented
-  `amazon.nova-micro-v1:0`)
-- Gemini backend + HTTPRoute (`gemini-secret`, `gemini-2.0-flash`)
-- Matching failover and HTTPRoute add-on examples per provider
+- Fields: name, namespace (default from Settings), provider pill, model,
+  `secretRef` name, route path (`/v1/chat/completions` or `/openai`),
+  parent Gateway (default `agentgateway-proxy`)
+- Presets: OpenAI, Claude, Grok (OpenAI-compat), Bedrock, Gemini,
+  failover groups + health policy, HTTPRoute add-on, Gateway HTTP :80
+- Inventory: list Gateways, HTTPRoutes, and AI backends from the
+  cluster; **Load** fills the form or **Delete** (confirm)
+- Live YAML preview — edit before Apply. No secret values.
 
 ### MCP
 
 - **MCP initialize** — JSON-RPC `initialize` (GET fallback). Default
   `http://35.226.209.32/mcp`
 
-Prebuilt deploy is a documented stub: MCP backend + `/mcp` HTTPRoute.
-Hostnames are placeholders from the Solo MCP guide.
+The MCP builder follows
+[Solo MCP docs](https://docs.solo.io/agentgateway/latest/mcp/)
+and the [MCP quickstart](https://docs.solo.io/agentgateway/latest/quickstart/mcp/):
+
+- Fields: name, target host/URL, port, protocol (`SSE` /
+  `StreamableHTTP` / `OpenAPI`), route path (`/mcp`), tool mode
+  (`Standard` / `Search` / `Code` / `CodeSearch` on `entMcp`), optional
+  `secretRef`, parent Gateway
+- Presets: **Remote MCP URL** (`spec.mcp` static host) and
+  **OpenAPI-as-MCP** (`spec.entMcp` + ConfigMap `schemaRef`)
+- Same inventory + Apply pattern as the LLM builder
 
 ### A2A
 
@@ -209,8 +217,9 @@ The gear in the header opens **Settings**.
   `chrome.storage.local`; default **on**. One ~1s canvas burst, not a
   loop. Honors `prefers-reduced-motion`.
 - **Cluster** — API server, token, namespace, kubeconfig parse, Test
-  connection, and CRD list/apply. Deploy accordions on the test tabs
-  use these fields.
+  connection, a short **Resources** list (Gateway / Backend / HTTPRoute /
+  Policy), and freeform Apply YAML. LLM and MCP builders use these
+  fields.
 
 ## Cluster
 
@@ -259,14 +268,15 @@ The help text under **Cluster type** changes with the selection:
 `GET /apis/gateway.networking.k8s.io/v1`. Status, latency, and the
 Kubernetes version (or error) are shown.
 
-### CRDs
+### Resources
 
-Always visible. **List** and **Apply** need an API server URL and token.
+Always visible. **Refresh** and **Apply** need an API server URL and
+token, and a successful **Test connection**.
 
-- **Kind** — `Gateway`, `HTTPRoute`, `EnterpriseAgentgatewayBackend`, or
-  `EnterpriseAgentgatewayPolicy` (`gateway.networking.k8s.io` /
-  `enterpriseagentgateway.solo.io` as appropriate)
-- **List** — `GET` the collection in the configured namespace and show names
+- **In cluster** — `GET` Gateway, `EnterpriseAgentgatewayBackend`,
+  `HTTPRoute`, and `EnterpriseAgentgatewayPolicy` in the configured
+  namespace. **Load** copies a resource into the YAML box; **Delete**
+  asks for confirm.
 - **YAML** — paste one or more documents (YAML preferred; JSON is accepted).
   **Load example** fills a small Gateway + OpenAI
   `EnterpriseAgentgatewayBackend` + `HTTPRoute`. The example uses
