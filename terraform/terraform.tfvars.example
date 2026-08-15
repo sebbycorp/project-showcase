@@ -10,6 +10,10 @@ create_project  = true
 region       = "us-central1"
 cluster_name = "showcase"
 
+# Autopilot already installs Gateway API CRDs. Leave false unless the cluster
+# does not already have Gateway API.
+# manage_gateway_api_crds = false
+
 # Never put real keys in this file or in git. Pass them at apply time:
 #   export TF_VAR_agentgateway_license_key
 #   export TF_VAR_openai_api_key
