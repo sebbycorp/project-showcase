@@ -74,14 +74,24 @@ Each of **LLM**, **MCP**, **A2A**, and **API/HTTP** has **Apply** + **Run** card
 
 ## Install
 
-Load the unpacked extension in Chrome (desktop). This is not on the Chrome Web Store.
+Not on the Chrome Web Store. Load it unpacked in Chrome (desktop).
 
-1. Clone this repo, or download the ZIP from GitHub and unzip it.
-2. In Chrome, open `chrome://extensions`.
-3. Turn on **Developer mode** (top right).
-4. Click **Load unpacked**.
-5. Select the **`chrome-extension`** folder — the folder that contains `manifest.json`, not the repo root.
-6. Pin **Agentgateway** from the extensions menu so the toolbar icon stays visible.
+### Download
+
+- Direct zip: [project-showcase-main.zip](https://github.com/sebbycorp/project-showcase/archive/refs/heads/main.zip)
+- Or on the GitHub repo page: green **Code** → **Download ZIP**
+
+Unzip it. You should have `project-showcase-main/chrome-extension/` — that inner folder has `manifest.json`. Load unpacked must select **that** `chrome-extension` folder, not `project-showcase-main` and not the zip.
+
+If you already have git: `git clone https://github.com/sebbycorp/project-showcase.git` then use `project-showcase/chrome-extension/`.
+
+### Load in Chrome
+
+1. Open `chrome://extensions`.
+2. Turn on **Developer mode** (top right).
+3. Click **Load unpacked**.
+4. Select the **`chrome-extension`** folder — the one that contains `manifest.json`.
+5. Pin **Agentgateway** from the extensions menu so the toolbar icon stays visible.
 
 Click the toolbar icon to open the popup. Version **0.11.0** is the `version` field in `chrome-extension/manifest.json`. If you already had 0.10.1 loaded, click **Reload** on the unpacked card so you pick up **Settings → Identity**.
 
