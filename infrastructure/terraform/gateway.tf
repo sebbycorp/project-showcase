@@ -1,7 +1,7 @@
 # Gateway API CRDs (standard-install v1.6.1) must exist before Agentgateway.
 # GKE Autopilot already installs them (kube-addon-manager). Only apply when
 # var.manage_gateway_api_crds is true (clusters that do not already have Gateway API).
-# Fetched from the same pinned URL as scripts/install-agentgateway.sh.
+# Fetched from the same pinned URL as ../scripts/install-agentgateway.sh.
 
 data "http" "gateway_api_crds" {
   url = var.gateway_api_crds_url

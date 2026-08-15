@@ -3,11 +3,11 @@
 These YAML files are the source of truth for the Gateway, OpenAI LLM path, and
 request tracing policy. `terraform apply` (with `TF_VAR_agentgateway_license_key`
 and `TF_VAR_openai_api_key`) creates the same objects via the kubectl provider.
-`scripts/install-agentgateway.sh` applies them as a fallback.
+`infrastructure/scripts/install-agentgateway.sh` applies them as a fallback.
 
 Manual apply (only if you are not using Terraform or the script):
 
-1. `kubectl apply -f manifests/gateway.yaml`
+1. `kubectl apply -f infrastructure/manifests/gateway.yaml`
 2. Create `openai-secret` if you did not pass `OPENAI_API_KEY` / `TF_VAR_openai_api_key`:
 
    ```bash
@@ -15,10 +15,10 @@ Manual apply (only if you are not using Terraform or the script):
      --from-literal=Authorization="${OPENAI_API_KEY}"
    ```
 
-3. `kubectl apply -f manifests/openai-backend.yaml`
-4. `kubectl apply -f manifests/tracing.yaml` (after the Solo UI / management chart)
+3. `kubectl apply -f infrastructure/manifests/openai-backend.yaml`
+4. `kubectl apply -f infrastructure/manifests/tracing.yaml` (after the Solo UI / management chart)
 
-Optional sample (not applied by Terraform): `manifests/model-failover.yaml`
+Optional sample (not applied by Terraform): `infrastructure/manifests/model-failover.yaml`
 is the documented model-failover shape — priority groups on one
 `EnterpriseAgentgatewayBackend`, an HTTPRoute, and the required health
 `EnterpriseAgentgatewayPolicy`. Create `openai-secret` first. See

@@ -8,7 +8,7 @@
 # Usage:
 #   export AGENTGATEWAY_LICENSE_KEY
 #   export OPENAI_API_KEY          # optional; creates openai-secret + OpenAI route
-#   ./scripts/install-agentgateway.sh
+#   ./infrastructure/scripts/install-agentgateway.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

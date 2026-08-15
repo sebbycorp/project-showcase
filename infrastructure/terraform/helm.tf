@@ -8,7 +8,7 @@
 #   export TF_VAR_openai_api_key
 #   terraform apply
 #
-# scripts/install-agentgateway.sh is an optional non-Terraform fallback.
+# ../scripts/install-agentgateway.sh is an optional non-Terraform fallback.
 
 resource "helm_release" "enterprise_agentgateway_crds" {
   count = local.install_agentgateway ? 1 : 0
