@@ -8,9 +8,9 @@ A fresh `terraform apply` with the license and OpenAI key produces that stack. D
 
 | Path | Purpose |
 | --- | --- |
-| `terraform/` | Project (optional), APIs, VPC, Autopilot cluster, Helm, secret, Gateway, OpenAI route (cluster Gateway API CRDs by default) |
+| `terraform/` | Project (optional), APIs, VPC, Autopilot cluster, Helm, secret, Gateway, OpenAI route, tracing policy (cluster Gateway API CRDs by default) |
 | `helm/management-values.yaml` | Shared ClickHouse persistence values (Terraform + fallback script) |
-| `manifests/` | Gateway + OpenAI backend/HTTPRoute (no secrets); applied by Terraform |
+| `manifests/` | Gateway + OpenAI backend/HTTPRoute + tracing policy (no secrets); applied by Terraform |
 | `scripts/install-agentgateway.sh` | Optional non-Terraform fallback for the in-cluster stack |
 | `chrome-extension/` | Manifest V3 popup: Chat, Services (LLM / MCP/A2A / Security), and Cluster CRD apply |
 
@@ -47,6 +47,7 @@ That apply creates:
 - Helm: `enterprise-agentgateway-crds` + `enterprise-agentgateway` **v2026.8.0**
 - Helm: management / Solo UI **0.5.5** with ClickHouse PVC (`20Gi`, `standard-rwo`) and `ephemeral-storage` 2Gi
 - Secret `openai-secret`, Gateway `agentgateway-proxy`, `EnterpriseAgentgatewayBackend`/`HTTPRoute` `openai`
+- `EnterpriseAgentgatewayPolicy` `tracing` (OTLP gRPC to `solo-enterprise-telemetry-collector:4317`; Helm does not create this)
 
 Namespace is `agentgateway-system`.
 
@@ -96,7 +97,7 @@ Docs: [install](https://docs.solo.io/agentgateway/latest/quickstart/install/), [
 
 ## Fallback (no Terraform Helm)
 
-`scripts/install-agentgateway.sh` installs the same in-cluster pieces (UI 0.5.5, ClickHouse persistence, Gateway, OpenAI route) against an existing kubeconfig. Use it only when you are not applying the Helm/kubectl resources through Terraform.
+`scripts/install-agentgateway.sh` installs the same in-cluster pieces (UI 0.5.5, ClickHouse persistence, Gateway, OpenAI route, tracing policy) against an existing kubeconfig. Use it only when you are not applying the Helm/kubectl resources through Terraform.
 
 ```bash
 export AGENTGATEWAY_LICENSE_KEY

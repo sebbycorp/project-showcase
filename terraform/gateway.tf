@@ -78,3 +78,23 @@ resource "kubectl_manifest" "openai_backend" {
     helm_release.enterprise_agentgateway,
   ]
 }
+
+# Helm does not create this policy. Same shape as the live GKE showcase /
+# official Solo UI tracing setup (OTLP gRPC to solo-enterprise-telemetry-collector:4317).
+data "kubectl_file_documents" "tracing" {
+  content = file("${path.module}/../manifests/tracing.yaml")
+}
+
+resource "kubectl_manifest" "tracing" {
+  for_each = local.install_agentgateway_gate && var.install_solo_ui ? data.kubectl_file_documents.tracing.manifests : {}
+
+  yaml_body         = each.value
+  server_side_apply = true
+  wait              = true
+
+  depends_on = [
+    helm_release.solo_ui,
+    kubectl_manifest.gateway,
+    helm_release.enterprise_agentgateway,
+  ]
+}

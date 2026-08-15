@@ -1,7 +1,8 @@
 # Helm + LLM path stay disabled until agentgateway_license_key is set.
 # After the cluster exists, one apply with the license (and OpenAI key) creates
-# charts, openai-secret, Gateway, backend, and HTTPRoute. Autopilot already has
-# Gateway API CRDs; set manage_gateway_api_crds only if the cluster does not.
+# charts, openai-secret, Gateway, backend, HTTPRoute, and the tracing policy.
+# Autopilot already has Gateway API CRDs; set manage_gateway_api_crds only if
+# the cluster does not.
 #
 #   export TF_VAR_agentgateway_license_key
 #   export TF_VAR_openai_api_key
