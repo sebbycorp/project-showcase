@@ -12,7 +12,7 @@ A fresh `terraform apply` with the license and OpenAI key produces that stack. D
 | `helm/management-values.yaml` | Shared ClickHouse persistence values (Terraform + fallback script) |
 | `manifests/` | Gateway + OpenAI backend/HTTPRoute + tracing policy (no secrets); applied by Terraform |
 | `scripts/install-agentgateway.sh` | Optional non-Terraform fallback for the in-cluster stack |
-| `chrome-extension/` | Manifest V3 popup: Chat, LLM, MCP, A2A, API/HTTP tests; LLM/MCP config builders and Cluster CRD apply in Settings |
+| `chrome-extension/` | Manifest V3 popup: Chat, LLM, MCP, A2A, API/HTTP tests; LLM/MCP config builders and Cluster CRD apply in Settings (Manual or Omni) |
 
 ## Prerequisites
 

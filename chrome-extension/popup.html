@@ -1376,32 +1376,66 @@
           API server, token, and Apply for Gateway / Agentgateway CRDs. Used by
           the LLM and MCP builders and each tab’s Deploy accordion.
         </p>
-        <label class="field-label" for="cluster-type">Cluster type</label>
-        <select id="cluster-type">
-          <option value="gke">GKE</option>
-          <option value="aks">AKS</option>
-          <option value="eks">EKS</option>
-          <option value="local">Local</option>
+        <label class="field-label" for="cluster-source">Source</label>
+        <select id="cluster-source">
+          <option value="manual">Manual</option>
+          <option value="omni">Omni</option>
         </select>
-        <p id="cluster-help" class="hint"></p>
+        <p id="cluster-source-help" class="hint"></p>
 
-        <label class="field-label" for="cluster-api-server">API server URL</label>
-        <input
-          id="cluster-api-server"
-          type="url"
-          spellcheck="false"
-          autocomplete="off"
-          placeholder="https://kubernetes.example:443"
-        />
+        <div id="cluster-manual-fields">
+          <label class="field-label" for="cluster-type">Cluster type</label>
+          <select id="cluster-type">
+            <option value="gke">GKE</option>
+            <option value="aks">AKS</option>
+            <option value="eks">EKS</option>
+            <option value="local">Local</option>
+          </select>
+          <p id="cluster-help" class="hint"></p>
 
-        <label class="field-label" for="cluster-token">Bearer token</label>
-        <input
-          id="cluster-token"
-          type="password"
-          spellcheck="false"
-          autocomplete="off"
-          placeholder="Paste a token, not an exec kubeconfig"
-        />
+          <label class="field-label" for="cluster-api-server">API server URL</label>
+          <input
+            id="cluster-api-server"
+            type="url"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="https://kubernetes.example:443"
+          />
+
+          <label class="field-label" for="cluster-token">Bearer token</label>
+          <input
+            id="cluster-token"
+            type="password"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="Paste a token, not an exec kubeconfig"
+          />
+        </div>
+
+        <div id="cluster-omni-fields" hidden>
+          <label class="field-label" for="omni-url">Omni URL</label>
+          <input
+            id="omni-url"
+            type="url"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="https://maniak.na-west-1.omni.siderolabs.io"
+          />
+          <label class="field-label" for="omni-sa-key">
+            OMNI_SERVICE_ACCOUNT_KEY (optional)
+          </label>
+          <input
+            id="omni-sa-key"
+            type="password"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="Stored locally; not used to list clusters"
+          />
+          <p class="hint">
+            Omni’s management API is gRPC, so Chrome cannot list clusters.
+            Paste a token kubeconfig below.
+          </p>
+        </div>
 
         <label class="field-label" for="cluster-namespace">Namespace</label>
         <input
@@ -1412,7 +1446,7 @@
           placeholder="agentgateway-system"
         />
 
-        <label class="field-label" for="cluster-kubeconfig">
+        <label class="field-label" for="cluster-kubeconfig" id="cluster-kubeconfig-label">
           Kubeconfig YAML (optional)
         </label>
         <textarea
@@ -1422,6 +1456,10 @@
           autocomplete="off"
           placeholder="Paste kubeconfig to fill server and token"
         ></textarea>
+        <label class="field-label" for="cluster-context" id="cluster-context-label" hidden>
+          Context / cluster
+        </label>
+        <select id="cluster-context" hidden></select>
         <button id="parse-kubeconfig" type="button" class="btn">
           Parse kubeconfig
         </button>
@@ -1486,6 +1524,7 @@
 
     <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
     <script src="yaml.js"></script>
+    <script src="kubeconfig.js"></script>
     <script src="examples.js"></script>
     <script src="builder.js"></script>
     <script src="confetti.js"></script>
