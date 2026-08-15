@@ -9,7 +9,7 @@
   <body>
     <header class="header">
       <h1>Agentgateway Chat</h1>
-      <label class="endpoint-label" for="endpoint">Endpoint URL</label>
+      <label class="field-label" for="endpoint">Endpoint URL</label>
       <input
         id="endpoint"
         type="url"
@@ -17,6 +17,20 @@
         autocomplete="off"
         placeholder="http://host/v1/chat/completions"
       />
+      <div class="model-row">
+        <div class="model-field">
+          <label class="field-label" for="model">Model</label>
+          <input
+            id="model"
+            type="text"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="gpt-4o-mini"
+          />
+        </div>
+        <button id="test" type="button">Test</button>
+      </div>
+      <div id="test-result" class="test-result" hidden></div>
     </header>
 
     <main id="log" class="log" aria-live="polite"></main>

@@ -44,14 +44,15 @@ body {
   font-weight: 600;
 }
 
-.endpoint-label {
+.field-label {
   display: block;
   margin-bottom: 4px;
   color: var(--muted);
   font-size: 11px;
 }
 
-#endpoint {
+#endpoint,
+#model {
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--border);
@@ -62,7 +63,70 @@ body {
   font-size: 12px;
 }
 
+.model-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.model-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#test {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#test:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+#test:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.test-result {
+  margin-top: 8px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: 12px;
+}
+
+.test-result.is-error {
+  border-color: var(--error);
+  background: var(--error);
+}
+
+.test-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.test-result.is-error .test-meta {
+  color: #ffc9c9;
+}
+
+.test-body {
+  margin-top: 3px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 #endpoint:focus,
+#model:focus,
 #message:focus {
   outline: 1px solid var(--accent);
   border-color: var(--accent);

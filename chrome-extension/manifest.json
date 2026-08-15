@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Agentgateway Chat",
-  "version": "0.1.0",
-  "description": "Chat with an LLM through an Agentgateway endpoint.",
+  "version": "0.2.0",
+  "description": "Chat with and test an LLM through an Agentgateway endpoint.",
   "action": {
     "default_title": "Agentgateway Chat",
     "default_popup": "popup.html"
