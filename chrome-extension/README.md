@@ -6,6 +6,12 @@ backend auth, so those areas do **not** store or send an API key or license
 key. Cluster talks to a Kubernetes API server so you can list and apply
 Agentgateway CRDs from the popup.
 
+The popup uses the Solo Enterprise dark palette (navy surfaces, teal accent).
+Chat, Failover, and MCP show a live sequence diagram
+(Client → Agentgateway → provider, or Client → MCP for a raw MCP URL).
+**Test**, **Run test**, and **Probe** highlight each hop in order, then
+mark the path teal on success or the failing hop red.
+
 ## Load unpacked
 
 1. Open `chrome://extensions`
@@ -31,7 +37,8 @@ If you enter a base URL without `/v1/chat/completions` (for example
 
 **Test** sends a tiny `POST` and shows HTTP status, round-trip latency, the
 response model when present, and the reply or error. It does not clear chat
-history.
+history. While the request is in flight, the sequence diagram highlights
+Client → Agentgateway → provider, then the return path.
 
 The chat box uses the same saved endpoint and model for follow-up messages.
 Each send is `POST` with JSON `{ "model": "<chosen model>", "messages": [...] }`.

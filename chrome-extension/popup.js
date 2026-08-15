@@ -137,6 +137,9 @@ const els = {
   runSecurity: document.getElementById("run-security"),
   securityHint: document.getElementById("security-endpoint-hint"),
   scenarioResult: document.getElementById("scenario-result"),
+  seqChat: document.getElementById("seq-chat"),
+  seqFailover: document.getElementById("seq-failover"),
+  seqMcp: document.getElementById("seq-mcp"),
   tabCluster: document.getElementById("tab-cluster"),
   areaCluster: document.getElementById("area-cluster"),
   clusterType: document.getElementById("cluster-type"),
@@ -255,6 +258,245 @@ function updateEndpointHints() {
   const text = `Uses chat endpoint ${endpoint}`;
   els.failoverHint.textContent = text;
   els.securityHint.textContent = text;
+  refreshSeqDiagrams();
+}
+
+const SEQ_STEP_MS = 240;
+const seqTokens = { "seq-chat": 0, "seq-failover": 0, "seq-mcp": 0 };
+
+function isIpHost(host) {
+  return (
+    /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) ||
+    host.includes(":") ||
+    host === "localhost"
+  );
+}
+
+function providerLabel(rawUrl) {
+  const raw = (rawUrl || "").trim();
+  if (/openai/i.test(raw)) {
+    return "OpenAI";
+  }
+  try {
+    const host = new URL(raw).hostname;
+    if (!host || isIpHost(host)) {
+      return "OpenAI";
+    }
+    return host;
+  } catch {
+    return "OpenAI";
+  }
+}
+
+function pathCaption(viaGateway, target) {
+  return viaGateway
+    ? `Client → Agentgateway → ${target}`
+    : `Client → ${target}`;
+}
+
+function mcpUsesGateway(mcpUrl, chatUrl) {
+  try {
+    const mcp = new URL((mcpUrl || "").trim() || DEFAULT_MCP_ENDPOINT);
+    const chat = new URL(normalizeEndpoint(chatUrl));
+    return mcp.host === chat.host;
+  } catch {
+    return true;
+  }
+}
+
+function setSeqCaption(seq, text) {
+  const caption = seq.querySelector(".seq-caption");
+  if (caption) {
+    caption.textContent = text;
+  }
+}
+
+function configureSeq(seq, { viaGateway, target }) {
+  seq.dataset.mode = viaGateway ? "via-gw" : "direct";
+  const targetBox = seq.querySelector('[data-role="target"]');
+  if (targetBox) {
+    targetBox.textContent = target;
+  }
+  if (!seq.classList.contains("is-run")) {
+    setSeqCaption(seq, pathCaption(viaGateway, target));
+  }
+}
+
+function llmSeqConfig() {
+  return {
+    viaGateway: true,
+    target: providerLabel(normalizeEndpoint(els.endpoint.value)),
+  };
+}
+
+function mcpSeqConfig() {
+  const mcpUrl = els.mcpEndpoint.value.trim() || DEFAULT_MCP_ENDPOINT;
+  const viaGateway = mcpUsesGateway(mcpUrl, els.endpoint.value);
+  return { viaGateway, target: "MCP" };
+}
+
+function refreshSeqDiagrams() {
+  configureSeq(els.seqChat, llmSeqConfig());
+  configureSeq(els.seqFailover, llmSeqConfig());
+  configureSeq(els.seqMcp, mcpSeqConfig());
+}
+
+function clearSeqMarks(seq) {
+  seq.querySelectorAll(".seq-box, .seq-arrow").forEach((node) => {
+    node.classList.remove("is-on", "is-fail");
+  });
+}
+
+function resetSeq(seq) {
+  seq.classList.remove("is-run", "is-ok", "is-fail");
+  clearSeqMarks(seq);
+}
+
+function markSeq(seq, roles, steps, className) {
+  roles.forEach((role) => {
+    const box = seq.querySelector(`[data-role="${role}"]`);
+    if (box) {
+      box.classList.add(className);
+    }
+  });
+  steps.forEach((step) => {
+    const arrow = seq.querySelector(`[data-step="${step}"]`);
+    if (arrow) {
+      arrow.classList.add(className);
+    }
+  });
+}
+
+function waitSeq(ms, seqId, token) {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(seqTokens[seqId] === token), ms);
+  });
+}
+
+function failHopFromResult(result, viaGateway) {
+  if (result.error || result.status == null) {
+    return 1;
+  }
+  if (result.status < 400) {
+    return null;
+  }
+  if (viaGateway && (result.status === 502 || result.status === 503 || result.status === 504)) {
+    return 3;
+  }
+  return 2;
+}
+
+function failSeq(seq, hop, viaGateway, target) {
+  seq.classList.remove("is-run");
+  seq.classList.add("is-fail");
+  clearSeqMarks(seq);
+
+  if (hop <= 1) {
+    markSeq(seq, ["client"], [1], "is-fail");
+    setSeqCaption(seq, "Failed at Client");
+    return;
+  }
+
+  if (!viaGateway) {
+    markSeq(seq, ["client"], [1], "is-on");
+    markSeq(seq, ["target"], [1], "is-fail");
+    setSeqCaption(seq, `Failed at ${target}`);
+    return;
+  }
+
+  if (hop === 2) {
+    markSeq(seq, ["client"], [1], "is-on");
+    markSeq(seq, ["gateway"], [], "is-fail");
+    setSeqCaption(seq, "Failed at Agentgateway");
+    return;
+  }
+
+  markSeq(seq, ["client", "gateway"], [1, 2], "is-on");
+  markSeq(seq, ["target"], [2], "is-fail");
+  setSeqCaption(seq, `Failed at ${target}`);
+}
+
+async function animateSeqForward(seq, viaGateway, target, token) {
+  const id = seq.id;
+  markSeq(seq, ["client"], [1], "is-on");
+  setSeqCaption(seq, "Client sends");
+  if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
+    return false;
+  }
+
+  if (viaGateway) {
+    markSeq(seq, ["gateway"], [], "is-on");
+    setSeqCaption(seq, "Agentgateway");
+    if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
+      return false;
+    }
+    markSeq(seq, ["target"], [2], "is-on");
+    setSeqCaption(seq, target);
+    if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
+      return false;
+    }
+    return true;
+  }
+
+  markSeq(seq, ["target"], [1], "is-on");
+  setSeqCaption(seq, target);
+  if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
+    return false;
+  }
+  return true;
+}
+
+async function animateSeqReturn(seq, viaGateway, target, token) {
+  if (viaGateway) {
+    markSeq(seq, [], [3, 4], "is-on");
+  } else {
+    markSeq(seq, [], [4], "is-on");
+  }
+  setSeqCaption(seq, "Response");
+  return waitSeq(180, seq.id, token);
+}
+
+async function runWithSeq(seq, requestFn, { viaGateway, target, ok }) {
+  const token = ++seqTokens[seq.id];
+  configureSeq(seq, { viaGateway, target });
+  resetSeq(seq);
+  seq.classList.add("is-run");
+
+  const request = Promise.resolve().then(requestFn);
+  const forward = animateSeqForward(seq, viaGateway, target, token);
+  const result = await request;
+  const stillCurrent = await forward;
+  if (!stillCurrent || seqTokens[seq.id] !== token) {
+    return result;
+  }
+
+  if (ok(result)) {
+    const returned = await animateSeqReturn(seq, viaGateway, target, token);
+    if (!returned || seqTokens[seq.id] !== token) {
+      return result;
+    }
+    seq.classList.remove("is-run");
+    seq.classList.add("is-ok");
+    markSeq(
+      seq,
+      viaGateway ? ["client", "gateway", "target"] : ["client", "target"],
+      viaGateway ? [1, 2, 3, 4] : [1, 4],
+      "is-on"
+    );
+    setSeqCaption(seq, pathCaption(viaGateway, target));
+    return result;
+  }
+
+  failSeq(seq, failHopFromResult(result, viaGateway), viaGateway, target);
+  return result;
+}
+
+function llmRequestOk(result) {
+  return Boolean(result.response && result.response.ok);
+}
+
+function mcpRequestOk(result) {
+  return !result.error && result.status != null && result.status < 400;
 }
 
 async function saveChatSettings() {
@@ -451,11 +693,16 @@ els.tabCluster.addEventListener("click", () => {
 
 els.scenarioType.addEventListener("change", () => {
   setScenario(els.scenarioType.value);
+  refreshSeqDiagrams();
   persist({ scenario: els.scenarioType.value });
 });
 
 els.endpoint.addEventListener("change", () => {
   saveChatSettings();
+});
+
+els.endpoint.addEventListener("input", () => {
+  refreshSeqDiagrams();
 });
 
 els.model.addEventListener("change", () => {
@@ -481,6 +728,11 @@ els.mcpEndpoint.addEventListener("change", () => {
   const mcpEndpoint = els.mcpEndpoint.value.trim() || DEFAULT_MCP_ENDPOINT;
   els.mcpEndpoint.value = mcpEndpoint;
   persist({ mcpEndpoint });
+  refreshSeqDiagrams();
+});
+
+els.mcpEndpoint.addEventListener("input", () => {
+  refreshSeqDiagrams();
 });
 
 els.a2aEndpoint.addEventListener("change", () => {
@@ -500,7 +752,11 @@ els.test.addEventListener("click", async () => {
   pending.textContent = "Testing…";
   els.testResult.append(pending);
 
-  const result = await postCompletions(endpoint, model, [TEST_MESSAGE]);
+  const result = await runWithSeq(
+    els.seqChat,
+    () => postCompletions(endpoint, model, [TEST_MESSAGE]),
+    { ...llmSeqConfig(), ok: llmRequestOk }
+  );
   const summary = summarizeCompletion(result, model);
   showBox(els.testResult, {
     status: summary.status,
@@ -527,7 +783,11 @@ els.form.addEventListener("submit", async (event) => {
   els.send.disabled = true;
 
   try {
-    const result = await postCompletions(endpoint, model, messages);
+    const result = await runWithSeq(
+      els.seqChat,
+      () => postCompletions(endpoint, model, messages),
+      { ...llmSeqConfig(), ok: llmRequestOk }
+    );
     if (result.error) {
       throw new Error(result.error);
     }
@@ -573,15 +833,25 @@ els.runFailover.addEventListener("click", async () => {
   ]);
 
   const attempts = [];
+  const seqOpts = { ...llmSeqConfig(), ok: llmRequestOk };
   const primary = summarizeCompletion(
-    await postCompletions(endpoint, primaryModel, [TEST_MESSAGE]),
+    await runWithSeq(
+      els.seqFailover,
+      () => postCompletions(endpoint, primaryModel, [TEST_MESSAGE]),
+      seqOpts
+    ),
     primaryModel
   );
   attempts.push({ label: "primary", ...primary });
 
   if (!primary.ok) {
+    await new Promise((resolve) => setTimeout(resolve, 450));
     const fallback = summarizeCompletion(
-      await postCompletions(endpoint, fallbackModel, [TEST_MESSAGE]),
+      await runWithSeq(
+        els.seqFailover,
+        () => postCompletions(endpoint, fallbackModel, [TEST_MESSAGE]),
+        seqOpts
+      ),
       fallbackModel
     );
     attempts.push({ label: "fallback", ...fallback });
@@ -634,25 +904,30 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.4.0" },
+      clientInfo: { name: "agentgateway-extension", version: "0.5.0" },
     },
   };
 
-  const result = await probeWithFallback(
-    url,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json, text/event-stream",
-      },
-      body: JSON.stringify(initialize),
-    },
-    {
-      method: "GET",
-      headers: { Accept: "application/json, text/event-stream" },
-    },
-    "POST initialize unavailable; used GET"
+  const result = await runWithSeq(
+    els.seqMcp,
+    () =>
+      probeWithFallback(
+        url,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json, text/event-stream",
+          },
+          body: JSON.stringify(initialize),
+        },
+        {
+          method: "GET",
+          headers: { Accept: "application/json, text/event-stream" },
+        },
+        "POST initialize unavailable; used GET"
+      ),
+    { ...mcpSeqConfig(), ok: mcpRequestOk }
   );
 
   const ok = !result.error && result.status != null && result.status < 400;
