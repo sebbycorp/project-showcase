@@ -12,7 +12,7 @@ A fresh `terraform apply` with the license and OpenAI key produces that stack. D
 | `helm/management-values.yaml` | Shared ClickHouse persistence values (Terraform + fallback script) |
 | `manifests/` | Gateway + OpenAI backend/HTTPRoute + tracing policy (no secrets); applied by Terraform |
 | `scripts/install-agentgateway.sh` | Optional non-Terraform fallback for the in-cluster stack |
-| `chrome-extension/` | Manifest V3 popup: Chat, LLM, MCP, A2A, API/HTTP tests; Cluster CRD apply in Settings |
+| `chrome-extension/` | Manifest V3 popup: Chat, LLM, MCP, A2A, API/HTTP tests; LLM/MCP config builders and Cluster CRD apply in Settings |
 
 ## Prerequisites
 
@@ -119,10 +119,11 @@ The project uses `deletion_policy = PREVENT` by default so `terraform destroy` w
 ## Chrome extension
 
 `chrome-extension/` is a Manifest V3 popup for Chat, LLM tests (OpenAI /
-Claude / Grok / Bedrock / Gemini), MCP, A2A, API/HTTP, and Cluster CRD
-apply in Settings through a configurable Agentgateway endpoint (saved in
-`chrome.storage.local`; no API keys). Load it unpacked from that folder —
-see [chrome-extension/README.md](chrome-extension/README.md).
+Claude / Grok / Bedrock / Gemini), MCP, A2A, API/HTTP, plus LLM/MCP
+cluster config builders and Cluster CRD apply in Settings through a
+configurable Agentgateway endpoint (saved in `chrome.storage.local`; no
+API keys). Load it unpacked from that folder — see
+[chrome-extension/README.md](chrome-extension/README.md).
 
 ## CI
 

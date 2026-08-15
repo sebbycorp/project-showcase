@@ -165,6 +165,8 @@ body {
 .btn,
 #cluster-type,
 #crd-kind,
+#llm-preset,
+#mcp-preset,
 #llm-example,
 #mcp-example,
 #a2a-example,
@@ -245,6 +247,8 @@ body {
 #http-url,
 #http-method,
 #solo-ui,
+#llm-preset,
+#mcp-preset,
 #llm-example,
 #mcp-example,
 #a2a-example,
@@ -1091,16 +1095,29 @@ html.demo-stage .seq-wire {
 
 #apply-llm,
 #apply-mcp,
+#apply-a2a,
+#apply-api,
 #apply-security,
 #parse-kubeconfig,
 #test-cluster,
-#list-crds,
 #apply-crds,
-#load-example {
+#load-example,
+#llm-regen,
+#mcp-regen {
   display: block;
   width: 100%;
   margin-top: 12px;
   padding: 8px 12px;
+}
+
+.button-row #apply-llm,
+.button-row #apply-mcp,
+.button-row #llm-regen,
+.button-row #mcp-regen,
+.button-row #apply-crds,
+.button-row #load-example {
+  width: auto;
+  margin-top: 0;
 }
 
 .btn:hover:not(:disabled) {
@@ -1189,6 +1206,8 @@ html.demo-stage .seq-wire {
 #a2a-endpoint:focus,
 #http-url:focus,
 #http-method:focus,
+#llm-preset:focus,
+#mcp-preset:focus,
 #llm-example:focus,
 #mcp-example:focus,
 #a2a-example:focus,
@@ -1259,6 +1278,105 @@ html.demo-stage .seq-wire {
 
 .crd-names li {
   margin: 2px 0;
+}
+
+.builder-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.builder-section-head .field-label {
+  margin: 0;
+}
+
+.btn-tiny {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.inventory {
+  margin-top: 8px;
+  max-height: 168px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.inventory-empty,
+.inventory-error {
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.inventory-error {
+  color: var(--error-fg);
+}
+
+.inventory-group {
+  padding: 6px 8px 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.inventory-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 6px;
+  border-top: 1px solid var(--border);
+}
+
+.inventory-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.inventory-actions {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.field-span {
+  grid-column: 1 / -1;
+}
+
+.deploy-body .builder-field,
+.deploy-body select,
+.deploy-body input[type="text"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.deploy-body .builder-field:focus,
+.deploy-body select:focus,
+.deploy-body input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.deploy-body .provider-switch {
+  margin-bottom: 4px;
 }
 
 .deploy {
