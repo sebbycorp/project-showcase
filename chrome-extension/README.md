@@ -12,12 +12,14 @@ The popup is a light enterprise console: off-white surfaces (`#F4F6F7`,
 and professional system type. The header keeps the official color mark
 beside the title. The dark wordmark and color mark are vendored in
 `icons/` from the live homepage (`/agw-dark.svg`, `/agw-mark-color.svg`) —
-they are not hotlinked at runtime. Toolbar PNGs (`icon16.png`,
+they are not hotlinked at runtime. Flow hops use compact vendored SVGs
+in the same folder (AI Agent, OpenAI, Claude, Grok, Bedrock, MCP, A2A,
+Policy). Toolbar PNGs (`icon16.png`,
 `icon32.png`, `icon48.png`) are rasterized from that mark and set as
 `action.default_icon`.
 
 Chat and each Services test show a live sequence diagram
-(Client → [Agentgateway logo] → provider or MCP/A2A). **Test** and each
+(AI Agent icon → Agentgateway logo → provider or MCP/A2A icon). **Test** and each
 named **Run** highlight hops in order, then mark the path in teal on
 success or the failing hop red.
 
@@ -54,7 +56,7 @@ If you enter a base URL without `/v1/chat/completions` (for example
 **Test** sends a tiny `POST` and shows HTTP status, round-trip latency, the
 response model when present, and the reply or error. It does not clear chat
 history. While the request is in flight, the sequence diagram highlights
-Client → Agentgateway → provider, then the return path.
+AI Agent → Agentgateway → provider, then the return path.
 
 The chat box uses the same saved endpoint and model for follow-up messages.
 Each send is `POST` with JSON `{ "model": "<chosen model>", "messages": [...] }`.
@@ -67,7 +69,7 @@ Open **Services**, then choose a subnav: **LLM**, **MCP / A2A**, or
 
 - Test name and a one-line description
 - A compact flow diagram for that test
-  (Client → Agentgateway mark → provider or target)
+  (AI Agent icon → Agentgateway logo → provider or target icon)
 - A **Run** button on the same row as the title
 - An expandable results drawer under that test
 
