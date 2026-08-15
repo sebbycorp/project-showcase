@@ -338,34 +338,53 @@ const seqTokens = {
   "seq-junk": 0,
 };
 
-function isIpHost(host) {
-  return (
-    /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) ||
-    host.includes(":") ||
-    host === "localhost"
-  );
+const SEQ_ICONS = {
+  openai: "icons/openai.svg",
+  claude: "icons/claude.svg",
+  grok: "icons/grok.svg",
+  bedrock: "icons/bedrock.svg",
+  mcp: "icons/mcp.svg",
+  a2a: "icons/a2a.svg",
+  security: "icons/policy.svg",
+};
+
+const SEQ_LABELS = {
+  openai: "OpenAI",
+  claude: "Claude",
+  grok: "Grok",
+  bedrock: "Bedrock",
+  mcp: "MCP",
+  a2a: "A2A",
+  security: "Policy",
+};
+
+function providerFromModel(raw) {
+  const model = String(raw || "").trim().toLowerCase();
+  if (
+    model.includes("bedrock") ||
+    model.includes("amazon") ||
+    model.includes("titan") ||
+    model.includes("anthropic-on-bedrock")
+  ) {
+    return "bedrock";
+  }
+  if (model.includes("claude")) {
+    return "claude";
+  }
+  if (model.includes("grok")) {
+    return "grok";
+  }
+  return "openai";
 }
 
-function providerLabel(rawUrl) {
-  const raw = (rawUrl || "").trim();
-  if (/openai/i.test(raw)) {
-    return "OpenAI";
-  }
-  try {
-    const host = new URL(raw).hostname;
-    if (!host || isIpHost(host)) {
-      return "OpenAI";
-    }
-    return host;
-  } catch {
-    return "OpenAI";
-  }
+function providerLabel(kind) {
+  return SEQ_LABELS[kind] || SEQ_LABELS.openai;
 }
 
 function pathCaption(viaGateway, target) {
   return viaGateway
-    ? `Client → Agentgateway → ${target}`
-    : `Client → ${target}`;
+    ? `AI Agent → Agentgateway → ${target}`
+    : `AI Agent → ${target}`;
 }
 
 function mcpUsesGateway(mcpUrl, chatUrl) {
@@ -385,40 +404,53 @@ function setSeqCaption(seq, text) {
   }
 }
 
-function configureSeq(seq, { viaGateway, target }) {
+function configureSeq(seq, { viaGateway, target, targetKind }) {
   seq.dataset.mode = viaGateway ? "via-gw" : "direct";
+  const caption = pathCaption(viaGateway, target);
+  seq.setAttribute("aria-label", caption);
+  seq.title = caption;
   const targetBox = seq.querySelector('[data-role="target"]');
   if (targetBox) {
-    targetBox.textContent = target;
+    targetBox.title = target;
+    const icon = targetBox.querySelector("[data-target-icon]");
+    const src = SEQ_ICONS[targetKind] || SEQ_ICONS.openai;
+    if (icon) {
+      icon.src = src;
+    }
   }
   if (!seq.classList.contains("is-run")) {
-    setSeqCaption(seq, pathCaption(viaGateway, target));
+    setSeqCaption(seq, caption);
   }
 }
 
-function llmSeqConfig() {
+function llmSeqConfig(model) {
+  const kind = providerFromModel(model || els.model.value);
   return {
     viaGateway: true,
-    target: providerLabel(normalizeEndpoint(els.endpoint.value)),
+    target: providerLabel(kind),
+    targetKind: kind,
   };
 }
 
 function mcpSeqConfig() {
   const mcpUrl = els.mcpEndpoint.value.trim() || DEFAULT_MCP_ENDPOINT;
   const viaGateway = mcpUsesGateway(mcpUrl, els.endpoint.value);
-  return { viaGateway, target: "MCP" };
+  return { viaGateway, target: "MCP", targetKind: "mcp" };
+}
+
+function securitySeqConfig() {
+  return { viaGateway: true, target: "Policy", targetKind: "security" };
 }
 
 function refreshSeqDiagrams() {
-  const llm = llmSeqConfig();
-  configureSeq(els.seqChat, llm);
-  configureSeq(els.seqChatPing, llm);
-  configureSeq(els.seqFailover, llm);
-  configureSeq(els.seqListCall, llm);
+  configureSeq(els.seqChat, llmSeqConfig(els.model.value));
+  configureSeq(els.seqChatPing, llmSeqConfig(els.model.value));
+  configureSeq(els.seqFailover, llmSeqConfig(els.primaryModel.value));
+  configureSeq(els.seqListCall, llmSeqConfig(els.chosenModel.value));
   configureSeq(els.seqMcpInit, mcpSeqConfig());
   configureSeq(els.seqA2a, a2aSeqConfig());
-  configureSeq(els.seqUnauth, llm);
-  configureSeq(els.seqJunk, llm);
+  configureSeq(els.seqUnauth, securitySeqConfig());
+  configureSeq(els.seqJunk, securitySeqConfig());
 }
 
 function clearSeqMarks(seq) {
@@ -473,7 +505,7 @@ function failSeq(seq, hop, viaGateway, target) {
 
   if (hop <= 1) {
     markSeq(seq, ["client"], [1], "is-fail");
-    setSeqCaption(seq, "Failed at Client");
+    setSeqCaption(seq, "Failed at AI Agent");
     return;
   }
 
@@ -499,7 +531,7 @@ function failSeq(seq, hop, viaGateway, target) {
 async function animateSeqForward(seq, viaGateway, target, token) {
   const id = seq.id;
   markSeq(seq, ["client"], [1], "is-on");
-  setSeqCaption(seq, "Client sends");
+  setSeqCaption(seq, "AI Agent sends");
   if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
     return false;
   }
@@ -892,10 +924,19 @@ els.model.addEventListener("change", () => {
   saveChatSettings();
 });
 
+els.model.addEventListener("input", () => {
+  refreshSeqDiagrams();
+});
+
 els.primaryModel.addEventListener("change", () => {
   const primaryModel = normalizeModel(els.primaryModel.value);
   els.primaryModel.value = primaryModel;
   persist({ primaryModel });
+  refreshSeqDiagrams();
+});
+
+els.primaryModel.addEventListener("input", () => {
+  refreshSeqDiagrams();
 });
 
 els.fallbackModel.addEventListener("change", () => {
@@ -911,6 +952,11 @@ els.chosenModel.addEventListener("change", () => {
   const chosenModel = normalizeModel(els.chosenModel.value);
   els.chosenModel.value = chosenModel;
   persist({ chosenModel });
+  refreshSeqDiagrams();
+});
+
+els.chosenModel.addEventListener("input", () => {
+  refreshSeqDiagrams();
 });
 
 els.mcpEndpoint.addEventListener("change", () => {
@@ -949,7 +995,7 @@ els.test.addEventListener("click", async () => {
   const result = await runWithSeq(
     els.seqChat,
     () => postCompletions(endpoint, model, [TEST_MESSAGE]),
-    { ...llmSeqConfig(), ok: llmRequestOk }
+    { ...llmSeqConfig(model), ok: llmRequestOk }
   );
   const summary = summarizeCompletion(result, model);
   showBox(els.testResult, {
@@ -983,7 +1029,7 @@ els.form.addEventListener("submit", async (event) => {
     const result = await runWithSeq(
       els.seqChat,
       () => postCompletions(endpoint, model, messages),
-      { ...llmSeqConfig(), ok: llmRequestOk }
+      { ...llmSeqConfig(model), ok: llmRequestOk }
     );
     if (result.error) {
       throw new Error(result.error);
@@ -1020,7 +1066,7 @@ els.runChatPing.addEventListener("click", async () => {
   const result = await runWithSeq(
     els.seqChatPing,
     () => postCompletions(endpoint, model, [TEST_MESSAGE]),
-    { ...llmSeqConfig(), ok: llmRequestOk }
+    { ...llmSeqConfig(model), ok: llmRequestOk }
   );
   const summary = summarizeCompletion(result, model);
   const statusText =
@@ -1058,12 +1104,11 @@ els.runFailover.addEventListener("click", async () => {
   runningDrawer(els.resultFailover, "Running primary model…");
 
   const attempts = [];
-  const seqOpts = { ...llmSeqConfig(), ok: llmRequestOk };
   const primary = summarizeCompletion(
     await runWithSeq(
       els.seqFailover,
       () => postCompletions(endpoint, primaryModel, [TEST_MESSAGE]),
-      seqOpts
+      { ...llmSeqConfig(primaryModel), ok: llmRequestOk }
     ),
     primaryModel
   );
@@ -1076,7 +1121,7 @@ els.runFailover.addEventListener("click", async () => {
       await runWithSeq(
         els.seqFailover,
         () => postCompletions(endpoint, fallbackModel, [TEST_MESSAGE]),
-        seqOpts
+        { ...llmSeqConfig(fallbackModel), ok: llmRequestOk }
       ),
       fallbackModel
     );
@@ -1154,7 +1199,7 @@ els.runListCall.addEventListener("click", async () => {
   const listed = await runWithSeq(
     els.seqListCall,
     () => timedFetch(listUrl, { method: "GET", headers: { Accept: "application/json" } }),
-    { ...llmSeqConfig(), ok: mcpRequestOk }
+    { ...llmSeqConfig(chosenModel), ok: mcpRequestOk }
   );
   const listOk = !listed.error && listed.status != null && listed.status < 400;
   const listStatus =
@@ -1171,7 +1216,7 @@ els.runListCall.addEventListener("click", async () => {
     await runWithSeq(
       els.seqListCall,
       () => postCompletions(endpoint, chosenModel, [TEST_MESSAGE]),
-      { ...llmSeqConfig(), ok: llmRequestOk }
+      { ...llmSeqConfig(chosenModel), ok: llmRequestOk }
     ),
     chosenModel
   );
@@ -1225,7 +1270,7 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.8.0" },
+      clientInfo: { name: "agentgateway-extension", version: "0.8.1" },
     },
   };
 
@@ -1283,7 +1328,7 @@ els.probeMcp.addEventListener("click", async () => {
 function a2aSeqConfig() {
   const a2aUrl = els.a2aEndpoint.value.trim() || DEFAULT_A2A_ENDPOINT;
   const viaGateway = mcpUsesGateway(a2aUrl, els.endpoint.value);
-  return { viaGateway, target: "A2A" };
+  return { viaGateway, target: "A2A", targetKind: "a2a" };
 }
 
 els.probeA2a.addEventListener("click", async () => {
@@ -1352,7 +1397,7 @@ async function runSecurityProbe(button, drawer, seq, label, messages) {
     await runWithSeq(
       seq,
       () => postCompletions(endpoint, model, messages),
-      { ...llmSeqConfig(), ok: llmRequestOk }
+      { ...securitySeqConfig(), ok: llmRequestOk }
     ),
     model
   );
