@@ -42,6 +42,36 @@
           </div>
           <button id="test" type="button">Test</button>
         </div>
+        <figure
+          class="seq"
+          id="seq-chat"
+          data-mode="via-gw"
+          aria-label="Request path"
+        >
+          <figcaption class="seq-caption" aria-live="polite">
+            Client → Agentgateway → OpenAI
+          </figcaption>
+          <div class="seq-fwd">
+            <div class="seq-col">
+              <div class="seq-box" data-role="client">Client</div>
+            </div>
+            <div class="seq-arrow" data-step="1" aria-hidden="true"></div>
+            <div class="seq-col" data-slot="gateway">
+              <div class="seq-box" data-role="gateway">Agentgateway</div>
+            </div>
+            <div class="seq-arrow" data-step="2" aria-hidden="true"></div>
+            <div class="seq-col">
+              <div class="seq-box" data-role="target">OpenAI</div>
+            </div>
+          </div>
+          <div class="seq-back">
+            <div class="seq-col"></div>
+            <div class="seq-arrow is-back" data-step="4" aria-hidden="true"></div>
+            <div class="seq-col" data-slot="gateway"></div>
+            <div class="seq-arrow is-back" data-step="3" aria-hidden="true"></div>
+            <div class="seq-col"></div>
+          </div>
+        </figure>
         <div id="test-result" class="result-box" hidden></div>
       </div>
 
@@ -86,6 +116,36 @@
             autocomplete="off"
             placeholder="gpt-4o"
           />
+          <figure
+            class="seq"
+            id="seq-failover"
+            data-mode="via-gw"
+            aria-label="Request path"
+          >
+            <figcaption class="seq-caption" aria-live="polite">
+              Client → Agentgateway → OpenAI
+            </figcaption>
+            <div class="seq-fwd">
+              <div class="seq-col">
+                <div class="seq-box" data-role="client">Client</div>
+              </div>
+              <div class="seq-arrow" data-step="1" aria-hidden="true"></div>
+              <div class="seq-col" data-slot="gateway">
+                <div class="seq-box" data-role="gateway">Agentgateway</div>
+              </div>
+              <div class="seq-arrow" data-step="2" aria-hidden="true"></div>
+              <div class="seq-col">
+                <div class="seq-box" data-role="target">OpenAI</div>
+              </div>
+            </div>
+            <div class="seq-back">
+              <div class="seq-col"></div>
+              <div class="seq-arrow is-back" data-step="4" aria-hidden="true"></div>
+              <div class="seq-col" data-slot="gateway"></div>
+              <div class="seq-arrow is-back" data-step="3" aria-hidden="true"></div>
+              <div class="seq-col"></div>
+            </div>
+          </figure>
           <button id="run-failover" type="button">Run test</button>
         </div>
 
@@ -98,6 +158,36 @@
             autocomplete="off"
             placeholder="http://host/mcp"
           />
+          <figure
+            class="seq"
+            id="seq-mcp"
+            data-mode="via-gw"
+            aria-label="Request path"
+          >
+            <figcaption class="seq-caption" aria-live="polite">
+              Client → Agentgateway → MCP
+            </figcaption>
+            <div class="seq-fwd">
+              <div class="seq-col">
+                <div class="seq-box" data-role="client">Client</div>
+              </div>
+              <div class="seq-arrow" data-step="1" aria-hidden="true"></div>
+              <div class="seq-col" data-slot="gateway">
+                <div class="seq-box" data-role="gateway">Agentgateway</div>
+              </div>
+              <div class="seq-arrow" data-step="2" aria-hidden="true"></div>
+              <div class="seq-col">
+                <div class="seq-box" data-role="target">MCP</div>
+              </div>
+            </div>
+            <div class="seq-back">
+              <div class="seq-col"></div>
+              <div class="seq-arrow is-back" data-step="4" aria-hidden="true"></div>
+              <div class="seq-col" data-slot="gateway"></div>
+              <div class="seq-arrow is-back" data-step="3" aria-hidden="true"></div>
+              <div class="seq-col"></div>
+            </div>
+          </figure>
           <button id="probe-mcp" type="button">Probe</button>
         </div>
 

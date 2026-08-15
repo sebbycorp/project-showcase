@@ -4,6 +4,11 @@ Manifest V3 popup with two areas: **Chat** and **Scenarios**. Both talk to a
 user-configured Agentgateway. The gateway injects backend auth, so this
 extension does **not** store or send an API key or license key.
 
+Chat, Failover, and MCP show a live sequence diagram
+(Client → Agentgateway → provider, or Client → MCP for a raw MCP URL).
+**Test**, **Run test**, and **Probe** highlight each hop in order, then
+mark the path green on success or the failing hop red.
+
 ## Load unpacked
 
 1. Open `chrome://extensions`
