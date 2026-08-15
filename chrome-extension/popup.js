@@ -8,7 +8,7 @@ const CHAT_PATH = "/v1/chat/completions";
 const TEST_MESSAGE = { role: "user", content: "Reply with the word pong." };
 const JUNK_PROMPT = `policy-probe ${"x".repeat(1024)}`;
 const BODY_SNIPPET = 400;
-const AREAS = ["chat", "scenarios", "cluster", "settings"];
+const AREAS = ["chat", "services", "cluster", "settings"];
 const STORAGE_KEYS = [
   "endpoint",
   "model",
@@ -118,9 +118,9 @@ spec:
 
 const els = {
   tabChat: document.getElementById("tab-chat"),
-  tabScenarios: document.getElementById("tab-scenarios"),
+  tabServices: document.getElementById("tab-services"),
   areaChat: document.getElementById("area-chat"),
-  areaScenarios: document.getElementById("area-scenarios"),
+  areaServices: document.getElementById("area-services"),
   endpoint: document.getElementById("endpoint"),
   model: document.getElementById("model"),
   test: document.getElementById("test"),
@@ -132,9 +132,9 @@ const els = {
   sectionLlm: document.getElementById("section-llm"),
   sectionMcp: document.getElementById("section-mcp"),
   sectionSecurity: document.getElementById("section-security"),
-  scenarioLlm: document.getElementById("scenario-llm"),
-  scenarioMcp: document.getElementById("scenario-mcp"),
-  scenarioSecurity: document.getElementById("scenario-security"),
+  serviceLlm: document.getElementById("service-llm"),
+  serviceMcp: document.getElementById("service-mcp"),
+  serviceSecurity: document.getElementById("service-security"),
   primaryModel: document.getElementById("primary-model"),
   fallbackModel: document.getElementById("fallback-model"),
   chosenModel: document.getElementById("chosen-model"),
@@ -161,11 +161,21 @@ const els = {
   securityYaml: document.getElementById("security-yaml"),
   applySecurity: document.getElementById("apply-security"),
   securityApplyResult: document.getElementById("security-apply-result"),
-  scenarioResult: document.getElementById("scenario-result"),
+  resultChatPing: document.getElementById("result-chat-ping"),
+  resultFailover: document.getElementById("result-failover"),
+  resultListCall: document.getElementById("result-list-call"),
+  resultMcp: document.getElementById("result-mcp"),
+  resultA2a: document.getElementById("result-a2a"),
+  resultUnauth: document.getElementById("result-unauth"),
+  resultJunk: document.getElementById("result-junk"),
   seqChat: document.getElementById("seq-chat"),
-  seqLlm: document.getElementById("seq-llm"),
-  seqMcp: document.getElementById("seq-mcp"),
-  seqSecurity: document.getElementById("seq-security"),
+  seqChatPing: document.getElementById("seq-chat-ping"),
+  seqFailover: document.getElementById("seq-failover"),
+  seqListCall: document.getElementById("seq-list-call"),
+  seqMcpInit: document.getElementById("seq-mcp-init"),
+  seqA2a: document.getElementById("seq-a2a"),
+  seqUnauth: document.getElementById("seq-unauth"),
+  seqJunk: document.getElementById("seq-junk"),
   tabCluster: document.getElementById("tab-cluster"),
   areaCluster: document.getElementById("area-cluster"),
   clusterType: document.getElementById("cluster-type"),
@@ -201,10 +211,10 @@ function celebrate() {
   burstConfetti(els.confetti);
 }
 
-const scenarioPanels = {
-  llm: els.scenarioLlm,
-  mcp: els.scenarioMcp,
-  security: els.scenarioSecurity,
+const servicePanels = {
+  llm: els.serviceLlm,
+  mcp: els.serviceMcp,
+  security: els.serviceSecurity,
 };
 
 const sectionTabs = {
@@ -319,9 +329,13 @@ function updateEndpointHints() {
 const SEQ_STEP_MS = 240;
 const seqTokens = {
   "seq-chat": 0,
-  "seq-llm": 0,
-  "seq-mcp": 0,
-  "seq-security": 0,
+  "seq-chat-ping": 0,
+  "seq-failover": 0,
+  "seq-list-call": 0,
+  "seq-mcp-init": 0,
+  "seq-a2a": 0,
+  "seq-unauth": 0,
+  "seq-junk": 0,
 };
 
 function isIpHost(host) {
@@ -396,10 +410,15 @@ function mcpSeqConfig() {
 }
 
 function refreshSeqDiagrams() {
-  configureSeq(els.seqChat, llmSeqConfig());
-  configureSeq(els.seqLlm, llmSeqConfig());
-  configureSeq(els.seqMcp, mcpSeqConfig());
-  configureSeq(els.seqSecurity, llmSeqConfig());
+  const llm = llmSeqConfig();
+  configureSeq(els.seqChat, llm);
+  configureSeq(els.seqChatPing, llm);
+  configureSeq(els.seqFailover, llm);
+  configureSeq(els.seqListCall, llm);
+  configureSeq(els.seqMcpInit, mcpSeqConfig());
+  configureSeq(els.seqA2a, a2aSeqConfig());
+  configureSeq(els.seqUnauth, llm);
+  configureSeq(els.seqJunk, llm);
 }
 
 function clearSeqMarks(seq) {
@@ -673,29 +692,98 @@ function card(className, extraClass, metaText, bodyText) {
   return wrap;
 }
 
-function setScenarioResult(nodes) {
-  els.scenarioResult.replaceChildren(...nodes);
+function normalizeArea(name) {
+  if (name === "scenarios") {
+    return "services";
+  }
+  return AREAS.includes(name) ? name : "chat";
+}
+
+function drawerStatus(state) {
+  const badge = document.createElement("span");
+  badge.className = `status-badge is-${state}`;
+  badge.textContent =
+    state === "running" ? "Running" : state === "ok" ? "OK" : "Fail";
+  return badge;
+}
+
+function drawerMeta(text) {
+  const meta = document.createElement("span");
+  meta.className = "drawer-meta";
+  meta.textContent = text;
+  return meta;
+}
+
+function collapseButton(target) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "drawer-collapse";
+  button.textContent = "Collapse";
+  button.addEventListener("click", () => {
+    closeTestDrawer(target);
+  });
+  return button;
+}
+
+function setTestDrawer(target, nodes, state) {
+  const card = target.closest(".test-card");
+  target.hidden = false;
+  target.classList.toggle("is-running", state === "running");
+  target.classList.toggle("is-ok", state === "ok");
+  target.classList.toggle("is-error", state === "fail");
+  if (card) {
+    card.classList.toggle("is-running", state === "running");
+    card.classList.toggle("is-ok", state === "ok");
+    card.classList.toggle("is-fail", state === "fail");
+    card.scrollIntoView({ block: "nearest" });
+  }
+  target.replaceChildren(...nodes);
+}
+
+function closeTestDrawer(target) {
+  const card = target.closest(".test-card");
+  target.hidden = true;
+  target.classList.remove("is-running", "is-ok", "is-error");
+  target.replaceChildren();
+  if (card) {
+    card.classList.remove("is-running", "is-ok", "is-fail");
+  }
+}
+
+function runningDrawer(target, text) {
+  const row = document.createElement("div");
+  row.className = "drawer-status";
+  row.append(drawerStatus("running"), drawerMeta(text));
+  setTestDrawer(target, [row], "running");
+}
+
+function resultDrawer(target, { ok, meta, nodes }) {
+  const row = document.createElement("div");
+  row.className = "drawer-status";
+  const state = ok ? "ok" : "fail";
+  row.append(drawerStatus(state), drawerMeta(meta), collapseButton(target));
+  setTestDrawer(target, [row, ...nodes], state);
 }
 
 function setArea(area) {
-  const selected = AREAS.includes(area) ? area : "chat";
+  const selected = normalizeArea(area);
   els.tabChat.classList.toggle("is-active", selected === "chat");
-  els.tabScenarios.classList.toggle("is-active", selected === "scenarios");
+  els.tabServices.classList.toggle("is-active", selected === "services");
   els.tabCluster.classList.toggle("is-active", selected === "cluster");
   els.tabSettings.classList.toggle("is-active", selected === "settings");
   els.areaChat.classList.toggle("is-active", selected === "chat");
-  els.areaScenarios.classList.toggle("is-active", selected === "scenarios");
+  els.areaServices.classList.toggle("is-active", selected === "services");
   els.areaCluster.classList.toggle("is-active", selected === "cluster");
   els.areaSettings.classList.toggle("is-active", selected === "settings");
   els.areaChat.hidden = selected !== "chat";
-  els.areaScenarios.hidden = selected !== "scenarios";
+  els.areaServices.hidden = selected !== "services";
   els.areaCluster.hidden = selected !== "cluster";
   els.areaSettings.hidden = selected !== "settings";
 }
 
 function setScenario(name) {
   const selected = normalizeScenario(name);
-  for (const [key, panel] of Object.entries(scenarioPanels)) {
+  for (const [key, panel] of Object.entries(servicePanels)) {
     const active = key === selected;
     panel.classList.toggle("is-active", active);
     panel.hidden = !active;
@@ -741,7 +829,7 @@ async function loadSettings() {
   }
   hoorayOn = stored.hooray !== false;
   els.hooray.checked = hoorayOn;
-  setArea(AREAS.includes(stored.area) ? stored.area : "chat");
+  setArea(normalizeArea(stored.area));
   setScenario(stored.scenario || "llm");
   updateEndpointHints();
   updateDeployHints();
@@ -752,11 +840,11 @@ els.tabChat.addEventListener("click", () => {
   persist({ area: "chat" });
 });
 
-els.tabScenarios.addEventListener("click", () => {
-  setArea("scenarios");
+els.tabServices.addEventListener("click", () => {
+  setArea("services");
   updateEndpointHints();
   updateDeployHints();
-  persist({ area: "scenarios" });
+  persist({ area: "services" });
 });
 
 els.tabCluster.addEventListener("click", () => {
@@ -840,6 +928,11 @@ els.a2aEndpoint.addEventListener("change", () => {
   const a2aEndpoint = els.a2aEndpoint.value.trim() || DEFAULT_A2A_ENDPOINT;
   els.a2aEndpoint.value = a2aEndpoint;
   persist({ a2aEndpoint });
+  refreshSeqDiagrams();
+});
+
+els.a2aEndpoint.addEventListener("input", () => {
+  refreshSeqDiagrams();
 });
 
 els.test.addEventListener("click", async () => {
@@ -923,23 +1016,27 @@ els.message.addEventListener("keydown", (event) => {
 els.runChatPing.addEventListener("click", async () => {
   const { endpoint, model } = await saveChatSettings();
   els.runChatPing.disabled = true;
-  setScenarioResult([card("check", "", "Chat ping", "Running…")]);
+  runningDrawer(els.resultChatPing, "Chat ping");
   const result = await runWithSeq(
-    els.seqLlm,
+    els.seqChatPing,
     () => postCompletions(endpoint, model, [TEST_MESSAGE]),
     { ...llmSeqConfig(), ok: llmRequestOk }
   );
   const summary = summarizeCompletion(result, model);
   const statusText =
     summary.status == null ? "no response" : `HTTP ${summary.status}`;
-  setScenarioResult([
-    card(
-      "check",
-      summary.ok ? "is-ok" : "is-error",
-      `Chat ping · ${summary.model} · ${statusText} · ${summary.latencyMs} ms`,
-      summary.body
-    ),
-  ]);
+  resultDrawer(els.resultChatPing, {
+    ok: summary.ok,
+    meta: `${summary.model} · ${statusText} · ${summary.latencyMs} ms`,
+    nodes: [
+      card(
+        "check",
+        summary.ok ? "is-ok" : "is-error",
+        `Chat ping · ${summary.model} · ${statusText} · ${summary.latencyMs} ms`,
+        summary.body
+      ),
+    ],
+  });
   if (summary.ok) {
     celebrate();
   }
@@ -958,15 +1055,13 @@ els.runFailover.addEventListener("click", async () => {
   await persist({ primaryModel, fallbackModel });
 
   els.runFailover.disabled = true;
-  setScenarioResult([
-    card("check", "", "Failover", "Running primary model…"),
-  ]);
+  runningDrawer(els.resultFailover, "Running primary model…");
 
   const attempts = [];
   const seqOpts = { ...llmSeqConfig(), ok: llmRequestOk };
   const primary = summarizeCompletion(
     await runWithSeq(
-      els.seqLlm,
+      els.seqFailover,
       () => postCompletions(endpoint, primaryModel, [TEST_MESSAGE]),
       seqOpts
     ),
@@ -975,10 +1070,11 @@ els.runFailover.addEventListener("click", async () => {
   attempts.push({ label: "primary", ...primary });
 
   if (!primary.ok) {
+    runningDrawer(els.resultFailover, "Primary failed · trying fallback…");
     await new Promise((resolve) => setTimeout(resolve, 450));
     const fallback = summarizeCompletion(
       await runWithSeq(
-        els.seqLlm,
+        els.seqFailover,
         () => postCompletions(endpoint, fallbackModel, [TEST_MESSAGE]),
         seqOpts
       ),
@@ -1007,7 +1103,13 @@ els.runFailover.addEventListener("click", async () => {
     );
   });
 
-  setScenarioResult([summary, ...cards]);
+  resultDrawer(els.resultFailover, {
+    ok: Boolean(winner),
+    meta: winner
+      ? `${winner.model} · ${winner.latencyMs} ms`
+      : "Neither model succeeded",
+    nodes: [summary, ...cards],
+  });
   if (winner) {
     celebrate();
   }
@@ -1047,10 +1149,10 @@ els.runListCall.addEventListener("click", async () => {
   await persist({ chosenModel });
   const listUrl = modelsUrl(endpoint);
   els.runListCall.disabled = true;
-  setScenarioResult([card("check", "", "List / call", "Listing models…")]);
+  runningDrawer(els.resultListCall, "Listing models…");
 
   const listed = await runWithSeq(
-    els.seqLlm,
+    els.seqListCall,
     () => timedFetch(listUrl, { method: "GET", headers: { Accept: "application/json" } }),
     { ...llmSeqConfig(), ok: mcpRequestOk }
   );
@@ -1063,10 +1165,11 @@ els.runListCall.addEventListener("click", async () => {
       ? listModelNames(listed.payload)
       : snippet(listed.raw || `HTTP ${listed.status}`);
 
+  runningDrawer(els.resultListCall, "Calling chosen model…");
   await new Promise((resolve) => setTimeout(resolve, 350));
   const called = summarizeCompletion(
     await runWithSeq(
-      els.seqLlm,
+      els.seqListCall,
       () => postCompletions(endpoint, chosenModel, [TEST_MESSAGE]),
       { ...llmSeqConfig(), ok: llmRequestOk }
     ),
@@ -1075,20 +1178,24 @@ els.runListCall.addEventListener("click", async () => {
   const callStatus =
     called.status == null ? "no response" : `HTTP ${called.status}`;
 
-  setScenarioResult([
-    card(
-      "check",
-      listOk ? "is-ok" : "is-error",
-      `List models · ${listStatus} · ${listed.latencyMs} ms`,
-      listBody
-    ),
-    card(
-      "check",
-      called.ok ? "is-ok" : "is-error",
-      `Call ${called.model} · ${callStatus} · ${called.latencyMs} ms`,
-      called.body
-    ),
-  ]);
+  resultDrawer(els.resultListCall, {
+    ok: listOk && called.ok,
+    meta: `List ${listStatus} · Call ${callStatus} · ${called.model}`,
+    nodes: [
+      card(
+        "check",
+        listOk ? "is-ok" : "is-error",
+        `List models · ${listStatus} · ${listed.latencyMs} ms`,
+        listBody
+      ),
+      card(
+        "check",
+        called.ok ? "is-ok" : "is-error",
+        `Call ${called.model} · ${callStatus} · ${called.latencyMs} ms`,
+        called.body
+      ),
+    ],
+  });
   if (listOk && called.ok) {
     celebrate();
   }
@@ -1109,7 +1216,7 @@ els.probeMcp.addEventListener("click", async () => {
   els.mcpEndpoint.value = url;
   await persist({ mcpEndpoint: url });
   els.probeMcp.disabled = true;
-  setScenarioResult([card("check", "", "MCP", "Probing…")]);
+  runningDrawer(els.resultMcp, "Probing…");
 
   const initialize = {
     jsonrpc: "2.0",
@@ -1118,12 +1225,12 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.7.0" },
+      clientInfo: { name: "agentgateway-extension", version: "0.8.0" },
     },
   };
 
   const result = await runWithSeq(
-    els.seqMcp,
+    els.seqMcpInit,
     () =>
       probeWithFallback(
         url,
@@ -1155,14 +1262,18 @@ els.probeMcp.addEventListener("click", async () => {
     meta.push(result.note);
   }
 
-  setScenarioResult([
-    card(
-      "check",
-      ok ? "is-ok" : "is-error",
-      meta.join(" · "),
-      snippet(result.error || result.raw || "(empty body)")
-    ),
-  ]);
+  resultDrawer(els.resultMcp, {
+    ok,
+    meta: meta.join(" · "),
+    nodes: [
+      card(
+        "check",
+        ok ? "is-ok" : "is-error",
+        meta.join(" · "),
+        snippet(result.error || result.raw || "(empty body)")
+      ),
+    ],
+  });
   if (!result.error && result.status >= 200 && result.status < 300) {
     celebrate();
   }
@@ -1180,10 +1291,10 @@ els.probeA2a.addEventListener("click", async () => {
   els.a2aEndpoint.value = url;
   await persist({ a2aEndpoint: url });
   els.probeA2a.disabled = true;
-  setScenarioResult([card("check", "", "A2A", "Probing…")]);
+  runningDrawer(els.resultA2a, "Probing…");
 
   const result = await runWithSeq(
-    els.seqMcp,
+    els.seqA2a,
     () =>
       probeWithFallback(
     url,
@@ -1215,27 +1326,31 @@ els.probeA2a.addEventListener("click", async () => {
     meta.push(result.note);
   }
 
-  setScenarioResult([
-    card(
-      "check",
-      ok ? "is-ok" : "is-error",
-      meta.join(" · "),
-      snippet(result.error || result.raw || "(empty body)")
-    ),
-  ]);
+  resultDrawer(els.resultA2a, {
+    ok,
+    meta: meta.join(" · "),
+    nodes: [
+      card(
+        "check",
+        ok ? "is-ok" : "is-error",
+        meta.join(" · "),
+        snippet(result.error || result.raw || "(empty body)")
+      ),
+    ],
+  });
   if (!result.error && result.status >= 200 && result.status < 300) {
     celebrate();
   }
   els.probeA2a.disabled = false;
 });
 
-async function runSecurityProbe(button, label, messages) {
+async function runSecurityProbe(button, drawer, seq, label, messages) {
   const { endpoint, model } = await saveChatSettings();
   button.disabled = true;
-  setScenarioResult([card("check", "", label, "Running…")]);
+  runningDrawer(drawer, label);
   const summary = summarizeCompletion(
     await runWithSeq(
-      els.seqSecurity,
+      seq,
       () => postCompletions(endpoint, model, messages),
       { ...llmSeqConfig(), ok: llmRequestOk }
     ),
@@ -1243,26 +1358,40 @@ async function runSecurityProbe(button, label, messages) {
   );
   const statusText =
     summary.status == null ? "no response" : `HTTP ${summary.status}`;
-  setScenarioResult([
-    card(
-      "check",
-      summary.ok ? "is-ok" : "is-error",
-      `${label} · ${statusText} · ${summary.latencyMs} ms`,
-      summary.body
-    ),
-  ]);
+  resultDrawer(drawer, {
+    ok: summary.ok,
+    meta: `${statusText} · ${summary.latencyMs} ms · ${summary.model}`,
+    nodes: [
+      card(
+        "check",
+        summary.ok ? "is-ok" : "is-error",
+        `${label} · ${statusText} · ${summary.latencyMs} ms`,
+        summary.body
+      ),
+    ],
+  });
   celebrate();
   button.disabled = false;
 }
 
 els.runUnauth.addEventListener("click", () => {
-  runSecurityProbe(els.runUnauth, "Unauthenticated", [TEST_MESSAGE]);
+  runSecurityProbe(
+    els.runUnauth,
+    els.resultUnauth,
+    els.seqUnauth,
+    "Unauthenticated",
+    [TEST_MESSAGE]
+  );
 });
 
 els.runJunk.addEventListener("click", () => {
-  runSecurityProbe(els.runJunk, "Junk / policy-probe", [
-    { role: "user", content: JUNK_PROMPT },
-  ]);
+  runSecurityProbe(
+    els.runJunk,
+    els.resultJunk,
+    els.seqJunk,
+    "Junk / policy-probe",
+    [{ role: "user", content: JUNK_PROMPT }]
+  );
 });
 
 function updateClusterHelp() {
