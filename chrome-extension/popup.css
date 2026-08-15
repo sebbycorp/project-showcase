@@ -156,6 +156,38 @@ body {
   font-weight: 500;
 }
 
+.localhost-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 118px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgb(12 116 105 / 28%);
+  border-radius: 999px;
+  background: var(--ok);
+  color: var(--ok-fg);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+}
+
+.localhost-chip[hidden] {
+  display: none;
+}
+
+.localhost-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.localhost-chip:hover {
+  border-color: var(--accent);
+}
+
 .cluster-chip:hover {
   color: var(--text);
   border-color: var(--border-strong);
@@ -346,6 +378,13 @@ body {
 #cluster-kubeconfig,
 #omni-url,
 #omni-sa-key,
+#pf-resource,
+#pf-name,
+#pf-namespace,
+#pf-context,
+#pf-local-port,
+#pf-remote-port,
+#pf-command,
 #crd-kind,
 #crd-yaml,
 #message {
@@ -1184,6 +1223,9 @@ html.demo-stage .seq-wire {
 #apply-security,
 #parse-kubeconfig,
 #test-cluster,
+#pf-copy,
+#pf-use-localhost,
+#pf-check,
 #apply-crds,
 #load-example,
 #llm-regen,
@@ -1199,7 +1241,10 @@ html.demo-stage .seq-wire {
 .button-row #llm-regen,
 .button-row #mcp-regen,
 .button-row #apply-crds,
-.button-row #load-example {
+.button-row #load-example,
+.button-row #pf-copy,
+.button-row #pf-use-localhost,
+.button-row #pf-check {
   width: auto;
   margin-top: 0;
 }
@@ -1309,6 +1354,13 @@ html.demo-stage .seq-wire {
 #cluster-kubeconfig:focus,
 #omni-url:focus,
 #omni-sa-key:focus,
+#pf-resource:focus,
+#pf-name:focus,
+#pf-namespace:focus,
+#pf-context:focus,
+#pf-local-port:focus,
+#pf-remote-port:focus,
+#pf-command:focus,
 #crd-kind:focus,
 #crd-yaml:focus,
 #message:focus {
@@ -1334,6 +1386,7 @@ html.demo-stage .seq-wire {
 #a2a-yaml,
 #api-yaml,
 #cluster-kubeconfig,
+#pf-command,
 #crd-yaml {
   resize: vertical;
   min-height: 64px;
@@ -1352,11 +1405,20 @@ html.demo-stage .seq-wire {
 
 .button-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .button-row button {
   flex: 1 1 0;
+}
+
+#port-forward-section .button-row button {
+  flex: 1 1 110px;
+}
+
+#pf-command {
+  min-height: 44px;
 }
 
 .crd-names {

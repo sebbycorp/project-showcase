@@ -331,11 +331,14 @@ The gear in the header opens **Settings**.
   `chrome.storage.local`; default **on**. One ~1s canvas burst, not a
   loop. Honors `prefers-reduced-motion`.
 - **Cluster** — source (Manual or Omni), API server, token, namespace,
-  kubeconfig parse with a context picker, Test connection, a short
-  **Resources** list (Gateway / Backend / HTTPRoute / Policy / Model /
-  RateLimit / Budget), and freeform Apply YAML. LLM and MCP builders use
-  whatever cluster is connected. The header chip shows the same
-  connection state and re-checks it when the popup opens.
+  kubeconfig parse with a context picker, Test connection, **Port
+  forward** (copy a `kubectl` command, point Chat/MCP/API tests at
+  localhost, check `127.0.0.1`), a short **Resources** list (Gateway /
+  Backend / HTTPRoute / Policy / Model / RateLimit / Budget), and
+  freeform Apply YAML. LLM and MCP builders use whatever cluster is
+  connected. The header chip shows the same connection state and
+  re-checks it when the popup opens. When tests use localhost, a
+  `127.0.0.1:<port>` chip appears in the header.
 
 ## Cluster
 
@@ -433,6 +436,41 @@ popup shows:
 **Test connection** GETs `/version`, and falls back to
 `GET /apis/gateway.networking.k8s.io/v1`. Status, latency, and the
 Kubernetes version (or error) are shown.
+
+### Port forward
+
+For Manual and Omni clusters that do not expose a public proxy or load
+balancer. Chrome **cannot** spawn `kubectl port-forward` — there is no
+Start button that pretends to tunnel. Settings are stored in
+`chrome.storage.local`.
+
+1. Fill **Resource** (Service, default, or Deployment), **Name**
+   (default `agentgateway-proxy`), **Namespace** (defaults from Cluster,
+   `agentgateway-system`), **Local port** (`8080`), and **Remote port**
+   (`80`).
+2. If Cluster already stored a kube context (Omni / kubeconfig picker),
+   an optional **Context** field adds `--context`. The extension does
+   not ask for a kubeconfig path on disk.
+3. **Copy command** copies the exact line, for example:
+
+   ```bash
+   kubectl -n agentgateway-system port-forward svc/agentgateway-proxy 8080:80
+   ```
+
+   Run it on the machine where Chrome is open (the same laptop as the
+   extension).
+4. **Use localhost** sets the Chat and API/HTTP test endpoints to
+   `http://127.0.0.1:<localPort>` (Chat still appends
+   `/v1/chat/completions`). If **MCP path** is on, MCP becomes
+   `http://127.0.0.1:<localPort>/mcp`. The header shows
+   `127.0.0.1:<port>` and test hints use that host.
+5. **Check localhost** GETs `http://127.0.0.1:<localPort>/` (or `/mcp`
+   when MCP path is on) and shows **Reachable** or **Not reachable**
+   (CORS / connection). That is how you see the forward is running.
+
+Omni still needs a working kubeconfig on that machine
+(`omnictl kubeconfig` / OIDC plugin). Port-forward is local kubectl,
+not the extension token.
 
 ### Resources
 
