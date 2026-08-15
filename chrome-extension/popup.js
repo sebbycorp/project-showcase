@@ -3,10 +3,12 @@ const DEFAULT_MODEL = "gpt-4o-mini";
 const DEFAULT_FALLBACK_MODEL = "gpt-4o";
 const DEFAULT_MCP_ENDPOINT = "http://35.226.209.32/mcp";
 const DEFAULT_A2A_ENDPOINT = "http://35.226.209.32/.well-known/agent-card.json";
+const DEFAULT_CLUSTER_NAMESPACE = "agentgateway-system";
 const CHAT_PATH = "/v1/chat/completions";
 const TEST_MESSAGE = { role: "user", content: "Reply with the word pong." };
 const JUNK_PROMPT = `policy-probe ${"x".repeat(1024)}`;
 const BODY_SNIPPET = 400;
+const AREAS = ["chat", "scenarios", "cluster"];
 const STORAGE_KEYS = [
   "endpoint",
   "model",
@@ -16,7 +18,95 @@ const STORAGE_KEYS = [
   "a2aEndpoint",
   "area",
   "scenario",
+  "clusterType",
+  "clusterApiServer",
+  "clusterToken",
+  "clusterNamespace",
+  "clusterKubeconfig",
+  "clusterConnected",
+  "clusterKind",
+  "clusterManifest",
 ];
+const CLUSTER_HELP = {
+  gke: "API server from kubectl cluster-info or gcloud container clusters describe. Token from gcloud auth print-access-token. Chrome cannot run gke-gcloud-auth-plugin.",
+  aks: "API server from az aks show. Token from a service account or az/kubelogin output — not the exec kubeconfig alone.",
+  eks: "API server from aws eks describe-cluster. Token from aws eks get-token --cluster-name …. Chrome cannot run the AWS exec plugin.",
+  local:
+    "API server + bearer token (for example kubectl create token). Chrome rejects self-signed CAs, so kind/minikube often fail unless the CA is trusted.",
+};
+const K8S_KINDS = {
+  Gateway: {
+    group: "gateway.networking.k8s.io",
+    version: "v1",
+    plural: "gateways",
+  },
+  HTTPRoute: {
+    group: "gateway.networking.k8s.io",
+    version: "v1",
+    plural: "httproutes",
+  },
+  EnterpriseAgentgatewayBackend: {
+    group: "enterpriseagentgateway.solo.io",
+    version: "v1alpha1",
+    plural: "enterpriseagentgatewaybackends",
+  },
+  EnterpriseAgentgatewayPolicy: {
+    group: "enterpriseagentgateway.solo.io",
+    version: "v1alpha1",
+    plural: "enterpriseagentgatewaypolicies",
+  },
+};
+const EXAMPLE_MANIFEST = `apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: agentgateway-proxy
+  namespace: agentgateway-system
+spec:
+  gatewayClassName: enterprise-agentgateway
+  listeners:
+    - protocol: HTTP
+      port: 80
+      name: http
+      allowedRoutes:
+        namespaces:
+          from: All
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: openai
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      openai: {}
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
+    ai:
+      routes:
+        "/v1/responses": "Responses"
+        "/v1/chat/completions": "Completions"
+        "/v1/models": "Models"
+        "*": "Passthrough"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: openai
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - backendRefs:
+        - name: openai
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+`;
 
 const els = {
   tabChat: document.getElementById("tab-chat"),
@@ -47,6 +137,25 @@ const els = {
   runSecurity: document.getElementById("run-security"),
   securityHint: document.getElementById("security-endpoint-hint"),
   scenarioResult: document.getElementById("scenario-result"),
+  tabCluster: document.getElementById("tab-cluster"),
+  areaCluster: document.getElementById("area-cluster"),
+  clusterType: document.getElementById("cluster-type"),
+  clusterHelp: document.getElementById("cluster-help"),
+  clusterApiServer: document.getElementById("cluster-api-server"),
+  clusterToken: document.getElementById("cluster-token"),
+  clusterNamespace: document.getElementById("cluster-namespace"),
+  clusterKubeconfig: document.getElementById("cluster-kubeconfig"),
+  parseKubeconfig: document.getElementById("parse-kubeconfig"),
+  kubeconfigResult: document.getElementById("kubeconfig-result"),
+  testCluster: document.getElementById("test-cluster"),
+  clusterTestResult: document.getElementById("cluster-test-result"),
+  crdKind: document.getElementById("crd-kind"),
+  listCrds: document.getElementById("list-crds"),
+  crdListResult: document.getElementById("crd-list-result"),
+  crdYaml: document.getElementById("crd-yaml"),
+  loadExample: document.getElementById("load-example"),
+  applyCrds: document.getElementById("apply-crds"),
+  crdApplyResult: document.getElementById("crd-apply-result"),
 };
 
 const scenarioPanels = {
@@ -266,13 +375,16 @@ function setScenarioResult(nodes) {
 }
 
 function setArea(area) {
-  const isChat = area === "chat";
-  els.tabChat.classList.toggle("is-active", isChat);
-  els.tabScenarios.classList.toggle("is-active", !isChat);
-  els.areaChat.classList.toggle("is-active", isChat);
-  els.areaScenarios.classList.toggle("is-active", !isChat);
-  els.areaChat.hidden = !isChat;
-  els.areaScenarios.hidden = isChat;
+  const selected = AREAS.includes(area) ? area : "chat";
+  els.tabChat.classList.toggle("is-active", selected === "chat");
+  els.tabScenarios.classList.toggle("is-active", selected === "scenarios");
+  els.tabCluster.classList.toggle("is-active", selected === "cluster");
+  els.areaChat.classList.toggle("is-active", selected === "chat");
+  els.areaScenarios.classList.toggle("is-active", selected === "scenarios");
+  els.areaCluster.classList.toggle("is-active", selected === "cluster");
+  els.areaChat.hidden = selected !== "chat";
+  els.areaScenarios.hidden = selected !== "scenarios";
+  els.areaCluster.hidden = selected !== "cluster";
 }
 
 function setScenario(name) {
@@ -293,7 +405,30 @@ async function loadSettings() {
   els.fallbackModel.value = stored.fallbackModel || DEFAULT_FALLBACK_MODEL;
   els.mcpEndpoint.value = stored.mcpEndpoint || DEFAULT_MCP_ENDPOINT;
   els.a2aEndpoint.value = stored.a2aEndpoint || DEFAULT_A2A_ENDPOINT;
-  setArea(stored.area === "scenarios" ? "scenarios" : "chat");
+  els.clusterType.value = CLUSTER_HELP[stored.clusterType]
+    ? stored.clusterType
+    : "gke";
+  els.clusterApiServer.value = stored.clusterApiServer || "";
+  els.clusterToken.value = stored.clusterToken || "";
+  els.clusterNamespace.value =
+    stored.clusterNamespace || DEFAULT_CLUSTER_NAMESPACE;
+  els.clusterKubeconfig.value = stored.clusterKubeconfig || "";
+  els.crdKind.value = K8S_KINDS[stored.clusterKind]
+    ? stored.clusterKind
+    : "Gateway";
+  els.crdYaml.value = stored.clusterManifest || EXAMPLE_MANIFEST;
+  updateClusterHelp();
+  if (stored.clusterConnected) {
+    els.clusterTestResult.hidden = false;
+    els.clusterTestResult.classList.remove("is-error");
+    els.clusterTestResult.replaceChildren();
+    const detail = document.createElement("div");
+    detail.className = "result-body";
+    detail.textContent =
+      "Last test succeeded. Re-test if the token may have expired.";
+    els.clusterTestResult.append(detail);
+  }
+  setArea(AREAS.includes(stored.area) ? stored.area : "chat");
   setScenario(stored.scenario || "failover");
   updateEndpointHints();
 }
@@ -307,6 +442,11 @@ els.tabScenarios.addEventListener("click", () => {
   setArea("scenarios");
   updateEndpointHints();
   persist({ area: "scenarios" });
+});
+
+els.tabCluster.addEventListener("click", () => {
+  setArea("cluster");
+  persist({ area: "cluster" });
 });
 
 els.scenarioType.addEventListener("change", () => {
@@ -494,7 +634,7 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.3.0" },
+      clientInfo: { name: "agentgateway-extension", version: "0.4.0" },
     },
   };
 
@@ -621,6 +761,558 @@ els.runSecurity.addEventListener("click", async () => {
     ),
   ]);
   els.runSecurity.disabled = false;
+});
+
+function updateClusterHelp() {
+  const type = CLUSTER_HELP[els.clusterType.value] ? els.clusterType.value : "gke";
+  els.clusterType.value = type;
+  els.clusterHelp.textContent = CLUSTER_HELP[type];
+}
+
+function normalizeApiServer(raw) {
+  return (raw || "").trim().replace(/\/+$/, "");
+}
+
+function currentClusterSettings() {
+  return {
+    clusterType: CLUSTER_HELP[els.clusterType.value]
+      ? els.clusterType.value
+      : "gke",
+    clusterApiServer: normalizeApiServer(els.clusterApiServer.value),
+    clusterToken: (els.clusterToken.value || "").trim(),
+    clusterNamespace:
+      (els.clusterNamespace.value || "").trim() || DEFAULT_CLUSTER_NAMESPACE,
+    clusterKubeconfig: els.clusterKubeconfig.value,
+    clusterKind: K8S_KINDS[els.crdKind.value] ? els.crdKind.value : "Gateway",
+    clusterManifest: els.crdYaml.value,
+  };
+}
+
+async function saveClusterSettings(extra = {}) {
+  const settings = currentClusterSettings();
+  els.clusterApiServer.value = settings.clusterApiServer;
+  els.clusterNamespace.value = settings.clusterNamespace;
+  await persist({ ...settings, ...extra });
+  return settings;
+}
+
+function k8sHeaders(token, contentType) {
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
+  };
+  if (contentType) {
+    headers["Content-Type"] = contentType;
+  }
+  return headers;
+}
+
+function clusterTargetError(settings) {
+  if (!settings.clusterApiServer || !settings.clusterToken) {
+    return "API server URL and bearer token are required.";
+  }
+  try {
+    const url = new URL(settings.clusterApiServer);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return "API server URL must start with http:// or https://.";
+    }
+  } catch {
+    return "API server URL is invalid.";
+  }
+  return "";
+}
+
+function k8sUrl(apiServer, path, query) {
+  const url = new URL(path, `${apiServer}/`);
+  if (query) {
+    for (const [key, value] of Object.entries(query)) {
+      url.searchParams.set(key, value);
+    }
+  }
+  return url.toString();
+}
+
+function manifestBody(doc, namespace, resourceVersion) {
+  const body = {
+    apiVersion: doc.apiVersion,
+    kind: doc.kind,
+    metadata: {
+      name: doc.metadata.name,
+      namespace,
+    },
+    spec: doc.spec,
+  };
+  if (resourceVersion) {
+    body.metadata.resourceVersion = resourceVersion;
+  }
+  if (doc.metadata.labels) {
+    body.metadata.labels = doc.metadata.labels;
+  }
+  if (doc.metadata.annotations) {
+    body.metadata.annotations = doc.metadata.annotations;
+  }
+  return body;
+}
+
+function kindSpecFromManifest(doc) {
+  if (!doc || !doc.kind) {
+    return null;
+  }
+  const known = K8S_KINDS[doc.kind];
+  if (known) {
+    return { kind: doc.kind, ...known };
+  }
+  const apiVersion = String(doc.apiVersion || "");
+  const slash = apiVersion.lastIndexOf("/");
+  if (slash === -1) {
+    return null;
+  }
+  return {
+    kind: doc.kind,
+    group: apiVersion.slice(0, slash),
+    version: apiVersion.slice(slash + 1),
+    plural: `${String(doc.kind).toLowerCase()}s`,
+  };
+}
+
+function collectionPath(spec, namespace) {
+  return `/apis/${spec.group}/${spec.version}/namespaces/${encodeURIComponent(
+    namespace
+  )}/${spec.plural}`;
+}
+
+function k8sStatusMessage(result) {
+  if (result.error) {
+    if (/CERT|SSL|certificate|authority|ERR_CERT/i.test(result.error)) {
+      return `${result.error} Chrome rejects untrusted or self-signed API server certificates.`;
+    }
+    return result.error;
+  }
+  const payload = result.payload;
+  if (payload && typeof payload.message === "string" && payload.message) {
+    return payload.message;
+  }
+  return snippet(result.raw || `HTTP ${result.status}`);
+}
+
+function showPending(target, text) {
+  target.hidden = false;
+  target.classList.remove("is-error");
+  target.replaceChildren();
+  const pending = document.createElement("div");
+  pending.className = "result-body";
+  pending.textContent = text;
+  target.append(pending);
+}
+
+function parseKubeconfigText(text) {
+  const docs = parseYamlDocuments(text);
+  const config = docs.find((doc) => doc && (doc["current-context"] || doc.clusters));
+  if (!config) {
+    throw new Error("No kubeconfig document found.");
+  }
+
+  const current = config["current-context"];
+  if (!current) {
+    throw new Error("Kubeconfig has no current-context.");
+  }
+
+  const contexts = Array.isArray(config.contexts) ? config.contexts : [];
+  const clusters = Array.isArray(config.clusters) ? config.clusters : [];
+  const users = Array.isArray(config.users) ? config.users : [];
+  const ctxEntry = contexts.find((item) => item && item.name === current);
+  if (!ctxEntry || !ctxEntry.context) {
+    throw new Error(`Context ${current} was not found.`);
+  }
+
+  const clusterName = ctxEntry.context.cluster;
+  const userName = ctxEntry.context.user;
+  const namespace = ctxEntry.context.namespace;
+  const clusterEntry = clusters.find((item) => item && item.name === clusterName);
+  const userEntry = users.find((item) => item && item.name === userName);
+  const server =
+    clusterEntry && clusterEntry.cluster && clusterEntry.cluster.server;
+  const user = (userEntry && userEntry.user) || {};
+  const token = typeof user.token === "string" ? user.token.trim() : "";
+  const execCommand =
+    user.exec && typeof user.exec.command === "string" ? user.exec.command : "";
+
+  return {
+    context: current,
+    server: server ? String(server).trim() : "",
+    token,
+    namespace: namespace ? String(namespace).trim() : "",
+    execCommand,
+    execOnly: Boolean(user.exec && !token),
+    hasClientCert: Boolean(
+      user["client-certificate"] || user["client-certificate-data"]
+    ),
+  };
+}
+
+function parseManifestText(text) {
+  const trimmed = (text || "").trim();
+  if (!trimmed) {
+    throw new Error("YAML is empty.");
+  }
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    const parsed = JSON.parse(trimmed);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  }
+  const docs = parseYamlDocuments(trimmed).filter(
+    (doc) => doc && typeof doc === "object" && !Array.isArray(doc)
+  );
+  if (docs.length === 0) {
+    throw new Error("No Kubernetes documents found in YAML.");
+  }
+  return docs;
+}
+
+async function applyManifest(settings, doc) {
+  const spec = kindSpecFromManifest(doc);
+  if (!spec) {
+    throw new Error("Manifest is missing kind or apiVersion.");
+  }
+  const name = doc.metadata && doc.metadata.name;
+  if (!name) {
+    throw new Error(`${spec.kind} is missing metadata.name.`);
+  }
+  const namespace =
+    (doc.metadata && doc.metadata.namespace) || settings.clusterNamespace;
+  const collection = k8sUrl(
+    settings.clusterApiServer,
+    collectionPath(spec, namespace)
+  );
+  const item = k8sUrl(
+    settings.clusterApiServer,
+    `${collectionPath(spec, namespace)}/${encodeURIComponent(name)}`
+  );
+  const headers = k8sHeaders(settings.clusterToken, "application/json");
+  const existing = await timedFetch(item, { method: "GET", headers });
+  if (existing.error) {
+    return { name, kind: spec.kind, result: existing, method: "GET" };
+  }
+  if (existing.status === 404) {
+    const created = await timedFetch(collection, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(manifestBody(doc, namespace)),
+    });
+    return { name, kind: spec.kind, result: created, method: "POST" };
+  }
+  if (!existing.response || !existing.response.ok) {
+    return { name, kind: spec.kind, result: existing, method: "GET" };
+  }
+  const updated = await timedFetch(item, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(
+      manifestBody(
+        doc,
+        namespace,
+        existing.payload &&
+          existing.payload.metadata &&
+          existing.payload.metadata.resourceVersion
+      )
+    ),
+  });
+  return { name, kind: spec.kind, result: updated, method: "PUT" };
+}
+
+els.clusterType.addEventListener("change", () => {
+  updateClusterHelp();
+  saveClusterSettings();
+});
+
+els.clusterApiServer.addEventListener("change", () => {
+  saveClusterSettings();
+});
+
+els.clusterToken.addEventListener("change", () => {
+  saveClusterSettings();
+});
+
+els.clusterNamespace.addEventListener("change", () => {
+  saveClusterSettings();
+});
+
+els.clusterKubeconfig.addEventListener("change", () => {
+  saveClusterSettings();
+});
+
+els.crdKind.addEventListener("change", () => {
+  saveClusterSettings();
+});
+
+els.crdYaml.addEventListener("change", () => {
+  saveClusterSettings();
+});
+
+els.parseKubeconfig.addEventListener("click", async () => {
+  const text = els.clusterKubeconfig.value.trim();
+  if (!text) {
+    showBox(els.kubeconfigResult, {
+      status: null,
+      latencyMs: 0,
+      body: "Paste a kubeconfig first.",
+      isError: true,
+    });
+    return;
+  }
+
+  try {
+    const parsed = parseKubeconfigText(text);
+    if (parsed.server) {
+      els.clusterApiServer.value = normalizeApiServer(parsed.server);
+    }
+    if (parsed.token) {
+      els.clusterToken.value = parsed.token;
+    }
+    if (parsed.namespace) {
+      els.clusterNamespace.value = parsed.namespace;
+    }
+    await saveClusterSettings();
+
+    const lines = [`Parsed context ${parsed.context}.`];
+    if (parsed.server) {
+      lines.push("API server filled from the current cluster.");
+    } else {
+      lines.push("No cluster.server found for this context.");
+    }
+    if (parsed.execOnly) {
+      lines.push(
+        `This user is exec-only (${parsed.execCommand || "exec plugin"}). Chrome cannot run gke-gcloud-auth-plugin, kubelogin, or aws eks get-token. Paste a bearer token from the matching command.`
+      );
+    } else if (parsed.token) {
+      lines.push("Bearer token filled from the user block.");
+    } else if (parsed.hasClientCert) {
+      lines.push(
+        "No bearer token in this kubeconfig. Client-certificate auth is not supported here; paste a token."
+      );
+    } else {
+      lines.push("No user.token found. Paste a bearer token.");
+    }
+
+    showBox(els.kubeconfigResult, {
+      status: parsed.token ? 200 : null,
+      latencyMs: 0,
+      body: lines.join(" "),
+      isError: !parsed.token,
+    });
+  } catch (error) {
+    showBox(els.kubeconfigResult, {
+      status: null,
+      latencyMs: 0,
+      body: error.message || String(error),
+      isError: true,
+    });
+  }
+});
+
+els.testCluster.addEventListener("click", async () => {
+  const settings = await saveClusterSettings();
+  const targetError = clusterTargetError(settings);
+  if (targetError) {
+    showBox(els.clusterTestResult, {
+      status: null,
+      latencyMs: 0,
+      body: targetError,
+      isError: true,
+    });
+    await persist({ clusterConnected: false });
+    return;
+  }
+
+  els.testCluster.disabled = true;
+  showPending(els.clusterTestResult, "Testing…");
+
+  const headers = k8sHeaders(settings.clusterToken);
+  let result = await timedFetch(k8sUrl(settings.clusterApiServer, "/version"), {
+    method: "GET",
+    headers,
+  });
+  let probe = "/version";
+
+  if (result.error || !result.response || !result.response.ok) {
+    const gateway = await timedFetch(
+      k8sUrl(settings.clusterApiServer, "/apis/gateway.networking.k8s.io/v1"),
+      { method: "GET", headers }
+    );
+    if (!gateway.error && gateway.response && gateway.response.ok) {
+      result = gateway;
+      probe = "/apis/gateway.networking.k8s.io/v1";
+    }
+  }
+
+  const ok = !result.error && result.response && result.response.ok;
+  let body = k8sStatusMessage(result);
+  if (ok && probe === "/version" && result.payload) {
+    const version =
+      result.payload.gitVersion ||
+      [result.payload.major, result.payload.minor].filter(Boolean).join(".");
+    body = version
+      ? `Connected. Kubernetes ${version}`
+      : "Connected via GET /version.";
+  } else if (ok) {
+    body = "Connected via GET /apis/gateway.networking.k8s.io/v1.";
+  }
+
+  showBox(els.clusterTestResult, {
+    status: result.status,
+    latencyMs: result.latencyMs,
+    body,
+    isError: !ok,
+  });
+  await persist({ clusterConnected: ok });
+  els.testCluster.disabled = false;
+});
+
+els.listCrds.addEventListener("click", async () => {
+  const settings = await saveClusterSettings();
+  const targetError = clusterTargetError(settings);
+  if (targetError) {
+    showBox(els.crdListResult, {
+      status: null,
+      latencyMs: 0,
+      body: targetError,
+      isError: true,
+    });
+    return;
+  }
+
+  const spec = K8S_KINDS[settings.clusterKind];
+  els.listCrds.disabled = true;
+  showPending(els.crdListResult, `Listing ${settings.clusterKind}…`);
+
+  const result = await timedFetch(
+    k8sUrl(
+      settings.clusterApiServer,
+      collectionPath(spec, settings.clusterNamespace)
+    ),
+    { method: "GET", headers: k8sHeaders(settings.clusterToken) }
+  );
+  const ok = !result.error && result.response && result.response.ok;
+  els.crdListResult.hidden = false;
+  els.crdListResult.classList.toggle("is-error", !ok);
+  els.crdListResult.replaceChildren();
+
+  const meta = document.createElement("div");
+  meta.className = "result-meta";
+  const statusText =
+    result.status == null ? "no response" : `HTTP ${result.status}`;
+  meta.textContent = `${settings.clusterKind} · ${settings.clusterNamespace} · ${statusText} · ${result.latencyMs} ms`;
+  els.crdListResult.append(meta);
+
+  if (!ok) {
+    const detail = document.createElement("div");
+    detail.className = "result-body";
+    detail.textContent = k8sStatusMessage(result);
+    els.crdListResult.append(detail);
+  } else {
+    const items =
+      result.payload && Array.isArray(result.payload.items)
+        ? result.payload.items
+        : [];
+    if (items.length === 0) {
+      const detail = document.createElement("div");
+      detail.className = "result-body";
+      detail.textContent = "No resources found.";
+      els.crdListResult.append(detail);
+    } else {
+      const list = document.createElement("ul");
+      list.className = "crd-names";
+      for (const item of items) {
+        const li = document.createElement("li");
+        li.textContent = (item.metadata && item.metadata.name) || "(unnamed)";
+        list.append(li);
+      }
+      els.crdListResult.append(list);
+    }
+  }
+
+  els.listCrds.disabled = false;
+});
+
+els.loadExample.addEventListener("click", () => {
+  els.crdYaml.value = EXAMPLE_MANIFEST;
+  saveClusterSettings();
+});
+
+els.applyCrds.addEventListener("click", async () => {
+  const settings = await saveClusterSettings();
+  const targetError = clusterTargetError(settings);
+  if (targetError) {
+    showBox(els.crdApplyResult, {
+      status: null,
+      latencyMs: 0,
+      body: targetError,
+      isError: true,
+    });
+    return;
+  }
+
+  let docs;
+  try {
+    docs = parseManifestText(settings.clusterManifest);
+  } catch (error) {
+    showBox(els.crdApplyResult, {
+      status: null,
+      latencyMs: 0,
+      body: error.message || String(error),
+      isError: true,
+    });
+    return;
+  }
+
+  els.applyCrds.disabled = true;
+  showPending(els.crdApplyResult, `Applying ${docs.length} document(s)…`);
+
+  const applied = [];
+  for (const doc of docs) {
+    try {
+      applied.push(await applyManifest(settings, doc));
+    } catch (error) {
+      applied.push({
+        name: (doc.metadata && doc.metadata.name) || "unknown",
+        kind: doc.kind || "Unknown",
+        method: "validate",
+        result: {
+          error: error.message || String(error),
+          status: null,
+          latencyMs: 0,
+          raw: "",
+          payload: null,
+          response: null,
+        },
+      });
+    }
+  }
+
+  const nodes = applied.map((item) => {
+    const ok =
+      !item.result.error && item.result.response && item.result.response.ok;
+    const statusText =
+      item.result.status == null ? "no response" : `HTTP ${item.result.status}`;
+    return card(
+      "check",
+      ok ? "is-ok" : "is-error",
+      `${item.method} ${item.kind}/${item.name} · ${statusText} · ${item.result.latencyMs} ms`,
+      ok
+        ? `${item.kind} ${item.name} ${item.method === "POST" ? "created" : "updated"}`
+        : k8sStatusMessage(item.result)
+    );
+  });
+
+  els.crdApplyResult.hidden = false;
+  els.crdApplyResult.classList.toggle(
+    "is-error",
+    applied.some(
+      (item) =>
+        item.result.error || !item.result.response || !item.result.response.ok
+    )
+  );
+  els.crdApplyResult.replaceChildren(...nodes);
+  els.applyCrds.disabled = false;
 });
 
 loadSettings();
