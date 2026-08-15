@@ -3,11 +3,11 @@
 // No anchors, tags, or merge keys.
 (function (root, factory) {
   const api = factory();
+  // Always set the browser globals. Chrome popups can have `module`.
+  root.parseYaml = api.parseYaml;
+  root.parseYamlDocuments = api.parseYamlDocuments;
   if (typeof module === "object" && module.exports) {
     module.exports = api;
-  } else {
-    root.parseYaml = api.parseYaml;
-    root.parseYamlDocuments = api.parseYamlDocuments;
   }
 })(typeof self !== "undefined" ? self : this, function () {
   function parseYaml(text) {

@@ -3,10 +3,11 @@
 // Chat / MCP / API tests at 127.0.0.1 after the user runs it locally.
 (function (root, factory) {
   const api = factory();
+  // Always set the browser global. Chrome popups can have `module`, which
+  // used to skip this assignment and crash popup.js (PortForward is not defined).
+  root.PortForward = api;
   if (typeof module === "object" && module.exports) {
     module.exports = api;
-  } else {
-    root.PortForward = api;
   }
 })(typeof self !== "undefined" ? self : this, function () {
   const DEFAULTS = {
