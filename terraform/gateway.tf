@@ -1,4 +1,6 @@
 # Gateway API CRDs (standard-install v1.6.1) must exist before Agentgateway.
+# GKE Autopilot already installs them (kube-addon-manager). Only apply when
+# var.manage_gateway_api_crds is true (clusters that do not already have Gateway API).
 # Fetched from the same pinned URL as scripts/install-agentgateway.sh.
 
 data "http" "gateway_api_crds" {
@@ -22,7 +24,7 @@ data "kubectl_file_documents" "gateway_api_crds" {
 }
 
 resource "kubectl_manifest" "gateway_api_crds" {
-  for_each = local.install_agentgateway_gate ? data.kubectl_file_documents.gateway_api_crds.manifests : {}
+  for_each = local.install_agentgateway_gate && var.manage_gateway_api_crds ? data.kubectl_file_documents.gateway_api_crds.manifests : {}
 
   yaml_body         = each.value
   server_side_apply = true
@@ -33,7 +35,7 @@ resource "kubectl_manifest" "gateway_api_crds" {
 
 # CRDs are registered before the API server serves them; Helm needs a short gap.
 resource "time_sleep" "gateway_api_crds" {
-  count = local.install_agentgateway_gate ? 1 : 0
+  count = local.install_agentgateway_gate && var.manage_gateway_api_crds ? 1 : 0
 
   create_duration = "20s"
 

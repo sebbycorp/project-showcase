@@ -128,8 +128,14 @@ variable "solo_ui_chart_version" {
   default     = "0.5.5"
 }
 
+variable "manage_gateway_api_crds" {
+  description = "Apply Kubernetes Gateway API CRDs (standard-install). GKE Autopilot already installs and manages these CRDs via kube-addon-manager; leave false to avoid field-manager conflicts. Set true only on a cluster that does not already have Gateway API."
+  type        = bool
+  default     = false
+}
+
 variable "gateway_api_crds_url" {
-  description = "Kubernetes Gateway API CRDs install manifest. Required before Agentgateway."
+  description = "Kubernetes Gateway API CRDs install manifest. Used only when manage_gateway_api_crds is true."
   type        = string
   default     = "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/standard-install.yaml"
 }

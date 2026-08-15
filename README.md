@@ -8,7 +8,7 @@ A fresh `terraform apply` with the license and OpenAI key produces that stack. D
 
 | Path | Purpose |
 | --- | --- |
-| `terraform/` | Project (optional), APIs, VPC, Autopilot cluster, Gateway API CRDs, Helm, secret, Gateway, OpenAI route |
+| `terraform/` | Project (optional), APIs, VPC, Autopilot cluster, Helm, secret, Gateway, OpenAI route (cluster Gateway API CRDs by default) |
 | `helm/management-values.yaml` | Shared ClickHouse persistence values (Terraform + fallback script) |
 | `manifests/` | Gateway + OpenAI backend/HTTPRoute (no secrets); applied by Terraform |
 | `scripts/install-agentgateway.sh` | Optional non-Terraform fallback for the in-cluster stack |
@@ -42,7 +42,7 @@ terraform apply
 That apply creates:
 
 - GCP project `maniak-showcase` (unless `create_project=false`) and Autopilot cluster `showcase`
-- Gateway API CRDs (`standard-install` v1.6.1)
+- Gateway API CRDs already present on Autopilot (kube-addon-manager). Terraform does not apply `standard-install` unless you set `manage_gateway_api_crds=true` on a cluster that does not already have Gateway API
 - Helm: `enterprise-agentgateway-crds` + `enterprise-agentgateway` **v2026.8.0**
 - Helm: management / Solo UI **0.5.5** with ClickHouse PVC (`20Gi`, `standard-rwo`) and `ephemeral-storage` 2Gi
 - Secret `openai-secret`, Gateway `agentgateway-proxy`, `EnterpriseAgentgatewayBackend`/`HTTPRoute` `openai`
@@ -62,6 +62,8 @@ terraform apply
 | --- | --- | --- |
 | `TF_VAR_agentgateway_license_key` | Helm + Gateway + LLM path | Empty skips all in-cluster Solo resources |
 | `TF_VAR_openai_api_key` | `openai-secret` + OpenAI backend/HTTPRoute | Empty skips the LLM path only |
+
+Autopilot already installs Gateway API CRDs. Leave `manage_gateway_api_crds` at its default (`false`) so Terraform does not server-side-apply `standard-install` and fight `kube-addon-manager`. Set `-var=manage_gateway_api_crds=true` only on a cluster that does not already have Gateway API.
 
 ### If you cannot create the project
 
