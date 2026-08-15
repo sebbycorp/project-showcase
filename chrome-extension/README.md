@@ -1,25 +1,25 @@
 # Agentgateway (Chrome extension)
 
-Manifest V3 popup with **Chat**, **Scenarios**, **Cluster**, and a header
+Manifest V3 popup with **Chat**, **Services**, **Cluster**, and a header
 gear for **Settings**.
-Chat and Scenarios talk to a user-configured Agentgateway. The gateway injects
+Chat and Services talk to a user-configured Agentgateway. The gateway injects
 backend auth, so those areas do **not** store or send an API key or license
 key. Cluster talks to a Kubernetes API server so you can list and apply
 Agentgateway CRDs from the popup.
 
-The popup matches the [agentgateway.dev](https://agentgateway.dev/) product
-site: deep navy/black surfaces (`#0B0E18`, `#111422`, `#181C2E`), purple
-accent (`#8A3FFC` / `#A06EFF`), and a tight header with the official mark
+The popup is a light enterprise console: off-white surfaces (`#F4F6F7`,
+`#FFFFFF`), subtle gray borders, a restrained teal accent (`#0D7A6F`),
+and professional system type. The header keeps the official color mark
 beside the title. The dark wordmark and color mark are vendored in
 `icons/` from the live homepage (`/agw-dark.svg`, `/agw-mark-color.svg`) —
 they are not hotlinked at runtime. Toolbar PNGs (`icon16.png`,
 `icon32.png`, `icon48.png`) are rasterized from that mark and set as
 `action.default_icon`.
 
-Chat and each Scenarios section show a live sequence diagram
+Chat and each Services test show a live sequence diagram
 (Client → [Agentgateway logo] → provider or MCP/A2A). **Test** and each
-named **Run** highlight hops in order, then mark the path in the site
-accent on success or the failing hop red.
+named **Run** highlight hops in order, then mark the path in teal on
+success or the failing hop red.
 
 The header gear opens **Settings**. **Hooray** (default on, stored in
 `chrome.storage.local`) plays a short canvas confetti burst after a
@@ -35,7 +35,7 @@ HTTP 2xx, a Security probe that finishes as designed, or a Cluster
 3. Click **Load unpacked**
 4. Select this `chrome-extension/` folder
 
-The toolbar action opens a 380×560 popup.
+The toolbar action opens a 448×600 popup.
 
 ## Chat
 
@@ -60,13 +60,24 @@ The chat box uses the same saved endpoint and model for follow-up messages.
 Each send is `POST` with JSON `{ "model": "<chosen model>", "messages": [...] }`.
 No API key is included.
 
-## Scenarios
+## Services
 
-Three sections — **LLM**, **MCP / A2A**, and **Security**. Each has a live
-flow diagram (middle hop is the vendored Agentgateway mark), a list of
-named tests, and a **Deploy config** area.
+Open **Services**, then choose a subnav: **LLM**, **MCP / A2A**, or
+**Security**. Each page lists tests as their own cards. A card has:
 
-**Deploy config** loads a prebuilt YAML example you can edit, then
+- Test name and a one-line description
+- A compact flow diagram for that test
+  (Client → Agentgateway mark → provider or target)
+- A **Run** button on the same row as the title
+- An expandable results drawer under that test
+
+Click **Run** on a card. The drawer opens in place with live status
+(`Running` → `OK` / `Fail`), latency, model when present, and the
+response or error. **Collapse** hides the drawer; run again to reopen
+it. There is no shared Run control at the bottom of the page.
+
+**Deploy config** is a secondary accordion on each service page so
+tests stay primary. It loads a prebuilt YAML example you can edit, then
 **Apply**s it with the Cluster tab API server, token, and namespace.
 If the cluster is not connected, the hint and Apply state say
 “Connect a cluster in the Cluster tab first.” No API keys are stored

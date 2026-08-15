@@ -11,7 +11,7 @@ function burstConfetti(canvas) {
 
   const width = (canvas.width = canvas.clientWidth);
   const height = (canvas.height = canvas.clientHeight);
-  const colors = ["#A06EFF", "#8A3FFC", "#20B7F3", "#E4E5EB", "#B48CFF"];
+  const colors = ["#0D7A6F", "#14A394", "#1B2430", "#C5CCD1", "#0A635A"];
   const pieces = [];
   for (let i = 0; i < 70; i += 1) {
     pieces.push({

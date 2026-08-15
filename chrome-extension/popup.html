@@ -39,8 +39,8 @@
         <button type="button" id="tab-chat" data-area="chat" class="is-active">
           Chat
         </button>
-        <button type="button" id="tab-scenarios" data-area="scenarios">
-          Scenarios
+        <button type="button" id="tab-services" data-area="services">
+          Services
         </button>
         <button type="button" id="tab-cluster" data-area="cluster">
           Cluster
@@ -69,7 +69,7 @@
               placeholder="gpt-4o-mini"
             />
           </div>
-          <button id="test" type="button">Test</button>
+          <button id="test" type="button" class="btn">Test</button>
         </div>
         <figure
           class="seq"
@@ -120,12 +120,12 @@
           placeholder="Message…"
           autocomplete="off"
         ></textarea>
-        <button id="send" type="submit">Send</button>
+        <button id="send" type="submit" class="btn">Send</button>
       </form>
     </section>
 
-    <section id="area-scenarios" class="area" hidden>
-      <nav class="section-tabs" aria-label="Scenario sections">
+    <section id="area-services" class="area" hidden>
+      <nav class="section-tabs" aria-label="Services">
         <button type="button" id="section-llm" data-section="llm" class="is-active">
           LLM
         </button>
@@ -137,14 +137,28 @@
         </button>
       </nav>
 
-      <div class="scenarios-body">
-        <div id="scenario-llm" class="scenario is-active">
-          <div class="panel">
+      <div class="services-body">
+        <div id="service-llm" class="service is-active">
+          <div class="service-intro">
+            <h2 class="service-title">LLM</h2>
+            <p class="hint" id="llm-endpoint-hint"></p>
+          </div>
+
+          <article class="test-card" id="test-chat-ping">
+            <div class="test-head">
+              <div class="test-copy">
+                <div class="test-name">Chat ping</div>
+                <p class="hint">Tiny pong prompt on the chat endpoint.</p>
+              </div>
+              <button id="run-chat-ping" type="button" class="btn btn-run">
+                Run
+              </button>
+            </div>
             <figure
-              class="seq"
-              id="seq-llm"
+              class="seq seq-compact"
+              id="seq-chat-ping"
               data-mode="via-gw"
-              aria-label="Request path"
+              aria-label="Chat ping path"
             >
               <figcaption class="seq-caption" aria-live="polite">
                 Client → Agentgateway → OpenAI
@@ -177,38 +191,100 @@
                 <div class="seq-col"></div>
               </div>
             </figure>
-            <p class="hint" id="llm-endpoint-hint"></p>
+            <div
+              id="result-chat-ping"
+              class="test-drawer"
+              hidden
+              aria-live="polite"
+            ></div>
+          </article>
 
-            <h2 class="cluster-heading">Tests</h2>
-            <div class="test-row">
-              <div class="test-copy">
-                <div class="test-name">Chat ping</div>
-                <p class="hint">Tiny pong prompt on the chat endpoint.</p>
-              </div>
-              <button id="run-chat-ping" type="button">Run</button>
-            </div>
-            <label class="field-label" for="primary-model">Primary model</label>
-            <input
-              id="primary-model"
-              type="text"
-              spellcheck="false"
-              autocomplete="off"
-              placeholder="gpt-4o-mini"
-            />
-            <label class="field-label" for="fallback-model">Fallback model</label>
-            <input
-              id="fallback-model"
-              type="text"
-              spellcheck="false"
-              autocomplete="off"
-              placeholder="gpt-4o"
-            />
-            <div class="test-row">
+          <article class="test-card" id="test-failover">
+            <div class="test-head">
               <div class="test-copy">
                 <div class="test-name">Model failover</div>
                 <p class="hint">Primary, then fallback if it fails.</p>
               </div>
-              <button id="run-failover" type="button">Run</button>
+              <button id="run-failover" type="button" class="btn btn-run">
+                Run
+              </button>
+            </div>
+            <div class="field-grid">
+              <div>
+                <label class="field-label" for="primary-model">Primary model</label>
+                <input
+                  id="primary-model"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="gpt-4o-mini"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="fallback-model">Fallback model</label>
+                <input
+                  id="fallback-model"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="gpt-4o"
+                />
+              </div>
+            </div>
+            <figure
+              class="seq seq-compact"
+              id="seq-failover"
+              data-mode="via-gw"
+              aria-label="Failover path"
+            >
+              <figcaption class="seq-caption" aria-live="polite">
+                Client → Agentgateway → OpenAI
+              </figcaption>
+              <div class="seq-fwd">
+                <div class="seq-col">
+                  <div class="seq-box" data-role="client">Client</div>
+                </div>
+                <div class="seq-arrow" data-step="1" aria-hidden="true"></div>
+                <div class="seq-col" data-slot="gateway">
+                  <div class="seq-box seq-gw" data-role="gateway">
+                    <img
+                      class="seq-logo"
+                      src="icons/agw-mark-color.svg"
+                      alt=""
+                    />
+                    <span>Agentgateway</span>
+                  </div>
+                </div>
+                <div class="seq-arrow" data-step="2" aria-hidden="true"></div>
+                <div class="seq-col">
+                  <div class="seq-box" data-role="target">OpenAI</div>
+                </div>
+              </div>
+              <div class="seq-back">
+                <div class="seq-col"></div>
+                <div class="seq-arrow is-back" data-step="4" aria-hidden="true"></div>
+                <div class="seq-col" data-slot="gateway"></div>
+                <div class="seq-arrow is-back" data-step="3" aria-hidden="true"></div>
+                <div class="seq-col"></div>
+              </div>
+            </figure>
+            <div
+              id="result-failover"
+              class="test-drawer"
+              hidden
+              aria-live="polite"
+            ></div>
+          </article>
+
+          <article class="test-card" id="test-list-call">
+            <div class="test-head">
+              <div class="test-copy">
+                <div class="test-name">List / call model</div>
+                <p class="hint">GET /v1/models, then chat with the chosen model.</p>
+              </div>
+              <button id="run-list-call" type="button" class="btn btn-run">
+                Run
+              </button>
             </div>
             <label class="field-label" for="chosen-model">Chosen model</label>
             <input
@@ -218,42 +294,107 @@
               autocomplete="off"
               placeholder="gpt-4o-mini"
             />
-            <div class="test-row">
-              <div class="test-copy">
-                <div class="test-name">List / call model</div>
-                <p class="hint">GET /v1/models, then chat with the chosen model.</p>
+            <figure
+              class="seq seq-compact"
+              id="seq-list-call"
+              data-mode="via-gw"
+              aria-label="List and call path"
+            >
+              <figcaption class="seq-caption" aria-live="polite">
+                Client → Agentgateway → OpenAI
+              </figcaption>
+              <div class="seq-fwd">
+                <div class="seq-col">
+                  <div class="seq-box" data-role="client">Client</div>
+                </div>
+                <div class="seq-arrow" data-step="1" aria-hidden="true"></div>
+                <div class="seq-col" data-slot="gateway">
+                  <div class="seq-box seq-gw" data-role="gateway">
+                    <img
+                      class="seq-logo"
+                      src="icons/agw-mark-color.svg"
+                      alt=""
+                    />
+                    <span>Agentgateway</span>
+                  </div>
+                </div>
+                <div class="seq-arrow" data-step="2" aria-hidden="true"></div>
+                <div class="seq-col">
+                  <div class="seq-box" data-role="target">OpenAI</div>
+                </div>
               </div>
-              <button id="run-list-call" type="button">Run</button>
-            </div>
+              <div class="seq-back">
+                <div class="seq-col"></div>
+                <div class="seq-arrow is-back" data-step="4" aria-hidden="true"></div>
+                <div class="seq-col" data-slot="gateway"></div>
+                <div class="seq-arrow is-back" data-step="3" aria-hidden="true"></div>
+                <div class="seq-col"></div>
+              </div>
+            </figure>
+            <div
+              id="result-list-call"
+              class="test-drawer"
+              hidden
+              aria-live="polite"
+            ></div>
+          </article>
 
-            <h2 class="cluster-heading">Deploy config</h2>
-            <p class="hint" data-deploy-hint></p>
-            <label class="field-label" for="llm-example">Prebuilt example</label>
-            <select id="llm-example">
-              <option value="gateway">Gateway (HTTP :80)</option>
-              <option value="openai">OpenAI backend + HTTPRoute</option>
-              <option value="failover">Failover backend (primary + fallback)</option>
-              <option value="httproute">HTTPRoute add-on (/openai)</option>
-            </select>
-            <label class="field-label" for="llm-yaml">YAML</label>
-            <textarea
-              id="llm-yaml"
-              rows="8"
-              spellcheck="false"
-              autocomplete="off"
-            ></textarea>
-            <button id="apply-llm" type="button">Apply</button>
-            <div id="llm-apply-result" class="result-box" hidden></div>
-          </div>
+          <details class="deploy">
+            <summary>Deploy config</summary>
+            <div class="deploy-body">
+              <p class="hint" data-deploy-hint></p>
+              <label class="field-label" for="llm-example">Prebuilt example</label>
+              <select id="llm-example">
+                <option value="gateway">Gateway (HTTP :80)</option>
+                <option value="openai">OpenAI backend + HTTPRoute</option>
+                <option value="failover">Failover backend (primary + fallback)</option>
+                <option value="httproute">HTTPRoute add-on (/openai)</option>
+              </select>
+              <label class="field-label" for="llm-yaml">YAML</label>
+              <textarea
+                id="llm-yaml"
+                rows="8"
+                spellcheck="false"
+                autocomplete="off"
+              ></textarea>
+              <button id="apply-llm" type="button" class="btn">Apply</button>
+              <div id="llm-apply-result" class="result-box" hidden></div>
+            </div>
+          </details>
         </div>
 
-        <div id="scenario-mcp" class="scenario" hidden>
-          <div class="panel">
+        <div id="service-mcp" class="service" hidden>
+          <div class="service-intro">
+            <h2 class="service-title">MCP / A2A</h2>
+            <p class="hint">
+              Probe MCP initialize and A2A agent-card or health through the
+              gateway.
+            </p>
+          </div>
+
+          <article class="test-card" id="test-mcp">
+            <div class="test-head">
+              <div class="test-copy">
+                <div class="test-name">MCP initialize</div>
+                <p class="hint">JSON-RPC initialize probe.</p>
+              </div>
+              <button id="probe-mcp" type="button" class="btn btn-run">
+                Run
+              </button>
+            </div>
+            <label class="field-label" for="mcp-endpoint">MCP endpoint</label>
+            <input
+              id="mcp-endpoint"
+              type="url"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="http://host/mcp"
+            />
             <figure
-              class="seq"
-              id="seq-mcp"
+              class="seq seq-compact"
+              id="seq-mcp-init"
               data-mode="via-gw"
-              aria-label="Request path"
+              aria-label="MCP path"
             >
               <figcaption class="seq-caption" aria-live="polite">
                 Client → Agentgateway → MCP
@@ -286,22 +427,18 @@
                 <div class="seq-col"></div>
               </div>
             </figure>
+            <div id="result-mcp" class="test-drawer" hidden aria-live="polite"></div>
+          </article>
 
-            <h2 class="cluster-heading">Tests</h2>
-            <label class="field-label" for="mcp-endpoint">MCP endpoint</label>
-            <input
-              id="mcp-endpoint"
-              type="url"
-              spellcheck="false"
-              autocomplete="off"
-              placeholder="http://host/mcp"
-            />
-            <div class="test-row">
+          <article class="test-card" id="test-a2a">
+            <div class="test-head">
               <div class="test-copy">
-                <div class="test-name">MCP initialize</div>
-                <p class="hint">JSON-RPC initialize probe.</p>
+                <div class="test-name">A2A agent-card / health</div>
+                <p class="hint">GET agent-card, or POST health.</p>
               </div>
-              <button id="probe-mcp" type="button">Run</button>
+              <button id="probe-a2a" type="button" class="btn btn-run">
+                Run
+              </button>
             </div>
             <label class="field-label" for="a2a-endpoint">A2A endpoint</label>
             <input
@@ -311,40 +448,92 @@
               autocomplete="off"
               placeholder="http://host/.well-known/agent-card.json"
             />
-            <div class="test-row">
-              <div class="test-copy">
-                <div class="test-name">A2A agent-card / health</div>
-                <p class="hint">GET agent-card, or POST health.</p>
+            <figure
+              class="seq seq-compact"
+              id="seq-a2a"
+              data-mode="via-gw"
+              aria-label="A2A path"
+            >
+              <figcaption class="seq-caption" aria-live="polite">
+                Client → Agentgateway → A2A
+              </figcaption>
+              <div class="seq-fwd">
+                <div class="seq-col">
+                  <div class="seq-box" data-role="client">Client</div>
+                </div>
+                <div class="seq-arrow" data-step="1" aria-hidden="true"></div>
+                <div class="seq-col" data-slot="gateway">
+                  <div class="seq-box seq-gw" data-role="gateway">
+                    <img
+                      class="seq-logo"
+                      src="icons/agw-mark-color.svg"
+                      alt=""
+                    />
+                    <span>Agentgateway</span>
+                  </div>
+                </div>
+                <div class="seq-arrow" data-step="2" aria-hidden="true"></div>
+                <div class="seq-col">
+                  <div class="seq-box" data-role="target">A2A</div>
+                </div>
               </div>
-              <button id="probe-a2a" type="button">Run</button>
-            </div>
+              <div class="seq-back">
+                <div class="seq-col"></div>
+                <div class="seq-arrow is-back" data-step="4" aria-hidden="true"></div>
+                <div class="seq-col" data-slot="gateway"></div>
+                <div class="seq-arrow is-back" data-step="3" aria-hidden="true"></div>
+                <div class="seq-col"></div>
+              </div>
+            </figure>
+            <div id="result-a2a" class="test-drawer" hidden aria-live="polite"></div>
+          </article>
 
-            <h2 class="cluster-heading">Deploy config</h2>
-            <p class="hint" data-deploy-hint></p>
-            <label class="field-label" for="mcp-example">Prebuilt example</label>
-            <select id="mcp-example">
-              <option value="mcp">MCP backend + HTTPRoute</option>
-              <option value="a2a">A2A backend + HTTPRoute</option>
-            </select>
-            <label class="field-label" for="mcp-yaml">YAML</label>
-            <textarea
-              id="mcp-yaml"
-              rows="8"
-              spellcheck="false"
-              autocomplete="off"
-            ></textarea>
-            <button id="apply-mcp" type="button">Apply</button>
-            <div id="mcp-apply-result" class="result-box" hidden></div>
-          </div>
+          <details class="deploy">
+            <summary>Deploy config</summary>
+            <div class="deploy-body">
+              <p class="hint" data-deploy-hint></p>
+              <label class="field-label" for="mcp-example">Prebuilt example</label>
+              <select id="mcp-example">
+                <option value="mcp">MCP backend + HTTPRoute</option>
+                <option value="a2a">A2A backend + HTTPRoute</option>
+              </select>
+              <label class="field-label" for="mcp-yaml">YAML</label>
+              <textarea
+                id="mcp-yaml"
+                rows="8"
+                spellcheck="false"
+                autocomplete="off"
+              ></textarea>
+              <button id="apply-mcp" type="button" class="btn">Apply</button>
+              <div id="mcp-apply-result" class="result-box" hidden></div>
+            </div>
+          </details>
         </div>
 
-        <div id="scenario-security" class="scenario" hidden>
-          <div class="panel">
+        <div id="service-security" class="service" hidden>
+          <div class="service-intro">
+            <h2 class="service-title">Security</h2>
+            <p class="hint" id="security-endpoint-hint"></p>
+            <p class="hint">
+              Safe connectivity checks only. No exploit or jailbreak payloads.
+            </p>
+          </div>
+
+          <article class="test-card" id="test-unauth">
+            <div class="test-head">
+              <div class="test-copy">
+                <div class="test-name">Unauthenticated request</div>
+                <p class="hint">Tiny chat ping with no extra headers.</p>
+              </div>
+              <button id="run-unauth" type="button" class="btn btn-run">
+                Run
+              </button>
+            </div>
             <figure
-              class="seq"
-              id="seq-security"
+              class="seq seq-compact"
+              id="seq-unauth"
               data-mode="via-gw"
-              aria-label="Request path"
+              aria-label="Unauthenticated path"
             >
               <figcaption class="seq-caption" aria-live="polite">
                 Client → Agentgateway → OpenAI
@@ -377,46 +566,84 @@
                 <div class="seq-col"></div>
               </div>
             </figure>
-            <p class="hint" id="security-endpoint-hint"></p>
-            <p class="hint">
-              Safe connectivity checks only. No exploit or jailbreak payloads.
-            </p>
+            <div
+              id="result-unauth"
+              class="test-drawer"
+              hidden
+              aria-live="polite"
+            ></div>
+          </article>
 
-            <h2 class="cluster-heading">Tests</h2>
-            <div class="test-row">
-              <div class="test-copy">
-                <div class="test-name">Unauthenticated request</div>
-                <p class="hint">Tiny chat ping with no extra headers.</p>
-              </div>
-              <button id="run-unauth" type="button">Run</button>
-            </div>
-            <div class="test-row">
+          <article class="test-card" id="test-junk">
+            <div class="test-head">
               <div class="test-copy">
                 <div class="test-name">Junk / policy-probe</div>
                 <p class="hint">Short padded prompt to see accept or reject.</p>
               </div>
-              <button id="run-junk" type="button">Run</button>
+              <button id="run-junk" type="button" class="btn btn-run">
+                Run
+              </button>
             </div>
+            <figure
+              class="seq seq-compact"
+              id="seq-junk"
+              data-mode="via-gw"
+              aria-label="Policy probe path"
+            >
+              <figcaption class="seq-caption" aria-live="polite">
+                Client → Agentgateway → OpenAI
+              </figcaption>
+              <div class="seq-fwd">
+                <div class="seq-col">
+                  <div class="seq-box" data-role="client">Client</div>
+                </div>
+                <div class="seq-arrow" data-step="1" aria-hidden="true"></div>
+                <div class="seq-col" data-slot="gateway">
+                  <div class="seq-box seq-gw" data-role="gateway">
+                    <img
+                      class="seq-logo"
+                      src="icons/agw-mark-color.svg"
+                      alt=""
+                    />
+                    <span>Agentgateway</span>
+                  </div>
+                </div>
+                <div class="seq-arrow" data-step="2" aria-hidden="true"></div>
+                <div class="seq-col">
+                  <div class="seq-box" data-role="target">OpenAI</div>
+                </div>
+              </div>
+              <div class="seq-back">
+                <div class="seq-col"></div>
+                <div class="seq-arrow is-back" data-step="4" aria-hidden="true"></div>
+                <div class="seq-col" data-slot="gateway"></div>
+                <div class="seq-arrow is-back" data-step="3" aria-hidden="true"></div>
+                <div class="seq-col"></div>
+              </div>
+            </figure>
+            <div id="result-junk" class="test-drawer" hidden aria-live="polite"></div>
+          </article>
 
-            <h2 class="cluster-heading">Deploy config</h2>
-            <p class="hint" data-deploy-hint></p>
-            <label class="field-label" for="security-example">Prebuilt example</label>
-            <select id="security-example">
-              <option value="policy">Prompt-guard policy (PII stub)</option>
-            </select>
-            <label class="field-label" for="security-yaml">YAML</label>
-            <textarea
-              id="security-yaml"
-              rows="8"
-              spellcheck="false"
-              autocomplete="off"
-            ></textarea>
-            <button id="apply-security" type="button">Apply</button>
-            <div id="security-apply-result" class="result-box" hidden></div>
-          </div>
+          <details class="deploy">
+            <summary>Deploy config</summary>
+            <div class="deploy-body">
+              <p class="hint" data-deploy-hint></p>
+              <label class="field-label" for="security-example">Prebuilt example</label>
+              <select id="security-example">
+                <option value="policy">Prompt-guard policy (PII stub)</option>
+              </select>
+              <label class="field-label" for="security-yaml">YAML</label>
+              <textarea
+                id="security-yaml"
+                rows="8"
+                spellcheck="false"
+                autocomplete="off"
+              ></textarea>
+              <button id="apply-security" type="button" class="btn">Apply</button>
+              <div id="security-apply-result" class="result-box" hidden></div>
+            </div>
+          </details>
         </div>
-
-        <div id="scenario-result" class="scenario-result" aria-live="polite"></div>
       </div>
     </section>
 
@@ -468,10 +695,14 @@
           autocomplete="off"
           placeholder="Paste kubeconfig to fill server and token"
         ></textarea>
-        <button id="parse-kubeconfig" type="button">Parse kubeconfig</button>
+        <button id="parse-kubeconfig" type="button" class="btn">
+          Parse kubeconfig
+        </button>
         <div id="kubeconfig-result" class="result-box" hidden></div>
 
-        <button id="test-cluster" type="button">Test connection</button>
+        <button id="test-cluster" type="button" class="btn">
+          Test connection
+        </button>
         <div id="cluster-test-result" class="result-box" hidden></div>
 
         <h2 class="cluster-heading">CRDs</h2>
@@ -491,7 +722,7 @@
             EnterpriseAgentgatewayPolicy
           </option>
         </select>
-        <button id="list-crds" type="button">List</button>
+        <button id="list-crds" type="button" class="btn">List</button>
         <div id="crd-list-result" class="result-box" hidden></div>
 
         <label class="field-label" for="crd-yaml">YAML</label>
@@ -502,10 +733,10 @@
           autocomplete="off"
         ></textarea>
         <div class="button-row">
-          <button id="load-example" type="button" class="btn-secondary">
+          <button id="load-example" type="button" class="btn btn-secondary">
             Load example
           </button>
-          <button id="apply-crds" type="button">Apply</button>
+          <button id="apply-crds" type="button" class="btn">Apply</button>
         </div>
         <div id="crd-apply-result" class="result-box" hidden></div>
       </div>
