@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Agentgateway Chat",
-  "version": "0.1.0",
-  "description": "Chat with an LLM through an Agentgateway endpoint.",
+  "name": "Agentgateway",
+  "version": "0.3.0",
+  "description": "Chat and run Agentgateway scenarios: failover, MCP, A2A, and security probes.",
   "action": {
-    "default_title": "Agentgateway Chat",
+    "default_title": "Agentgateway",
     "default_popup": "popup.html"
   },
   "permissions": ["storage"],

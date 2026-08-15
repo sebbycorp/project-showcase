@@ -7,6 +7,7 @@
   --user: #364fc7;
   --assistant: #2b2d31;
   --error: #7d1f1f;
+  --ok: #2b4a3a;
   --accent: #4c6ef5;
   --accent-hover: #5c7cfa;
 }
@@ -17,8 +18,8 @@
 
 html,
 body {
-  width: 360px;
-  height: 480px;
+  width: 380px;
+  height: 560px;
   margin: 0;
 }
 
@@ -44,14 +45,76 @@ body {
   font-weight: 600;
 }
 
-.endpoint-label {
+.area-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.area-tabs button,
+#scenario-type,
+#run-failover,
+#probe-mcp,
+#probe-a2a,
+#run-security,
+#test,
+#send {
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.area-tabs button {
+  flex: 1 1 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.area-tabs button.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.area {
+  display: none;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.area.is-active {
+  display: flex;
+}
+
+.panel {
+  flex: 0 0 auto;
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.field-label {
   display: block;
-  margin-bottom: 4px;
+  margin: 8px 0 4px;
   color: var(--muted);
   font-size: 11px;
 }
 
-#endpoint {
+.panel > .field-label:first-child {
+  margin-top: 0;
+}
+
+#endpoint,
+#model,
+#primary-model,
+#fallback-model,
+#mcp-endpoint,
+#a2a-endpoint,
+#scenario-type,
+#message {
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--border);
@@ -62,13 +125,151 @@ body {
   font-size: 12px;
 }
 
+.model-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.model-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.model-field .field-label {
+  margin-top: 8px;
+}
+
+.hint {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.scenario {
+  display: none;
+  margin-top: 4px;
+}
+
+.scenario.is-active {
+  display: block;
+}
+
+#test,
+#run-failover,
+#probe-mcp,
+#probe-a2a,
+#run-security,
+#send {
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+}
+
+#test {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+}
+
+#run-failover,
+#probe-mcp,
+#probe-a2a,
+#run-security {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 7px 12px;
+}
+
+#test:hover:not(:disabled),
+#run-failover:hover:not(:disabled),
+#probe-mcp:hover:not(:disabled),
+#probe-a2a:hover:not(:disabled),
+#run-security:hover:not(:disabled),
+#send:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+#test:disabled,
+#run-failover:disabled,
+#probe-mcp:disabled,
+#probe-a2a:disabled,
+#run-security:disabled,
+#send:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.result-box,
+.attempt,
+.check {
+  margin-top: 8px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: 12px;
+}
+
+.result-box.is-error,
+.attempt.is-error,
+.check.is-error {
+  border-color: var(--error);
+  background: var(--error);
+}
+
+.attempt.is-ok,
+.check.is-ok {
+  border-color: #2f6f4e;
+  background: var(--ok);
+}
+
+.result-meta,
+.attempt-meta,
+.check-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.result-box.is-error .result-meta,
+.attempt.is-error .attempt-meta,
+.check.is-error .check-meta {
+  color: #ffc9c9;
+}
+
+.attempt.is-ok .attempt-meta,
+.check.is-ok .check-meta {
+  color: #b2f2bb;
+}
+
+.result-body,
+.attempt-body,
+.check-body {
+  margin-top: 3px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.summary {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
 #endpoint:focus,
+#model:focus,
+#primary-model:focus,
+#fallback-model:focus,
+#mcp-endpoint:focus,
+#a2a-endpoint:focus,
+#scenario-type:focus,
 #message:focus {
   outline: 1px solid var(--accent);
   border-color: var(--accent);
 }
 
-.log {
+.log,
+.scenario-result {
   flex: 1 1 auto;
   overflow-y: auto;
   padding: 10px 12px;
@@ -123,32 +324,10 @@ body {
   resize: none;
   min-height: 44px;
   max-height: 88px;
-  padding: 7px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--text);
-  font: inherit;
 }
 
 #send {
   flex: 0 0 auto;
   align-self: flex-end;
   padding: 8px 12px;
-  border: 0;
-  border-radius: 6px;
-  background: var(--accent);
-  color: #fff;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-#send:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-#send:disabled {
-  opacity: 0.55;
-  cursor: default;
 }

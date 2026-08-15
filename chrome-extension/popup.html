@@ -3,33 +3,128 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Agentgateway Chat</title>
+    <title>Agentgateway</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <header class="header">
-      <h1>Agentgateway Chat</h1>
-      <label class="endpoint-label" for="endpoint">Endpoint URL</label>
-      <input
-        id="endpoint"
-        type="url"
-        spellcheck="false"
-        autocomplete="off"
-        placeholder="http://host/v1/chat/completions"
-      />
+      <h1>Agentgateway</h1>
+      <nav class="area-tabs" aria-label="Areas">
+        <button type="button" id="tab-chat" data-area="chat" class="is-active">
+          Chat
+        </button>
+        <button type="button" id="tab-scenarios" data-area="scenarios">
+          Scenarios
+        </button>
+      </nav>
     </header>
 
-    <main id="log" class="log" aria-live="polite"></main>
+    <section id="area-chat" class="area is-active">
+      <div class="panel">
+        <label class="field-label" for="endpoint">Endpoint URL</label>
+        <input
+          id="endpoint"
+          type="url"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="http://host/v1/chat/completions"
+        />
+        <div class="model-row">
+          <div class="model-field">
+            <label class="field-label" for="model">Model</label>
+            <input
+              id="model"
+              type="text"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="gpt-4o-mini"
+            />
+          </div>
+          <button id="test" type="button">Test</button>
+        </div>
+        <div id="test-result" class="result-box" hidden></div>
+      </div>
 
-    <form id="chat-form" class="composer">
-      <textarea
-        id="message"
-        rows="2"
-        placeholder="Message…"
-        autocomplete="off"
-      ></textarea>
-      <button id="send" type="submit">Send</button>
-    </form>
+      <main id="log" class="log" aria-live="polite"></main>
+
+      <form id="chat-form" class="composer">
+        <textarea
+          id="message"
+          rows="2"
+          placeholder="Message…"
+          autocomplete="off"
+        ></textarea>
+        <button id="send" type="submit">Send</button>
+      </form>
+    </section>
+
+    <section id="area-scenarios" class="area" hidden>
+      <div class="panel">
+        <label class="field-label" for="scenario-type">Scenario</label>
+        <select id="scenario-type">
+          <option value="failover">Failover</option>
+          <option value="mcp">MCP</option>
+          <option value="a2a">A2A</option>
+          <option value="security">Security</option>
+        </select>
+
+        <div id="scenario-failover" class="scenario is-active">
+          <p class="hint" id="failover-endpoint-hint"></p>
+          <label class="field-label" for="primary-model">Primary model</label>
+          <input
+            id="primary-model"
+            type="text"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="gpt-4o-mini"
+          />
+          <label class="field-label" for="fallback-model">Fallback model</label>
+          <input
+            id="fallback-model"
+            type="text"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="gpt-4o"
+          />
+          <button id="run-failover" type="button">Run test</button>
+        </div>
+
+        <div id="scenario-mcp" class="scenario" hidden>
+          <label class="field-label" for="mcp-endpoint">MCP endpoint</label>
+          <input
+            id="mcp-endpoint"
+            type="url"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="http://host/mcp"
+          />
+          <button id="probe-mcp" type="button">Probe</button>
+        </div>
+
+        <div id="scenario-a2a" class="scenario" hidden>
+          <label class="field-label" for="a2a-endpoint">A2A endpoint</label>
+          <input
+            id="a2a-endpoint"
+            type="url"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="http://host/.well-known/agent-card.json"
+          />
+          <button id="probe-a2a" type="button">Probe</button>
+        </div>
+
+        <div id="scenario-security" class="scenario" hidden>
+          <p class="hint" id="security-endpoint-hint"></p>
+          <p class="hint">
+            Safe connectivity checks only: an unauthenticated ping and a short
+            junk prompt. No exploit or jailbreak payloads.
+          </p>
+          <button id="run-security" type="button">Run checks</button>
+        </div>
+      </div>
+
+      <div id="scenario-result" class="scenario-result" aria-live="polite"></div>
+    </section>
 
     <script src="popup.js"></script>
   </body>
