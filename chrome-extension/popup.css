@@ -463,6 +463,8 @@ body {
 }
 
 .seq-col {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -519,11 +521,12 @@ body {
 
 .seq-arrow {
   position: relative;
-  flex: 1 1 28px;
-  min-width: 20px;
-  max-width: 64px;
-  height: 22px;
-  margin: 0 4px;
+  z-index: 0;
+  flex: 1 1 40px;
+  min-width: 36px;
+  max-width: 88px;
+  height: 24px;
+  margin: 0 6px;
   align-self: center;
   overflow: hidden;
   background: transparent;
@@ -533,7 +536,8 @@ body {
     filter 0.18s;
 }
 
-.seq-arrow::before {
+.seq-arrow::before,
+.seq-arrow::after {
   content: "";
   position: absolute;
   top: 50%;
@@ -545,7 +549,12 @@ body {
   transform: translate(-70%, -50%) rotate(45deg);
 }
 
-.seq-arrow.is-back::before {
+.seq-arrow::after {
+  opacity: 0;
+}
+
+.seq-arrow.is-back::before,
+.seq-arrow.is-back::after {
   transform: translate(-30%, -50%) rotate(-135deg);
 }
 
@@ -563,7 +572,8 @@ body {
   opacity: 1;
 }
 
-.seq-arrow.is-on::before {
+.seq-arrow.is-on::before,
+.seq-arrow.is-on::after {
   border-right-color: var(--accent);
   border-top-color: var(--accent);
 }
@@ -572,8 +582,8 @@ body {
   background-image: linear-gradient(
     to right,
     transparent 0%,
-    rgb(27 36 48 / 12%) 14%,
-    rgb(27 36 48 / 12%) 86%,
+    rgb(27 36 48 / 14%) 10%,
+    rgb(27 36 48 / 14%) 90%,
     transparent 100%
   );
   background-repeat: no-repeat;
@@ -585,22 +595,87 @@ body {
   background-image: linear-gradient(
     to right,
     transparent 0%,
-    rgb(13 122 111 / 28%) 14%,
-    rgb(13 122 111 / 28%) 86%,
+    rgb(13 122 111 / 38%) 8%,
+    rgb(13 122 111 / 38%) 92%,
     transparent 100%
   );
+}
+
+.seq.is-run .seq-arrow.is-transit:not(.is-back) {
+  background-image:
+    linear-gradient(
+      to right,
+      transparent 0%,
+      rgb(13 122 111 / 42%) 10%,
+      rgb(13 122 111 / 42%) 90%,
+      transparent 100%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 9px,
+      rgb(13 122 111 / 55%) 9px 12px,
+      transparent 12px 20px
+    );
+  background-repeat: no-repeat, repeat-x;
+  background-position: center, 0 center;
+  background-size: 100% 1px, 20px 2px;
+  animation: seq-dash-fwd 0.42s linear infinite;
+}
+
+.seq.is-run .seq-arrow.is-transit.is-back {
+  background-image:
+    linear-gradient(
+      to right,
+      transparent 0%,
+      rgb(13 122 111 / 28%) 10%,
+      rgb(13 122 111 / 28%) 90%,
+      transparent 100%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 9px,
+      rgb(13 122 111 / 38%) 9px 12px,
+      transparent 12px 20px
+    );
+  background-repeat: no-repeat, repeat-x;
+  background-position: center, 0 center;
+  background-size: 100% 1px, 20px 2px;
+  animation: seq-dash-back 0.42s linear infinite;
 }
 
 .seq.is-run .seq-box.is-on.is-hop {
   animation: seq-pulse 0.7s ease-in-out infinite;
 }
 
-.seq.is-run .seq-arrow.is-transit:not(.is-back)::before {
-  animation: seq-chevron-fwd 0.7s ease-in-out infinite;
+.seq.is-run .seq-arrow.is-on:not(.is-transit):not(.is-back)::before {
+  left: 84%;
+  opacity: 1;
+  filter: drop-shadow(0 0 2px rgb(13 122 111 / 40%));
 }
 
-.seq.is-run .seq-arrow.is-transit.is-back::before {
-  animation: seq-chevron-back 0.7s ease-in-out infinite;
+.seq.is-run .seq-arrow.is-on.is-back:not(.is-transit)::before {
+  left: 16%;
+  opacity: 0.72;
+}
+
+.seq.is-run .seq-arrow.is-transit:not(.is-back)::before,
+.seq.is-run .seq-arrow.is-transit:not(.is-back)::after {
+  filter: drop-shadow(0 0 3px rgb(13 122 111 / 70%));
+  animation: seq-chevron-fwd 0.52s linear infinite;
+}
+
+.seq.is-run .seq-arrow.is-transit:not(.is-back)::after {
+  animation-delay: -0.26s;
+}
+
+.seq.is-run .seq-arrow.is-transit.is-back::before,
+.seq.is-run .seq-arrow.is-transit.is-back::after {
+  filter: drop-shadow(0 0 2px rgb(13 122 111 / 40%));
+  animation: seq-chevron-back 0.48s linear infinite;
+}
+
+.seq.is-run .seq-arrow.is-transit.is-back::after {
+  animation-delay: -0.24s;
 }
 
 .seq.is-ok .seq-box {
@@ -613,13 +688,20 @@ body {
 .seq.is-ok .seq-arrow {
   opacity: 1;
   background-image: none;
+  animation: none;
 }
 
-.seq.is-ok .seq-arrow::before {
+.seq.is-ok .seq-arrow::before,
+.seq.is-ok .seq-arrow::after {
   left: 50%;
   border-right-color: var(--accent);
   border-top-color: var(--accent);
   animation: none;
+  filter: none;
+}
+
+.seq.is-ok .seq-arrow::after {
+  opacity: 0;
 }
 
 .seq-box.is-fail {
@@ -634,15 +716,22 @@ body {
   background-image: none;
 }
 
-.seq-arrow.is-fail::before {
+.seq-arrow.is-fail::before,
+.seq-arrow.is-fail::after {
   left: 50%;
   border-right-color: var(--error-fg);
   border-top-color: var(--error-fg);
   animation: none;
+  filter: none;
+}
+
+.seq-arrow.is-fail::after {
+  opacity: 0;
 }
 
 .seq.is-fail .seq-arrow {
   background-image: none;
+  animation: none;
 }
 
 .seq.is-fail .seq-arrow:not(.is-fail):not(.is-on) {
@@ -661,50 +750,70 @@ body {
 
 @keyframes seq-chevron-fwd {
   0% {
-    left: 8%;
-    opacity: 0.2;
+    left: -8%;
+    opacity: 0;
   }
-  18% {
+  10% {
     opacity: 1;
   }
-  82% {
+  90% {
     opacity: 1;
   }
   100% {
-    left: 92%;
-    opacity: 0.2;
+    left: 108%;
+    opacity: 0;
   }
 }
 
 @keyframes seq-chevron-back {
   0% {
-    left: 92%;
-    opacity: 0.12;
+    left: 108%;
+    opacity: 0;
   }
-  18% {
-    opacity: 0.62;
+  10% {
+    opacity: 0.7;
   }
-  82% {
-    opacity: 0.62;
+  90% {
+    opacity: 0.7;
   }
   100% {
-    left: 8%;
-    opacity: 0.1;
+    left: -8%;
+    opacity: 0;
+  }
+}
+
+@keyframes seq-dash-fwd {
+  to {
+    background-position: center, 20px center;
+  }
+}
+
+@keyframes seq-dash-back {
+  to {
+    background-position: center, -20px center;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .seq.is-run .seq-box.is-on.is-hop,
-  .seq.is-run .seq-arrow.is-transit::before {
+  .seq.is-run .seq-arrow.is-transit,
+  .seq.is-run .seq-arrow.is-transit::before,
+  .seq.is-run .seq-arrow.is-transit::after {
     animation: none;
   }
 
   .seq.is-run .seq-arrow.is-transit:not(.is-back)::before {
-    left: 78%;
+    left: 84%;
+    opacity: 1;
   }
 
   .seq.is-run .seq-arrow.is-transit.is-back::before {
-    left: 22%;
+    left: 16%;
+    opacity: 0.7;
+  }
+
+  .seq.is-run .seq-arrow.is-transit::after {
+    opacity: 0;
   }
 }
 

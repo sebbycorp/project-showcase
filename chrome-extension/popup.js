@@ -326,8 +326,8 @@ function updateEndpointHints() {
   refreshSeqDiagrams();
 }
 
-const SEQ_STEP_MS = 360;
-const SEQ_RETURN_MS = 280;
+const SEQ_STEP_MS = 560;
+const SEQ_RETURN_MS = 480;
 const seqTokens = {
   "seq-chat": 0,
   "seq-chat-ping": 0,
