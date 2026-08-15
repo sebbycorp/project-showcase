@@ -127,4 +127,4 @@ In **Settings**, set **Solo UI URL** to the Solo UI app base (path `/age/`). Aft
 - The extension **cannot spawn kubectl**. That is why **Port forward** is copy/paste, then **Use localhost** / **Check localhost**.
 - Chat and the test tabs do **not** store provider API keys or a Solo license. Cluster tokens stay in `chrome.storage.local` (not sync) and are not logged.
 
-Terraform under `terraform/` is still in the repo if you want to stand up a demo cluster later. The live GCP project that used to back the default endpoints is gone — set **Endpoint URL**, **Solo UI URL**, and Cluster to **your** environment.
+Terraform under `infrastructure/` is still in the repo if you want to stand up a demo cluster later. The live GCP project that used to back the default endpoints is gone — set **Endpoint URL**, **Solo UI URL**, and Cluster to **your** environment.
