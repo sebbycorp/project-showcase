@@ -398,10 +398,8 @@ function mcpUsesGateway(mcpUrl, chatUrl) {
 }
 
 function setSeqCaption(seq, text) {
-  const caption = seq.querySelector(".seq-caption");
-  if (caption) {
-    caption.textContent = text;
-  }
+  seq.setAttribute("aria-label", text);
+  seq.title = text;
 }
 
 function configureSeq(seq, { viaGateway, target, targetKind }) {
@@ -455,7 +453,7 @@ function refreshSeqDiagrams() {
 
 function clearSeqMarks(seq) {
   seq.querySelectorAll(".seq-box, .seq-arrow").forEach((node) => {
-    node.classList.remove("is-on", "is-fail");
+    node.classList.remove("is-on", "is-fail", "is-back");
   });
 }
 
@@ -559,10 +557,13 @@ async function animateSeqForward(seq, viaGateway, target, token) {
 }
 
 async function animateSeqReturn(seq, viaGateway, target, token) {
+  seq.querySelectorAll(".seq-arrow").forEach((arrow) => {
+    arrow.classList.add("is-back");
+  });
   if (viaGateway) {
-    markSeq(seq, [], [3, 4], "is-on");
+    markSeq(seq, [], [1, 2], "is-on");
   } else {
-    markSeq(seq, [], [4], "is-on");
+    markSeq(seq, [], [1], "is-on");
   }
   setSeqCaption(seq, "Response");
   return waitSeq(180, seq.id, token);
@@ -592,7 +593,7 @@ async function runWithSeq(seq, requestFn, { viaGateway, target, ok }) {
     markSeq(
       seq,
       viaGateway ? ["client", "gateway", "target"] : ["client", "target"],
-      viaGateway ? [1, 2, 3, 4] : [1, 4],
+      viaGateway ? [1, 2] : [1],
       "is-on"
     );
     setSeqCaption(seq, pathCaption(viaGateway, target));
@@ -1270,7 +1271,7 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.8.1" },
+      clientInfo: { name: "agentgateway-extension", version: "0.8.2" },
     },
   };
 
