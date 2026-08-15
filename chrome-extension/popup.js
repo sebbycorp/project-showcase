@@ -1204,11 +1204,17 @@ const seqTokens = {
   "seq-failover": 0,
   "seq-list-call": 0,
   "seq-mcp-init": 0,
+  "seq-mcp-list": 0,
+  "seq-mcp-echo": 0,
+  "seq-mcp-fetch": 0,
+  "seq-mcp-jwt": 0,
+  "seq-mcp-tools": 0,
   "seq-a2a": 0,
   "seq-http": 0,
   "seq-unauth": 0,
   "seq-junk": 0,
 };
+const mcpDeploySeqs = {};
 
 const SEQ_ICONS = {
   openai: "icons/openai.svg",
@@ -1497,6 +1503,7 @@ function refreshSeqDiagrams() {
     els.seqMcpFetch,
     els.seqMcpJwt,
     els.seqMcpTools,
+    ...Object.values(mcpDeploySeqs),
   ].forEach((seq) => {
     if (seq) {
       configureSeq(seq, mcpSeqConfig());
@@ -1815,15 +1822,24 @@ async function saveChatSettings() {
 
 async function timedFetch(url, options) {
   const started = performance.now();
-  notifySeqProgress("start", { started });
+  const fetchOptions = { ...(options || {}) };
+  const quiet = Boolean(fetchOptions.quiet);
+  delete fetchOptions.quiet;
+  if (!quiet) {
+    notifySeqProgress("start", { started });
+  }
   try {
-    const response = await fetch(url, options);
+    const response = await fetch(url, fetchOptions);
     const headersMs = Math.round(performance.now() - started);
-    notifySeqProgress("headers", { response, status: response.status, headersMs });
+    if (!quiet) {
+      notifySeqProgress("headers", { response, status: response.status, headersMs });
+    }
     const raw = await response.text();
     const payload = parseJson(raw);
     const latencyMs = Math.round(performance.now() - started);
-    notifySeqProgress("body", { response, raw, payload, headersMs, latencyMs });
+    if (!quiet) {
+      notifySeqProgress("body", { response, raw, payload, headersMs, latencyMs });
+    }
     return {
       response,
       status: response.status,
@@ -2142,6 +2158,9 @@ async function loadSettings() {
   ) {
     refreshInventory(area === "settings" ? "cluster" : area);
   }
+  if (area === "mcp") {
+    void refreshMcpDeployStatuses();
+  }
   probeClusterConnection({ interactive: false });
 }
 
@@ -2160,6 +2179,9 @@ function switchArea(area) {
     if (clusterIsReady()) {
       refreshInventory(area === "settings" ? "cluster" : area);
     }
+  }
+  if (area === "mcp") {
+    void refreshMcpDeployStatuses();
   }
   persist({ area, settingsFocus });
 }
@@ -2688,7 +2710,7 @@ function mcpSessionId(result) {
 }
 
 function mcpClientInfo() {
-  return { name: "agentgateway-extension", version: "0.9.6" };
+  return { name: "agentgateway-extension", version: "0.9.7" };
 }
 
 function mcpHeaders(sessionId, extra) {
@@ -2837,12 +2859,12 @@ function pickMcpTool(names, preferred) {
   return preferred[0] || "";
 }
 
-els.probeMcp.addEventListener("click", async () => {
-  els.probeMcp.disabled = true;
+async function runMcpInitializeTest({ button, drawer, seq }) {
+  button.disabled = true;
   const url = await saveMcpEndpoint();
-  runningDrawer(els.resultMcp, "Probing…");
+  runningDrawer(drawer, "Probing…");
   const { result } = await runWithSeq(
-    els.seqMcpInit,
+    seq,
     () => mcpInitializeSession(url).then((session) => session.result),
     { ...mcpSeqConfig(), ok: mcpRequestOk, path: requestPath(url) }
   );
@@ -2852,7 +2874,7 @@ els.probeMcp.addEventListener("click", async () => {
   if (result.note) {
     meta.push(result.note);
   }
-  resultDrawer(els.resultMcp, {
+  resultDrawer(drawer, {
     ok,
     meta: meta.join(" · "),
     result,
@@ -2868,15 +2890,16 @@ els.probeMcp.addEventListener("click", async () => {
   if (!result.error && result.status >= 200 && result.status < 300) {
     celebrate();
   }
-  els.probeMcp.disabled = false;
-});
+  button.disabled = false;
+  return ok;
+}
 
-els.probeMcpList.addEventListener("click", async () => {
+async function runMcpListTest({ button, drawer, seq }) {
   const url = await saveMcpEndpoint();
-  els.probeMcpList.disabled = true;
-  runningDrawer(els.resultMcpList, "Listing tools…");
+  button.disabled = true;
+  runningDrawer(drawer, "Listing tools…");
   const listed = await runWithSeq(
-    els.seqMcpList,
+    seq,
     async () => {
       const session = await mcpInitializeSession(url);
       if (!mcpRequestOk(session.result)) {
@@ -2895,7 +2918,7 @@ els.probeMcpList.addEventListener("click", async () => {
   const rpcError = listed.rpcError;
   const ok = mcpRequestOk(listed) && !rpcError;
   const statusText = listed.status == null ? "no response" : `HTTP ${listed.status}`;
-  resultDrawer(els.resultMcpList, {
+  resultDrawer(drawer, {
     ok,
     meta: `tools/list · ${statusText} · ${listed.latencyMs} ms`,
     result: listed,
@@ -2913,7 +2936,24 @@ els.probeMcpList.addEventListener("click", async () => {
   if (ok) {
     celebrate();
   }
-  els.probeMcpList.disabled = false;
+  button.disabled = false;
+  return ok;
+}
+
+els.probeMcp.addEventListener("click", () => {
+  return runMcpInitializeTest({
+    button: els.probeMcp,
+    drawer: els.resultMcp,
+    seq: els.seqMcpInit,
+  });
+});
+
+els.probeMcpList.addEventListener("click", () => {
+  return runMcpListTest({
+    button: els.probeMcpList,
+    drawer: els.resultMcpList,
+    seq: els.seqMcpList,
+  });
 });
 
 async function runMcpToolCall({
@@ -2988,7 +3028,7 @@ async function runMcpToolCall({
         ok ? "is-ok" : "is-error",
         tool,
         ok
-          ? snippet(mcpCallContent(called.payload) || "(empty result)")
+          ? snippet(mcpCallContent(called.payload) || "OK")
           : snippet(called.error || rpcError || called.raw || "(empty body)")
       ),
     ],
@@ -2997,6 +3037,158 @@ async function runMcpToolCall({
     celebrate();
   }
   button.disabled = false;
+  return ok;
+}
+
+function mcpStepMeta(result, fallback) {
+  if (!result) {
+    return fallback;
+  }
+  const statusText = result.status == null ? "no response" : `HTTP ${result.status}`;
+  return `${fallback} · ${statusText} · ${result.latencyMs} ms`;
+}
+
+async function runMcpAllTest({ button, drawer, seq }) {
+  const url = await saveMcpEndpoint();
+  button.disabled = true;
+  runningDrawer(drawer, "initialize → list → echo…");
+  const outcome = await runWithSeq(
+    seq,
+    async () => {
+      const session = await mcpInitializeSession(url);
+      const initOk = mcpRequestOk(session.result);
+      const steps = [
+        {
+          id: "initialize",
+          ok: initOk,
+          result: session.result,
+          body: snippet(
+            session.result.error || session.result.raw || "(empty body)"
+          ),
+        },
+      ];
+      if (!initOk) {
+        return {
+          ...session.result,
+          step: "initialize",
+          steps,
+          toolNames: [],
+        };
+      }
+      const listed = await mcpRpc(url, session.sessionId, 2, "tools/list", {});
+      const names = mcpToolNames(listed.payload);
+      const listError = mcpRpcError(listed.payload);
+      const listOk = mcpRequestOk(listed.result) && !listError;
+      steps.push({
+        id: "tools/list",
+        ok: listOk,
+        result: listed.result,
+        names,
+        body: listOk
+          ? names.join(", ") || "(no tools)"
+          : snippet(
+              listed.result.error || listError || listed.result.raw || "(empty body)"
+            ),
+      });
+      if (!listOk) {
+        return {
+          ...listed.result,
+          step: "tools/list",
+          steps,
+          toolNames: names,
+          rpcError: listError,
+        };
+      }
+      const echo = pickMcpTool(names, [
+        "mcp-server-everything-3001_echo",
+        "echo",
+      ]);
+      const call = await mcpRpc(url, session.sessionId, 3, "tools/call", {
+        name: echo,
+        arguments: { message: "Hello world" },
+      });
+      const callError = mcpRpcError(call.payload);
+      const callOk = mcpRequestOk(call.result) && !callError;
+      steps.push({
+        id: "tools/call",
+        ok: callOk,
+        result: call.result,
+        toolName: echo,
+        body: callOk
+          ? snippet(mcpCallContent(call.payload) || "OK")
+          : snippet(call.result.error || callError || call.result.raw || "(empty body)"),
+      });
+      return {
+        ...call.result,
+        step: "tools/call",
+        steps,
+        toolName: echo,
+        toolNames: names,
+        payload: call.payload,
+        rpcError: callError,
+      };
+    },
+    { ...mcpSeqConfig(), ok: mcpRequestOk, path: requestPath(url) }
+  );
+  const steps = outcome.steps || [];
+  const rpcError = outcome.rpcError;
+  const ok = steps.length > 0 && steps.every((step) => step.ok) && !rpcError;
+  const statusText =
+    outcome.status == null ? "no response" : `HTTP ${outcome.status}`;
+  resultDrawer(drawer, {
+    ok,
+    meta: `${outcome.step || "run all"} · ${statusText} · ${outcome.latencyMs} ms`,
+    result: outcome,
+    nodes: steps.map((step) =>
+      card(
+        "check",
+        step.ok ? "is-ok" : "is-error",
+        mcpStepMeta(
+          step.result,
+          step.id === "tools/list" && step.names
+            ? `${step.names.length} tool(s)`
+            : step.toolName
+              ? `tools/call ${step.toolName}`
+              : step.id
+        ),
+        step.body
+      )
+    ),
+  });
+  if (ok) {
+    celebrate();
+  }
+  button.disabled = false;
+  return ok;
+}
+
+function runMcpDeployTest(id, button, drawer, seq) {
+  const recipe = AgwBuilder.mcpDeployRecipe(id);
+  const kind = recipe && recipe.run;
+  if (kind === "echo") {
+    return runMcpToolCall({
+      button,
+      drawer,
+      seq,
+      preferredNames: ["mcp-server-everything-3001_echo", "echo"],
+      args: { message: "Hello world" },
+      label: "Calling echo…",
+    });
+  }
+  if (kind === "fetch") {
+    return runMcpToolCall({
+      button,
+      drawer,
+      seq,
+      preferredNames: ["mcp-website-fetcher_fetch", "fetch"],
+      args: { url: "https://example.com" },
+      label: "Calling fetch…",
+    });
+  }
+  if (kind === "list") {
+    return runMcpListTest({ button, drawer, seq });
+  }
+  return runMcpInitializeTest({ button, drawer, seq });
 }
 
 els.probeMcpEcho.addEventListener("click", () => {
@@ -4319,6 +4511,9 @@ function updateDeployHints() {
   document.querySelectorAll("[data-mcp-deploy]").forEach((btn) => {
     btn.disabled = !connected;
   });
+  if (!connected) {
+    setAllMcpStatusChips("disconnected");
+  }
   if (els.listCrds) {
     els.listCrds.disabled = !connected;
   }
@@ -4434,9 +4629,65 @@ function mcpApplyBackendGroup() {
   return K8S_KINDS.EnterpriseAgentgatewayBackend.group;
 }
 
+function mcpTabVisible() {
+  return Boolean(els.areaMcp && !els.areaMcp.hidden);
+}
+
+function createMcpSeq(id) {
+  const template = els.seqMcpInit;
+  if (!template) {
+    return null;
+  }
+  const seq = template.cloneNode(true);
+  seq.id = id;
+  seqTokens[id] = 0;
+  return seq;
+}
+
+function setMcpStatusChip(chip, state, detail) {
+  if (!chip) {
+    return;
+  }
+  const label =
+    state === "disconnected"
+      ? "Not connected"
+      : state === "Running"
+        ? "Running"
+        : state === "Pending"
+          ? "Pending"
+          : state === "Missing"
+            ? "Missing"
+            : state === "Error"
+              ? "Error"
+              : "Pending";
+  const css =
+    state === "disconnected"
+      ? "disconnected"
+      : state === "Running"
+        ? "running"
+        : state === "Pending"
+          ? "pending"
+          : state === "Missing"
+            ? "missing"
+            : "error";
+  chip.className = `mcp-status-chip is-${css}`;
+  chip.dataset.state = state;
+  chip.textContent = label;
+  chip.title = detail ? `${label} — ${detail}` : label;
+}
+
+function setAllMcpStatusChips(state, detail) {
+  document.querySelectorAll("[data-mcp-status]").forEach((chip) => {
+    setMcpStatusChip(chip, state, detail);
+  });
+}
+
 function renderMcpDeploys() {
   const recipes = (typeof AgwBuilder !== "undefined" && AgwBuilder.MCP_DEPLOYS) || [];
   const connected = clusterIsReady();
+  Object.keys(mcpDeploySeqs).forEach((key) => {
+    delete mcpDeploySeqs[key];
+  });
   const fill = (container, items, kind) => {
     if (!container) {
       return;
@@ -4457,17 +4708,102 @@ function renderMcpDeploys() {
         container.append(link);
         continue;
       }
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className =
-        kind === "virtual" ? "btn mcp-deploy-btn" : "btn btn-secondary mcp-deploy-btn";
-      btn.dataset.mcpDeploy = item.id;
-      btn.dataset.label = item.label;
-      btn.textContent = item.label;
-      btn.title = item.blurb || item.label;
-      btn.disabled = !connected;
-      btn.addEventListener("click", () => applyMcpDeploy(item.id, btn));
-      container.append(btn);
+      if (kind !== "virtual") {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn btn-secondary mcp-deploy-btn";
+        btn.dataset.mcpDeploy = item.id;
+        btn.dataset.label = item.label;
+        btn.textContent = item.label;
+        btn.title = item.blurb || item.label;
+        btn.disabled = !connected;
+        btn.addEventListener("click", () => applyMcpDeploy(item.id, btn));
+        container.append(btn);
+        continue;
+      }
+      const cardEl = document.createElement("article");
+      cardEl.className = "test-card mcp-deploy-card";
+      cardEl.dataset.mcpDeployCard = item.id;
+
+      const head = document.createElement("div");
+      head.className = "test-head";
+      const copy = document.createElement("div");
+      copy.className = "test-copy";
+      const name = document.createElement("div");
+      name.className = "test-name";
+      name.textContent = item.label;
+      const blurb = document.createElement("p");
+      blurb.className = "hint";
+      blurb.textContent = item.blurb || "";
+      copy.append(name, blurb);
+      const chip = document.createElement("span");
+      chip.dataset.mcpStatus = item.id;
+      setMcpStatusChip(
+        chip,
+        connected ? "Pending" : "disconnected",
+        connected ? "Checking cluster…" : ""
+      );
+      head.append(copy, chip);
+
+      const actions = document.createElement("div");
+      actions.className = "mcp-deploy-actions";
+      const deployBtn = document.createElement("button");
+      deployBtn.type = "button";
+      deployBtn.className = "btn mcp-deploy-btn";
+      deployBtn.dataset.mcpDeploy = item.id;
+      deployBtn.dataset.label = item.label;
+      deployBtn.dataset.shortLabel = "Deploy";
+      deployBtn.textContent = "Deploy";
+      deployBtn.title = item.blurb || item.label;
+      deployBtn.disabled = !connected;
+      deployBtn.addEventListener("click", () => applyMcpDeploy(item.id, deployBtn));
+      const runBtn = document.createElement("button");
+      runBtn.type = "button";
+      runBtn.className = "btn btn-run";
+      runBtn.dataset.mcpRun = item.id;
+      runBtn.textContent = "Run test";
+      runBtn.title = "JSON-RPC against the MCP endpoint";
+      actions.append(deployBtn, runBtn);
+      let allBtn = null;
+      if (item.runAll) {
+        allBtn = document.createElement("button");
+        allBtn.type = "button";
+        allBtn.className = "btn btn-run";
+        allBtn.dataset.mcpRunAll = item.id;
+        allBtn.textContent = "Run all";
+        allBtn.title = "initialize → tools/list → echo";
+        actions.append(allBtn);
+      }
+
+      const seq = createMcpSeq(`seq-mcp-deploy-${item.id}`);
+      const drawer = document.createElement("div");
+      drawer.className = "test-drawer";
+      drawer.hidden = true;
+      drawer.setAttribute("aria-live", "polite");
+      drawer.dataset.mcpDeployDrawer = item.id;
+      if (seq) {
+        mcpDeploySeqs[item.id] = seq;
+        configureSeq(seq, mcpSeqConfig());
+      }
+      runBtn.addEventListener("click", () =>
+        runMcpDeployTest(item.id, runBtn, drawer, seq || els.seqMcpInit)
+      );
+      if (allBtn) {
+        allBtn.addEventListener("click", () =>
+          runMcpAllTest({
+            button: allBtn,
+            drawer,
+            seq: seq || els.seqMcpTools || els.seqMcpInit,
+          })
+        );
+      }
+
+      cardEl.append(head, actions);
+      if (seq) {
+        cardEl.append(seq);
+      }
+      cardEl.append(drawer);
+      container.append(cardEl);
     }
   };
   fill(
@@ -4485,6 +4821,173 @@ function renderMcpDeploys() {
     recipes.filter((item) => item.apply === false || item.group === "docs"),
     "docs"
   );
+}
+
+const MCP_STATUS_POLL_MS = 2000;
+const MCP_STATUS_TIMEOUT_MS = 45000;
+const mcpStatusPolls = {};
+
+function kindSpecFromDoc(doc) {
+  if (!doc || !doc.kind) {
+    return null;
+  }
+  const known = K8S_KINDS[doc.kind];
+  const apiVersion = String(doc.apiVersion || "");
+  if (!apiVersion) {
+    return known ? { kind: doc.kind, ...known } : null;
+  }
+  if (apiVersion === "v1" || !apiVersion.includes("/")) {
+    return {
+      kind: doc.kind,
+      core: true,
+      group: "",
+      version: apiVersion || "v1",
+      plural: (known && known.plural) || `${String(doc.kind).toLowerCase()}s`,
+    };
+  }
+  const slash = apiVersion.lastIndexOf("/");
+  return {
+    kind: doc.kind,
+    group: apiVersion.slice(0, slash),
+    version: apiVersion.slice(slash + 1),
+    plural: (known && known.plural) || `${String(doc.kind).toLowerCase()}s`,
+    core: Boolean(known && known.core),
+  };
+}
+
+async function getResource(settings, doc) {
+  const spec = kindSpecFromDoc(doc) || kindSpecFromManifest(doc);
+  if (!spec) {
+    return {
+      error: "unknown kind",
+      status: null,
+      payload: null,
+      response: null,
+      latencyMs: 0,
+      raw: "",
+    };
+  }
+  const name = doc.metadata && doc.metadata.name;
+  if (!name) {
+    return {
+      error: "missing metadata.name",
+      status: null,
+      payload: null,
+      response: null,
+      latencyMs: 0,
+      raw: "",
+    };
+  }
+  const namespace =
+    (doc.metadata && doc.metadata.namespace) || settings.clusterNamespace;
+  const item = k8sUrl(
+    settings.clusterApiServer,
+    `${collectionPath(spec, namespace)}/${encodeURIComponent(name)}`
+  );
+  return timedFetch(item, {
+    method: "GET",
+    headers: k8sHeaders(settings.clusterToken),
+    quiet: true,
+  });
+}
+
+async function getMcpWatchResource(settings, doc) {
+  const first = await getResource(settings, doc);
+  if (
+    first.status !== 404 ||
+    doc.kind !== "EnterpriseAgentgatewayBackend"
+  ) {
+    return first;
+  }
+  const api = String(doc.apiVersion || "");
+  const altGroup = api.startsWith("enterpriseagentgateway.solo.io")
+    ? "agentgateway.dev"
+    : "enterpriseagentgateway.solo.io";
+  return getResource(settings, {
+    ...doc,
+    apiVersion: `${altGroup}/v1alpha1`,
+  });
+}
+
+function stopMcpStatusPoll(id) {
+  const handle = mcpStatusPolls[id];
+  if (!handle) {
+    return;
+  }
+  handle.cancelled = true;
+  if (handle.timer) {
+    clearTimeout(handle.timer);
+  }
+  delete mcpStatusPolls[id];
+}
+
+function scheduleMcpStatusPoll(id, started) {
+  const handle = mcpStatusPolls[id] || { cancelled: false, timer: null };
+  handle.cancelled = false;
+  mcpStatusPolls[id] = handle;
+  handle.timer = setTimeout(() => {
+    if (handle.cancelled) {
+      return;
+    }
+    void refreshMcpDeployStatus(id, { poll: true, started });
+  }, MCP_STATUS_POLL_MS);
+}
+
+async function refreshMcpDeployStatus(id, { poll = false, started = 0 } = {}) {
+  const chip = document.querySelector(`[data-mcp-status="${id}"]`);
+  if (!chip) {
+    stopMcpStatusPoll(id);
+    return null;
+  }
+  if (!clusterIsReady()) {
+    stopMcpStatusPoll(id);
+    setMcpStatusChip(chip, "disconnected");
+    return { state: "disconnected" };
+  }
+  const settings = currentClusterSettings();
+  const docs = AgwBuilder.mcpDeployDocs(id, {
+    namespace: settings.clusterNamespace,
+    backendGroup: mcpApplyBackendGroup(),
+  });
+  const parts = [];
+  for (const doc of docs) {
+    const result = await getMcpWatchResource(settings, doc);
+    const evaluated = AgwBuilder.mcpResourceState(doc.kind, result);
+    parts.push({
+      ...evaluated,
+      kind: doc.kind,
+      name: (doc.metadata && doc.metadata.name) || doc.kind,
+    });
+  }
+  const rolled = AgwBuilder.mcpRollupState(parts);
+  setMcpStatusChip(chip, rolled.state, rolled.detail);
+  if (poll) {
+    const begin = started || Date.now();
+    if (rolled.state === "Running" || Date.now() - begin >= MCP_STATUS_TIMEOUT_MS) {
+      stopMcpStatusPoll(id);
+    } else {
+      scheduleMcpStatusPoll(id, begin);
+    }
+  }
+  return rolled;
+}
+
+function refreshMcpDeployStatuses() {
+  const ids = (AgwBuilder.MCP_STATUS_DEPLOYS || []).filter((id) =>
+    document.querySelector(`[data-mcp-status="${id}"]`)
+  );
+  if (!clusterIsReady()) {
+    setAllMcpStatusChips("disconnected");
+    ids.forEach((id) => stopMcpStatusPoll(id));
+    return;
+  }
+  ids.forEach((id) => {
+    void refreshMcpDeployStatus(id).then((rolled) => {
+      if (rolled && rolled.state === "Pending") {
+        void refreshMcpDeployStatus(id, { poll: true, started: Date.now() });
+      }
+    });
+  });
 }
 
 async function applyMcpDeploy(id, button) {
@@ -4517,11 +5020,12 @@ async function applyMcpDeploy(id, button) {
     return;
   }
   const label = (button && button.dataset.label) || recipe.label;
+  const buttonLabel = (button && button.dataset.shortLabel) || label;
   if (button) {
     button.disabled = true;
     button.classList.add("is-busy");
     button.classList.remove("is-ok", "is-fail");
-    button.textContent = `${label} — deploying…`;
+    button.textContent = `${buttonLabel} — deploying…`;
   }
   showPending(resultEl, `Applying ${docs.length} document(s)…`);
   const applied = [];
@@ -4570,13 +5074,16 @@ async function applyMcpDeploy(id, button) {
     button.classList.remove("is-busy");
     button.classList.toggle("is-ok", !failed);
     button.classList.toggle("is-fail", failed);
-    button.textContent = failed ? `${label} — fail` : `${label} — OK`;
+    button.textContent = failed ? `${buttonLabel} — fail` : `${buttonLabel} — OK`;
     button.title = names;
     button.disabled = !clusterIsReady();
   }
   updateDeployHints();
   if (!failed) {
     refreshInventory("mcp");
+    if (AgwBuilder.MCP_STATUS_DEPLOYS.includes(id)) {
+      void refreshMcpDeployStatus(id, { poll: true });
+    }
   }
 }
 
@@ -5340,6 +5847,9 @@ async function probeClusterConnection({ interactive = false } = {}) {
     });
   }
   updateDeployHints();
+  if (ok && mcpTabVisible()) {
+    void refreshMcpDeployStatuses();
+  }
   if (interactive && ok) {
     celebrate();
     refreshInventory("cluster");

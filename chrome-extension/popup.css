@@ -1557,9 +1557,72 @@ html.demo-stage .seq-wire {
 }
 
 .mcp-deploy-primary .btn {
-  width: 100%;
   justify-content: center;
   font-weight: 650;
+}
+
+.mcp-deploy-card {
+  margin: 0;
+  padding: 12px 12px 10px;
+}
+
+.mcp-deploy-card .test-head {
+  align-items: center;
+}
+
+.mcp-deploy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.mcp-deploy-actions .btn {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 72px;
+}
+
+.mcp-status-chip {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.mcp-status-chip.is-running {
+  color: var(--ok-fg);
+  background: var(--ok);
+  border-color: rgb(12 116 105 / 28%);
+}
+
+.mcp-status-chip.is-pending {
+  color: var(--running);
+  background: var(--running-bg);
+  border-color: rgb(138 106 18 / 28%);
+}
+
+.mcp-status-chip.is-missing {
+  color: var(--muted);
+  background: var(--bg);
+}
+
+.mcp-status-chip.is-error {
+  color: var(--error-fg);
+  background: var(--error);
+  border-color: #f0b8b4;
+}
+
+.mcp-status-chip.is-disconnected {
+  color: var(--muted);
 }
 
 .mcp-deploy-more-label {

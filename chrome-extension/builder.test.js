@@ -417,5 +417,102 @@ assert.match(guardrails, /"tools\/call": Request/);
 assert.ok(AgwBuilder.MCP_DEPLOYS.some((item) => item.id === "everything"));
 assert.ok(AgwBuilder.MCP_DEPLOYS.some((item) => item.apply === false));
 assert.strictEqual(AgwBuilder.generateMcpDeployYaml("auth"), "");
+assert.deepStrictEqual(AgwBuilder.MCP_STATUS_DEPLOYS, [
+  "everything",
+  "fetcher",
+  "virtual",
+]);
+assert.strictEqual(
+  AgwBuilder.MCP_DEPLOYS.find((item) => item.id === "everything").run,
+  "echo"
+);
+assert.strictEqual(
+  AgwBuilder.MCP_DEPLOYS.find((item) => item.id === "fetcher").run,
+  "fetch"
+);
+assert.strictEqual(
+  AgwBuilder.MCP_DEPLOYS.find((item) => item.id === "virtual").run,
+  "initialize"
+);
+assert.strictEqual(
+  AgwBuilder.MCP_DEPLOYS.find((item) => item.id === "virtual").runAll,
+  true
+);
+
+const readyDeploy = AgwBuilder.mcpResourceState("Deployment", {
+  status: 200,
+  payload: { spec: { replicas: 1 }, status: { readyReplicas: 1 } },
+});
+assert.strictEqual(readyDeploy.state, "Running");
+assert.strictEqual(readyDeploy.detail, "1/1 ready");
+
+const pendingDeploy = AgwBuilder.mcpResourceState("Deployment", {
+  status: 200,
+  payload: { spec: { replicas: 1 }, status: { readyReplicas: 0 } },
+});
+assert.strictEqual(pendingDeploy.state, "Pending");
+assert.strictEqual(pendingDeploy.detail, "0/1 ready");
+
+const missing = AgwBuilder.mcpResourceState("Service", { status: 404 });
+assert.strictEqual(missing.state, "Missing");
+
+const errored = AgwBuilder.mcpResourceState("Service", {
+  error: "Failed to fetch",
+});
+assert.strictEqual(errored.state, "Error");
+
+const routeOk = AgwBuilder.mcpResourceState("HTTPRoute", {
+  status: 200,
+  payload: {
+    status: {
+      parents: [
+        {
+          conditions: [
+            { type: "Accepted", status: "True" },
+            { type: "Programmed", status: "True" },
+          ],
+        },
+      ],
+    },
+  },
+});
+assert.strictEqual(routeOk.state, "Running");
+assert.match(routeOk.detail, /Accepted=True/);
+assert.match(routeOk.detail, /Programmed=True/);
+
+const routePending = AgwBuilder.mcpResourceState("HTTPRoute", {
+  status: 200,
+  payload: { status: {} },
+});
+assert.strictEqual(routePending.state, "Pending");
+
+const routeRejected = AgwBuilder.mcpResourceState("HTTPRoute", {
+  status: 200,
+  payload: {
+    status: {
+      parents: [{ conditions: [{ type: "Accepted", status: "False" }] }],
+    },
+  },
+});
+assert.strictEqual(routeRejected.state, "Pending");
+
+const serviceOk = AgwBuilder.mcpResourceState("Service", {
+  status: 200,
+  payload: { metadata: { name: "mcp-server-everything" } },
+});
+assert.strictEqual(serviceOk.state, "Running");
+
+const rolled = AgwBuilder.mcpRollupState([
+  { state: "Running", kind: "Service", name: "mcp", detail: "Service" },
+  { state: "Pending", kind: "Deployment", name: "mcp", detail: "0/1 ready" },
+]);
+assert.strictEqual(rolled.state, "Pending");
+assert.match(rolled.detail, /0\/1 ready/);
+
+const rolledError = AgwBuilder.mcpRollupState([
+  { state: "Missing", kind: "Service", name: "mcp", detail: "not found" },
+  { state: "Error", kind: "Deployment", name: "mcp", detail: "HTTP 500" },
+]);
+assert.strictEqual(rolledError.state, "Error");
 
 console.log("builder.test.js: ok");
