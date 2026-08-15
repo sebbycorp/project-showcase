@@ -307,63 +307,69 @@ function failSeq(seq, hop, viaGateway, target) {
   setSeqCaption(seq, `Failed at ${target}`);
 }
 
-async function animateSeqForward(seq, viaGateway, target, token) {
-  const id = seq.id;
-  markSeq(seq, ["client"], [1], "is-on");
-  setSeqCaption(seq, "Client sends");
-  if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
-    return false;
-  }
-
+function forwardSteps(viaGateway, target) {
   if (viaGateway) {
-    markSeq(seq, ["gateway"], [], "is-on");
-    setSeqCaption(seq, "Agentgateway");
-    if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
-      return false;
-    }
-    markSeq(seq, ["target"], [2], "is-on");
-    setSeqCaption(seq, target);
-    if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
-      return false;
-    }
-    return true;
+    return [
+      { hop: 1, roles: ["client"], arrows: [1], label: "Client sends" },
+      { hop: 2, roles: ["gateway"], arrows: [], label: "Agentgateway" },
+      { hop: 3, roles: ["target"], arrows: [2], label: target },
+    ];
   }
-
-  markSeq(seq, ["target"], [1], "is-on");
-  setSeqCaption(seq, target);
-  if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
-    return false;
-  }
-  return true;
+  return [
+    { hop: 1, roles: ["client"], arrows: [1], label: "Client sends" },
+    { hop: 2, roles: ["target"], arrows: [1], label: target },
+  ];
 }
 
-async function animateSeqReturn(seq, viaGateway, target, token) {
-  if (viaGateway) {
-    markSeq(seq, [], [3, 4], "is-on");
-  } else {
-    markSeq(seq, [], [4], "is-on");
-  }
+async function animateSeqReturn(seq, viaGateway, token) {
+  markSeq(seq, [], viaGateway ? [3, 4] : [4], "is-on");
   setSeqCaption(seq, "Response");
   return waitSeq(180, seq.id, token);
 }
 
 async function runWithSeq(seq, requestFn, { viaGateway, target, ok }) {
   const token = ++seqTokens[seq.id];
+  const id = seq.id;
   configureSeq(seq, { viaGateway, target });
   resetSeq(seq);
   seq.classList.add("is-run");
 
-  const request = Promise.resolve().then(requestFn);
-  const forward = animateSeqForward(seq, viaGateway, target, token);
-  const result = await request;
-  const stillCurrent = await forward;
-  if (!stillCurrent || seqTokens[seq.id] !== token) {
+  let result;
+  let settled = false;
+  const request = Promise.resolve()
+    .then(requestFn)
+    .then((value) => {
+      result = value;
+      settled = true;
+      return value;
+    });
+
+  for (const step of forwardSteps(viaGateway, target)) {
+    if (seqTokens[id] !== token) {
+      return request;
+    }
+    markSeq(seq, step.roles, step.arrows, "is-on");
+    setSeqCaption(seq, step.label);
+    if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
+      return request;
+    }
+    if (settled && !ok(result)) {
+      const hop = failHopFromResult(result, viaGateway);
+      if (hop != null && step.hop >= hop) {
+        failSeq(seq, hop, viaGateway, target);
+        return result;
+      }
+    }
+  }
+
+  result = await request;
+  if (seqTokens[id] !== token) {
     return result;
   }
 
   if (ok(result)) {
-    const returned = await animateSeqReturn(seq, viaGateway, target, token);
-    if (!returned || seqTokens[seq.id] !== token) {
+    const returned = await animateSeqReturn(seq, viaGateway, token);
+    if (!returned || seqTokens[id] !== token) {
       return result;
     }
     seq.classList.remove("is-run");
