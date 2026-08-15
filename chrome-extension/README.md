@@ -146,23 +146,39 @@ latency, model, and reply or error.
 - **Model failover** — two provider tiles (primary + fallback). On Run,
   primary lights, then dims if it fails and fallback lights. Hop labels
   say **Primary failed** / **Failover → {provider}**. Default models
-  stay `gpt-4o-mini` / `gpt-4o` for the OpenAI pill; tiles follow the
-  model names so Claude → Grok (or any pair) is visible
+  stay `gpt-4o-mini` / `gpt-4o` for the OpenAI pill. After you apply a
+  failover policy, tiles follow that form’s primary/fallback providers
+  (not hardcoded OpenAI), so OpenAI → Claude is visible
 - **List / call model** — `GET /v1/models`, then chat with the chosen
   model
 
 The LLM builder (from `manifests/` and
 [Solo LLM docs](https://docs.solo.io/agentgateway/latest/llm/))
-creates or updates an `EnterpriseAgentgatewayBackend` plus `HTTPRoute`:
+creates or updates an `EnterpriseAgentgatewayBackend` plus `HTTPRoute`.
+A **Policies** optgroup adds first-class failover presets from the
+[failover guide](https://docs.solo.io/agentgateway/latest/llm/failover/):
 
 - Fields: name, namespace (default from Settings), provider pill, model,
   `secretRef` name, route path (`/v1/chat/completions` or `/openai`),
   parent Gateway (default `agentgateway-proxy`)
 - Presets: OpenAI, Claude, Grok (OpenAI-compat), Bedrock, Gemini,
-  failover groups + health policy, HTTPRoute add-on, Gateway HTTP :80
-- Inventory: list Gateways, HTTPRoutes, and AI backends from the
-  cluster; **Load** fills the form or **Delete** (confirm)
-- Live YAML preview — edit before Apply. No secret values.
+  HTTPRoute add-on, Gateway HTTP :80
+- **Model failover** — same provider, primary model + fallback model(s),
+  `secretRef`, parent Gateway. Emits `spec.ai.groups` priority groups
+  (one model per group) plus the required health
+  `EnterpriseAgentgatewayPolicy` (`unhealthyCondition` default
+  `response.code >= 500 || response.code == 429`; eviction duration and
+  `consecutiveFailures` are editable). Without that policy, failover
+  does not occur
+- **Provider failover** — primary provider+model+secretRef and fallback
+  provider+model+secretRef on one backend (official 2026.8 multi-provider
+  priority groups, e.g. OpenAI → Claude). Same health policy so 5xx/429
+  evicts the primary group
+- Inventory: list Gateways, HTTPRoutes, AI backends, and
+  `EnterpriseAgentgatewayPolicy` from the cluster; **Load** fills the
+  form or **Delete** (confirm)
+- Live YAML preview — edit before Apply. No secret values. `secretRef`
+  names only.
 
 ### MCP
 

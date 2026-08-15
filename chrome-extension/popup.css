@@ -1379,6 +1379,29 @@ html.demo-stage .seq-wire {
   margin-bottom: 4px;
 }
 
+.builder-subhead {
+  display: block;
+  margin: 14px 0 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.field-grid .field-span {
+  grid-column: 1 / -1;
+}
+
+#llm-policy-hint {
+  margin-top: 6px;
+}
+
+#llm-health-wrap,
+#llm-fallback-provider-wrap {
+  margin-top: 4px;
+}
+
 .deploy {
   margin-top: 4px;
   border: 1px solid var(--border);

@@ -64,13 +64,24 @@
     },
   };
 
+  const HEALTH_DEFAULTS = {
+    unhealthyCondition: "response.code >= 500 || response.code == 429",
+    evictionDuration: "10s",
+    consecutiveFailures: 1,
+  };
+
   const LLM_PRESETS = [
     { id: "openai", label: "OpenAI backend + HTTPRoute", provider: "openai" },
     { id: "claude", label: "Claude backend + HTTPRoute", provider: "claude" },
     { id: "grok", label: "Grok (OpenAI-compat) + HTTPRoute", provider: "grok" },
     { id: "bedrock", label: "Bedrock backend + HTTPRoute", provider: "bedrock" },
     { id: "gemini", label: "Gemini backend + HTTPRoute", provider: "gemini" },
-    { id: "failover", label: "Failover backend (primary + fallback)" },
+    { id: "model-failover", label: "Model failover (same provider)", group: "Policies" },
+    {
+      id: "provider-failover",
+      label: "Provider failover (OpenAI → Claude / Grok)",
+      group: "Policies",
+    },
     { id: "httproute", label: "HTTPRoute add-on only" },
     { id: "gateway", label: "Gateway (HTTP :80)" },
   ];
@@ -361,6 +372,31 @@
     };
   }
 
+  function isFailoverPreset(preset) {
+    return (
+      preset === "failover" ||
+      preset === "model-failover" ||
+      preset === "provider-failover"
+    );
+  }
+
+  function normalizeFailoverPreset(preset, providerFailover) {
+    if (preset === "provider-failover" || providerFailover) {
+      return "provider-failover";
+    }
+    if (preset === "failover" || preset === "model-failover") {
+      return "model-failover";
+    }
+    return preset;
+  }
+
+  function parseModelList(raw) {
+    return String(raw || "")
+      .split(/[,;\n]+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
   function llmHeader(fields) {
     const docs =
       fields.provider === "claude"
@@ -372,66 +408,94 @@
             : fields.provider === "gemini"
               ? "https://docs.solo.io/agentgateway/latest/llm/providers/google/"
               : "https://docs.solo.io/agentgateway/latest/llm/providers/openai/";
-    const extra = fields.failover
-      ? "# Failover groups: https://docs.solo.io/agentgateway/latest/llm/failover/\n"
+    const extra = isFailoverPreset(fields.preset) || fields.failover
+      ? "# Failover groups: https://docs.solo.io/agentgateway/latest/llm/failover/\n# Health policy is required — without it, backends are not evicted and failover does not occur.\n"
       : "";
     return `# Docs: ${docs}\n# secretRef name only — create the Secret in the cluster first.\n${extra}`;
   }
 
+  function llmGroupProvider(fields, { name, model }) {
+    const local = { ...fields, model, failover: true };
+    const block = {
+      name,
+      ...llmProviderBlock(local),
+    };
+    const policies = {};
+    const auth = llmAuth(local.provider, String(local.secretRef || "").trim());
+    if (auth) {
+      policies.auth = auth;
+    }
+    const host = String(local.host || "").trim();
+    if (host) {
+      policies.tls = { sni: host };
+    }
+    if (Object.keys(policies).length) {
+      block.policies = policies;
+    }
+    return block;
+  }
+
+  function fallbackProviderFields(fields) {
+    const provider = String(fields.fallbackProvider || "").trim() || "claude";
+    const defaults = llmDefaults(provider);
+    return {
+      ...defaults,
+      provider,
+      model: String(fields.fallbackModel || "").trim() || defaults.model,
+      secretRef:
+        String(fields.fallbackSecretRef || "").trim() || defaults.secretRef,
+      namespace: fields.namespace,
+      gateway: fields.gateway,
+    };
+  }
+
   function llmBackendDoc(fields) {
-    const name = cleanName(fields.name, "openai");
+    const failover = isFailoverPreset(fields.preset) || fields.failover;
+    const name = cleanName(
+      fields.name,
+      failover
+        ? normalizeFailoverPreset(fields.preset, fields.preset === "provider-failover")
+        : "openai"
+    );
     const namespace = cleanNs(fields.namespace);
     const spec = {};
-    if (fields.failover) {
-      const fallback = String(fields.fallbackModel || "").trim();
-      const primaryFields = { ...fields, failover: false };
-      const fallbackFields = { ...fields, model: fallback, failover: false };
-      const primary = {
-        name: `${name}-primary`,
-        ...llmProviderBlock(primaryFields),
-      };
-      const primaryAuth = llmAuth(
-        fields.provider,
-        String(fields.secretRef || "").trim()
-      );
-      if (primaryAuth) {
-        primary.policies = { auth: primaryAuth };
+    if (failover) {
+      const primaryFields = { ...fields, failover: true };
+      const primary = llmGroupProvider(primaryFields, {
+        name: `${primaryFields.provider || "openai"}-primary`,
+        model: fields.model,
+      });
+      const groups = [{ providers: [primary] }];
+      if (normalizeFailoverPreset(fields.preset) === "provider-failover") {
+        const fallbackFields = fallbackProviderFields(fields);
+        groups.push({
+          providers: [
+            llmGroupProvider(fallbackFields, {
+              name: `${fallbackFields.provider}-fallback`,
+              model: fallbackFields.model,
+            }),
+          ],
+        });
+      } else {
+        const fallbacks = parseModelList(fields.fallbackModel);
+        const models = fallbacks.length
+          ? fallbacks
+          : [String(fields.fallbackModel || "").trim() || "gpt-4o"];
+        models.forEach((model, index) => {
+          groups.push({
+            providers: [
+              llmGroupProvider(primaryFields, {
+                name:
+                  index === 0
+                    ? `${primaryFields.provider || "openai"}-fallback`
+                    : `${primaryFields.provider || "openai"}-fallback-${index + 1}`,
+                model,
+              }),
+            ],
+          });
+        });
       }
-      if (String(fields.host || "").trim()) {
-        primary.policies = primary.policies || {};
-        primary.policies.tls = { sni: String(fields.host).trim() };
-        if (String(fields.host || "").trim()) {
-          primary.host = String(fields.host).trim();
-          const port = Number(fields.port);
-          primary.port = Number.isFinite(port) && port > 0 ? port : 443;
-          if (String(fields.providerPath || "").trim()) {
-            primary.path = String(fields.providerPath).trim();
-          }
-        }
-      }
-      const fallbackProv = {
-        name: `${name}-fallback`,
-        ...llmProviderBlock(fallbackFields),
-      };
-      if (primaryAuth) {
-        fallbackProv.policies = { auth: primaryAuth };
-      }
-      if (String(fields.host || "").trim()) {
-        fallbackProv.policies = fallbackProv.policies || {};
-        fallbackProv.policies.tls = { sni: String(fields.host).trim() };
-        fallbackProv.host = String(fields.host).trim();
-        const port = Number(fields.port);
-        fallbackProv.port = Number.isFinite(port) && port > 0 ? port : 443;
-        if (String(fields.providerPath || "").trim()) {
-          fallbackProv.path = String(fields.providerPath).trim();
-        }
-      }
-      spec.ai = {
-        groups: [
-          { providers: [primary] },
-          { providers: [fallbackProv] },
-        ],
-      };
+      spec.ai = { groups };
     } else {
       spec.ai = { provider: llmProviderBlock(fields) };
       const policies = llmPolicies(fields);
@@ -448,8 +512,21 @@
   }
 
   function healthPolicyDoc(fields) {
-    const name = cleanName(fields.name, "openai");
+    const failover = isFailoverPreset(fields.preset) || fields.failover;
+    const name = cleanName(
+      fields.name,
+      failover
+        ? normalizeFailoverPreset(fields.preset, fields.preset === "provider-failover")
+        : "openai"
+    );
     const namespace = cleanNs(fields.namespace);
+    const condition =
+      String(fields.unhealthyCondition || "").trim() ||
+      HEALTH_DEFAULTS.unhealthyCondition;
+    const duration =
+      String(fields.evictionDuration || "").trim() ||
+      HEALTH_DEFAULTS.evictionDuration;
+    const failures = Number(fields.consecutiveFailures);
     return {
       apiVersion: AGW_API,
       kind: KIND_POLICY,
@@ -464,8 +541,14 @@
         ],
         backend: {
           health: {
-            unhealthyCondition: "response.code >= 500 || response.code == 429",
-            eviction: { duration: "10s", consecutiveFailures: 1 },
+            unhealthyCondition: condition,
+            eviction: {
+              duration,
+              consecutiveFailures:
+                Number.isFinite(failures) && failures > 0
+                  ? Math.floor(failures)
+                  : HEALTH_DEFAULTS.consecutiveFailures,
+            },
           },
         },
       },
@@ -495,7 +578,7 @@
       );
     }
     const docs = [llmBackendDoc(fields), httpRouteDoc(fields)];
-    if (fields.failover) {
+    if (isFailoverPreset(fields.preset) || fields.failover) {
       docs.push(healthPolicyDoc(fields));
     }
     return joinDocs(docs, llmHeader(fields));
@@ -593,6 +676,8 @@
 
   function llmDefaults(provider) {
     const spec = LLM_DEFAULTS[provider] || LLM_DEFAULTS.openai;
+    const fallbackProvider = provider === "openai" ? "claude" : "openai";
+    const fallbackSpec = LLM_DEFAULTS[fallbackProvider] || LLM_DEFAULTS.claude;
     return {
       provider: LLM_DEFAULTS[provider] ? provider : "openai",
       gateway: DEFAULT_GATEWAY,
@@ -603,6 +688,9 @@
       providerPath: "",
       region: "",
       rewriteTo: "",
+      fallbackProvider,
+      fallbackSecretRef: fallbackSpec.secretRef,
+      ...HEALTH_DEFAULTS,
       ...spec,
     };
   }
@@ -628,36 +716,58 @@
     return cur;
   }
 
+  function detectProviderFromBlock(block) {
+    if (!block || typeof block !== "object") {
+      return "openai";
+    }
+    if (block.bedrock) {
+      return "bedrock";
+    }
+    if (block.anthropic) {
+      return "claude";
+    }
+    if (block.gemini) {
+      return "gemini";
+    }
+    if (block.host) {
+      return "grok";
+    }
+    if (block.openai) {
+      return "openai";
+    }
+    return "openai";
+  }
+
   function detectLlmProvider(spec) {
     const provider = pick(spec, ["ai", "provider"]) || {};
     const firstGroup = pick(spec, ["ai", "groups", 0, "providers", 0]) || {};
     const src = provider.openai || provider.anthropic || provider.bedrock || provider.gemini
       ? provider
       : firstGroup;
-    if (src.bedrock) {
-      return "bedrock";
-    }
-    if (src.anthropic) {
-      return "claude";
-    }
-    if (src.gemini) {
-      return "gemini";
-    }
-    if (src.host || firstGroup.host) {
-      return "grok";
-    }
-    if (src.openai || provider.openai) {
-      return "openai";
-    }
-    return "openai";
+    return detectProviderFromBlock(src);
+  }
+
+  function groupsAreProviderFailover(spec) {
+    const groups = pick(spec, ["ai", "groups"]) || [];
+    const providers = groups
+      .map((group) => detectProviderFromBlock((group && group.providers && group.providers[0]) || {}))
+      .filter(Boolean);
+    return providers.length > 1 && providers.some((item) => item !== providers[0]);
+  }
+
+  function secretFromProvider(block) {
+    return (
+      pick(block, ["policies", "auth", "secretRef", "name"]) ||
+      pick(block, ["policies", "auth", "aws", "secretRef", "name"]) ||
+      ""
+    );
   }
 
   function secretNameFromSpec(spec) {
     return (
       pick(spec, ["policies", "auth", "secretRef", "name"]) ||
       pick(spec, ["policies", "auth", "aws", "secretRef", "name"]) ||
-      pick(spec, ["ai", "groups", 0, "providers", 0, "policies", "auth", "secretRef", "name"]) ||
-      pick(spec, ["ai", "groups", 0, "providers", 0, "policies", "auth", "aws", "secretRef", "name"]) ||
+      secretFromProvider(pick(spec, ["ai", "groups", 0, "providers", 0]) || {}) ||
       ""
     );
   }
@@ -681,11 +791,32 @@
     return "";
   }
 
-  function fieldsFromLlmResource(item, route) {
+  function fieldsFromHealthPolicy(item) {
+    const health = pick(item, ["spec", "backend", "health"]) || {};
+    const eviction = health.eviction || {};
+    return {
+      unhealthyCondition:
+        health.unhealthyCondition || HEALTH_DEFAULTS.unhealthyCondition,
+      evictionDuration: eviction.duration || HEALTH_DEFAULTS.evictionDuration,
+      consecutiveFailures:
+        eviction.consecutiveFailures != null
+          ? eviction.consecutiveFailures
+          : HEALTH_DEFAULTS.consecutiveFailures,
+      policyName: pick(item, ["metadata", "name"]) || "",
+      targetBackend: pick(item, ["spec", "targetRefs", 0, "name"]) || "",
+    };
+  }
+
+  function isHealthPolicy(item) {
+    return Boolean(pick(item, ["spec", "backend", "health"]));
+  }
+
+  function fieldsFromLlmResource(item, route, policy) {
     const spec = (item && item.spec) || {};
     const provider = detectLlmProvider(spec);
     const defaults = llmDefaults(provider);
     const providerBlock = pick(spec, ["ai", "provider"]) || {};
+    const groups = pick(spec, ["ai", "groups"]) || [];
     const primary = pick(spec, ["ai", "groups", 0, "providers", 0]) || {};
     const fallback = pick(spec, ["ai", "groups", 1, "providers", 0]) || {};
     const src = providerBlock.openai || providerBlock.anthropic || providerBlock.bedrock || providerBlock.gemini
@@ -702,13 +833,26 @@
       "path",
       "replacePrefixMatch",
     ]);
+    const providerFailover = groupsAreProviderFailover(spec);
+    const failover = Boolean(groups.length);
+    const fallbackModels = groups
+      .slice(1)
+      .map((group) => modelFromProvider((group && group.providers && group.providers[0]) || {}))
+      .filter(Boolean);
+    const health = policy ? fieldsFromHealthPolicy(policy) : {};
     return {
       ...defaults,
       name: pick(item, ["metadata", "name"]) || defaults.name,
       namespace: pick(item, ["metadata", "namespace"]) || defaults.namespace,
       provider,
       model: modelFromProvider(src) || defaults.model,
-      fallbackModel: modelFromProvider(fallback) || defaults.fallbackModel,
+      fallbackModel: fallbackModels.join(", ") || modelFromProvider(fallback) || defaults.fallbackModel,
+      fallbackProvider: providerFailover
+        ? detectProviderFromBlock(fallback)
+        : defaults.fallbackProvider,
+      fallbackSecretRef: providerFailover
+        ? secretFromProvider(fallback) || defaults.fallbackSecretRef
+        : defaults.fallbackSecretRef,
       secretRef: secretNameFromSpec(spec) || defaults.secretRef,
       routePath: match || defaults.routePath,
       rewriteTo: rewrite || "",
@@ -718,8 +862,19 @@
       port: src.port != null ? String(src.port) : defaults.port || "",
       providerPath: src.path || primary.path || defaults.providerPath || "",
       region: pick(src, ["bedrock", "region"]) || defaults.region || "",
-      failover: Boolean(pick(spec, ["ai", "groups"])),
-      preset: pick(spec, ["ai", "groups"]) ? "failover" : provider,
+      failover,
+      preset: failover
+        ? providerFailover
+          ? "provider-failover"
+          : "model-failover"
+        : provider,
+      unhealthyCondition:
+        health.unhealthyCondition || defaults.unhealthyCondition,
+      evictionDuration: health.evictionDuration || defaults.evictionDuration,
+      consecutiveFailures:
+        health.consecutiveFailures != null
+          ? health.consecutiveFailures
+          : defaults.consecutiveFailures,
     };
   }
 
@@ -827,10 +982,16 @@
     KIND_POLICY,
     LLM_PRESETS,
     MCP_PRESETS,
+    HEALTH_DEFAULTS,
     llmDefaults,
     mcpDefaults,
     generateLlmYaml,
     generateMcpYaml,
+    isFailoverPreset,
+    normalizeFailoverPreset,
+    parseModelList,
+    fieldsFromHealthPolicy,
+    isHealthPolicy,
     generateGatewayYaml(fields) {
       return generateLlmYaml({ ...fields, preset: "gateway" });
     },

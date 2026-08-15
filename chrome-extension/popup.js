@@ -40,6 +40,13 @@ const STORAGE_KEYS = [
   "llmPort",
   "llmProviderPath",
   "llmRegion",
+  "llmFallbackProvider",
+  "llmFallbackSecret",
+  "llmUnhealthyCondition",
+  "llmEvictionDuration",
+  "llmConsecutiveFailures",
+  "failoverPrimaryProvider",
+  "failoverFallbackProvider",
   "mcpPreset",
   "mcpName",
   "mcpBuilderNamespace",
@@ -260,6 +267,15 @@ const els = {
   llmProviderPath: document.getElementById("llm-provider-path"),
   llmRegionWrap: document.getElementById("llm-region-wrap"),
   llmRegion: document.getElementById("llm-region"),
+  llmPolicyHint: document.getElementById("llm-policy-hint"),
+  llmModelLabel: document.getElementById("llm-model-label"),
+  llmFallbackProviderWrap: document.getElementById("llm-fallback-provider-wrap"),
+  llmFallbackProvider: document.getElementById("llm-fallback-provider"),
+  llmFallbackSecret: document.getElementById("llm-fallback-secret"),
+  llmHealthWrap: document.getElementById("llm-health-wrap"),
+  llmUnhealthy: document.getElementById("llm-unhealthy"),
+  llmEviction: document.getElementById("llm-eviction"),
+  llmFailures: document.getElementById("llm-failures"),
   llmRegen: document.getElementById("llm-regen"),
   llmInvRefresh: document.getElementById("llm-inv-refresh"),
   llmInventory: document.getElementById("llm-inventory"),
@@ -488,43 +504,64 @@ function currentProvider() {
   return PROVIDERS[raw] ? raw : providerFromModel(els.model.value);
 }
 
-function setProviderSelects(id) {
+function setProviderSelect(root, id) {
+  if (!root) {
+    return;
+  }
   const spec = providerSpec(id);
-  document.querySelectorAll(".provider-switch").forEach((root) => {
-    root.querySelectorAll(".provider-pill").forEach((btn) => {
-      const on = btn.dataset.provider === spec.id;
-      btn.classList.toggle("is-active", on);
-      btn.setAttribute("aria-checked", on ? "true" : "false");
-    });
+  root.querySelectorAll(".provider-pill").forEach((btn) => {
+    const on = btn.dataset.provider === spec.id;
+    btn.classList.toggle("is-active", on);
+    btn.setAttribute("aria-checked", on ? "true" : "false");
   });
 }
 
-function buildProviderSwitches(selected) {
-  const spec = providerSpec(selected);
-  document.querySelectorAll(".provider-switch").forEach((root) => {
-    root.replaceChildren();
-    for (const item of Object.values(PROVIDERS)) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "provider-pill";
-      btn.dataset.provider = item.id;
-      btn.setAttribute("role", "radio");
-      btn.setAttribute("aria-checked", item.id === spec.id ? "true" : "false");
-      if (item.id === spec.id) {
-        btn.classList.add("is-active");
-      }
-      const img = document.createElement("img");
-      img.src = SEQ_ICONS[item.id] || SEQ_ICONS.openai;
-      img.alt = "";
-      const name = document.createElement("span");
-      name.textContent = item.label;
-      btn.append(img, name);
-      btn.addEventListener("click", () => {
-        onProviderChange(item.id);
-      });
-      root.append(btn);
-    }
+function setProviderSelects(id) {
+  document.querySelectorAll(".provider-switch:not([data-scope])").forEach((root) => {
+    setProviderSelect(root, id);
   });
+}
+
+function fillProviderSwitch(root, selected, onPick) {
+  if (!root) {
+    return;
+  }
+  const spec = providerSpec(selected);
+  root.replaceChildren();
+  for (const item of Object.values(PROVIDERS)) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "provider-pill";
+    btn.dataset.provider = item.id;
+    btn.setAttribute("role", "radio");
+    btn.setAttribute("aria-checked", item.id === spec.id ? "true" : "false");
+    if (item.id === spec.id) {
+      btn.classList.add("is-active");
+    }
+    const img = document.createElement("img");
+    img.src = SEQ_ICONS[item.id] || SEQ_ICONS.openai;
+    img.alt = "";
+    const name = document.createElement("span");
+    name.textContent = item.label;
+    btn.append(img, name);
+    btn.addEventListener("click", () => {
+      onPick(item.id);
+    });
+    root.append(btn);
+  }
+}
+
+function buildProviderSwitches(selected) {
+  document.querySelectorAll(".provider-switch:not([data-scope])").forEach((root) => {
+    const handler =
+      root.id === "llm-builder-provider" ? onBuilderProviderChange : onProviderChange;
+    fillProviderSwitch(root, selected, handler);
+  });
+  fillProviderSwitch(
+    els.llmFallbackProvider,
+    "claude",
+    onFallbackProviderChange
+  );
 }
 
 function providerDeployOptions(id) {
@@ -1160,9 +1197,21 @@ function httpSeqConfig() {
   return { viaGateway, target: "API", targetKind: "api" };
 }
 
+const appliedFailoverProviders = { primary: "", fallback: "" };
+
 function failoverSeqConfig() {
-  const primaryKind = providerFromModel(els.primaryModel.value);
-  const fallbackKind = providerFromModel(els.fallbackModel.value);
+  const fields = els.llmPreset ? currentLlmBuilderFields() : {};
+  const failover = AgwBuilder.isFailoverPreset(fields.preset);
+  const primaryKind = failover
+    ? fields.provider
+    : appliedFailoverProviders.primary ||
+      providerFromModel(els.primaryModel.value);
+  const fallbackKind = failover
+    ? fields.preset === "provider-failover"
+      ? fields.fallbackProvider
+      : fields.provider
+    : appliedFailoverProviders.fallback ||
+      providerFromModel(els.fallbackModel.value);
   return {
     viaGateway: true,
     target: providerLabel(primaryKind),
@@ -1171,6 +1220,39 @@ function failoverSeqConfig() {
     fallbackKind,
     fallbackTarget: providerLabel(fallbackKind),
   };
+}
+
+function firstFallbackModel(raw, fallback) {
+  const listed = AgwBuilder.parseModelList(raw);
+  return listed[0] || fallback;
+}
+
+function syncFailoverTestFromBuilder() {
+  if (!els.primaryModel || !els.llmPreset) {
+    return;
+  }
+  const fields = currentLlmBuilderFields();
+  if (!AgwBuilder.isFailoverPreset(fields.preset)) {
+    return;
+  }
+  const fallbackModel =
+    fields.preset === "provider-failover"
+      ? fields.fallbackModel
+      : firstFallbackModel(fields.fallbackModel, fields.fallbackModel);
+  els.primaryModel.value = fields.model || els.primaryModel.value;
+  els.fallbackModel.value = fallbackModel || els.fallbackModel.value;
+  appliedFailoverProviders.primary = fields.provider;
+  appliedFailoverProviders.fallback =
+    fields.preset === "provider-failover"
+      ? fields.fallbackProvider
+      : fields.provider;
+  persist({
+    primaryModel: els.primaryModel.value,
+    fallbackModel: els.fallbackModel.value,
+    failoverPrimaryProvider: appliedFailoverProviders.primary,
+    failoverFallbackProvider: appliedFailoverProviders.fallback,
+  });
+  refreshSeqDiagrams();
 }
 
 function refreshSeqDiagrams() {
@@ -1859,6 +1941,42 @@ function onProviderChange(id) {
   applyProvider(id, { setModels: true, loadYaml: true });
 }
 
+function onBuilderProviderChange(id) {
+  const preset = (els.llmPreset && els.llmPreset.value) || "";
+  if (AgwBuilder.isFailoverPreset(preset)) {
+    setProviderSelect(els.llmBuilderProvider, id);
+    const defaults = AgwBuilder.llmDefaults(id);
+    els.llmBuilderModel.value = defaults.model;
+    if (preset !== "provider-failover") {
+      els.llmBuilderFallback.value = defaults.fallbackModel;
+    }
+    els.llmSecret.value = defaults.secretRef;
+    els.llmHost.value = defaults.host || "";
+    els.llmPort.value = defaults.port || "";
+    els.llmProviderPath.value = defaults.providerPath || "";
+    els.llmRegion.value = defaults.region || "";
+    updateLlmBuilderVisibility();
+    regenLlmYaml();
+    syncFailoverTestFromBuilder();
+    return;
+  }
+  onProviderChange(id);
+}
+
+function onFallbackProviderChange(id) {
+  setProviderSelect(els.llmFallbackProvider, id);
+  const defaults = AgwBuilder.llmDefaults(id);
+  if (els.llmBuilderFallback) {
+    els.llmBuilderFallback.value = defaults.model;
+  }
+  if (els.llmFallbackSecret) {
+    els.llmFallbackSecret.value = defaults.secretRef;
+  }
+  updateLlmBuilderVisibility();
+  regenLlmYaml();
+  syncFailoverTestFromBuilder();
+}
+
 els.endpoint.addEventListener("change", () => {
   saveChatSettings();
 });
@@ -2264,7 +2382,7 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.9.3" },
+      clientInfo: { name: "agentgateway-extension", version: "0.9.4" },
     },
   };
 
@@ -2568,14 +2686,39 @@ function fillPresetSelect(select, presets, selected) {
     return;
   }
   select.replaceChildren();
+  const ungrouped = [];
+  const groups = new Map();
   for (const preset of presets) {
+    if (preset.group) {
+      if (!groups.has(preset.group)) {
+        groups.set(preset.group, []);
+      }
+      groups.get(preset.group).push(preset);
+    } else {
+      ungrouped.push(preset);
+    }
+  }
+  const addOption = (parent, preset) => {
     const option = document.createElement("option");
     option.value = preset.id;
     option.textContent = preset.label;
-    select.append(option);
+    parent.append(option);
+  };
+  for (const preset of ungrouped) {
+    addOption(select, preset);
   }
-  const valid = presets.some((preset) => preset.id === selected);
-  select.value = valid ? selected : presets[0].id;
+  for (const [label, items] of groups) {
+    const group = document.createElement("optgroup");
+    group.label = label;
+    for (const preset of items) {
+      addOption(group, preset);
+    }
+    select.append(group);
+  }
+  const mapped =
+    selected === "failover" ? "model-failover" : selected;
+  const valid = presets.some((preset) => preset.id === mapped);
+  select.value = valid ? mapped : presets[0].id;
 }
 
 function currentBuilderProvider() {
@@ -2584,6 +2727,14 @@ function currentBuilderProvider() {
     els.llmBuilderProvider.querySelector(".provider-pill.is-active");
   const raw = (active && active.dataset.provider) || "";
   return PROVIDERS[raw] ? raw : currentProvider();
+}
+
+function currentFallbackProvider() {
+  const active =
+    els.llmFallbackProvider &&
+    els.llmFallbackProvider.querySelector(".provider-pill.is-active");
+  const raw = (active && active.dataset.provider) || "";
+  return PROVIDERS[raw] ? raw : "claude";
 }
 
 function fillLlmBuilder(fields) {
@@ -2601,10 +2752,35 @@ function fillLlmBuilder(fields) {
   els.llmPort.value = fields.port || "";
   els.llmProviderPath.value = fields.providerPath || "";
   els.llmRegion.value = fields.region || "";
+  if (els.llmFallbackSecret) {
+    els.llmFallbackSecret.value = fields.fallbackSecretRef || "";
+  }
+  if (els.llmUnhealthy) {
+    els.llmUnhealthy.value =
+      fields.unhealthyCondition || AgwBuilder.HEALTH_DEFAULTS.unhealthyCondition;
+  }
+  if (els.llmEviction) {
+    els.llmEviction.value =
+      fields.evictionDuration || AgwBuilder.HEALTH_DEFAULTS.evictionDuration;
+  }
+  if (els.llmFailures) {
+    els.llmFailures.value =
+      fields.consecutiveFailures != null
+        ? fields.consecutiveFailures
+        : AgwBuilder.HEALTH_DEFAULTS.consecutiveFailures;
+  }
+  if (fields.provider && els.llmBuilderProvider) {
+    setProviderSelect(els.llmBuilderProvider, fields.provider);
+  }
+  if (fields.fallbackProvider && els.llmFallbackProvider) {
+    setProviderSelect(els.llmFallbackProvider, fields.fallbackProvider);
+  }
   if (fields.preset && els.llmPreset) {
-    const known = AgwBuilder.LLM_PRESETS.some((preset) => preset.id === fields.preset);
+    const mapped =
+      fields.preset === "failover" ? "model-failover" : fields.preset;
+    const known = AgwBuilder.LLM_PRESETS.some((preset) => preset.id === mapped);
     if (known) {
-      els.llmPreset.value = fields.preset;
+      els.llmPreset.value = mapped;
     }
   }
 }
@@ -2612,14 +2788,17 @@ function fillLlmBuilder(fields) {
 function currentLlmBuilderFields() {
   const provider = currentBuilderProvider();
   const preset = (els.llmPreset && els.llmPreset.value) || provider;
+  const failover = AgwBuilder.isFailoverPreset(preset);
   return {
     provider,
     preset,
-    failover: preset === "failover",
+    failover,
     name: els.llmName.value,
     namespace: els.llmNamespace.value || clusterNamespaceOrDefault(),
     model: els.llmBuilderModel.value,
     fallbackModel: els.llmBuilderFallback.value,
+    fallbackProvider: currentFallbackProvider(),
+    fallbackSecretRef: els.llmFallbackSecret ? els.llmFallbackSecret.value : "",
     secretRef: els.llmSecret.value,
     routePath: els.llmPath.value,
     gateway: els.llmGateway.value || AgwBuilder.DEFAULT_GATEWAY,
@@ -2627,6 +2806,9 @@ function currentLlmBuilderFields() {
     port: els.llmPort.value,
     providerPath: els.llmProviderPath.value,
     region: els.llmRegion.value,
+    unhealthyCondition: els.llmUnhealthy ? els.llmUnhealthy.value : "",
+    evictionDuration: els.llmEviction ? els.llmEviction.value : "",
+    consecutiveFailures: els.llmFailures ? els.llmFailures.value : "",
     rewriteTo: preset === "httproute" ? "/v1/chat/completions" : "",
   };
 }
@@ -2637,9 +2819,35 @@ function updateLlmBuilderVisibility() {
   }
   const provider = currentBuilderProvider();
   const preset = (els.llmPreset && els.llmPreset.value) || provider;
+  const failover = AgwBuilder.isFailoverPreset(preset);
+  const providerFailover = preset === "provider-failover";
   const compat = provider === "grok" && preset !== "gateway";
   const bedrock = provider === "bedrock" && preset !== "gateway";
-  els.llmFallbackWrap.hidden = preset !== "failover";
+  els.llmFallbackWrap.hidden = !failover;
+  const fallbackLabel = document.querySelector('label[for="llm-fallback"]');
+  if (fallbackLabel) {
+    fallbackLabel.textContent = providerFailover
+      ? "Fallback model"
+      : "Fallback model(s)";
+  }
+  if (els.llmFallbackProviderWrap) {
+    els.llmFallbackProviderWrap.hidden = !providerFailover;
+  }
+  if (els.llmHealthWrap) {
+    els.llmHealthWrap.hidden = !failover;
+  }
+  if (els.llmPolicyHint) {
+    els.llmPolicyHint.hidden = !failover;
+  }
+  if (els.llmModelLabel) {
+    els.llmModelLabel.textContent = failover ? "Primary model" : "Model";
+  }
+  if (els.llmBuilderProvider) {
+    const label = document.getElementById("llm-builder-provider-label");
+    if (label) {
+      label.textContent = providerFailover ? "Primary provider" : "Provider";
+    }
+  }
   els.llmHostWrap.hidden = !compat;
   els.llmPortWrap.hidden = !compat;
   els.llmProviderPathWrap.hidden = !compat;
@@ -2660,6 +2868,11 @@ function persistLlmBuilder() {
     llmPort: els.llmPort.value,
     llmProviderPath: els.llmProviderPath.value,
     llmRegion: els.llmRegion.value,
+    llmFallbackProvider: currentFallbackProvider(),
+    llmFallbackSecret: els.llmFallbackSecret ? els.llmFallbackSecret.value : "",
+    llmUnhealthyCondition: els.llmUnhealthy ? els.llmUnhealthy.value : "",
+    llmEvictionDuration: els.llmEviction ? els.llmEviction.value : "",
+    llmConsecutiveFailures: els.llmFailures ? els.llmFailures.value : "",
     llmYaml: els.llmYaml.value,
   });
 }
@@ -2679,20 +2892,32 @@ function applyLlmProviderDefaults(provider) {
 }
 
 function applyLlmPreset(presetId) {
+  const mapped = presetId === "failover" ? "model-failover" : presetId;
   const preset =
-    AgwBuilder.LLM_PRESETS.find((item) => item.id === presetId) ||
+    AgwBuilder.LLM_PRESETS.find((item) => item.id === mapped) ||
     AgwBuilder.LLM_PRESETS[0];
   els.llmPreset.value = preset.id;
   if (preset.provider) {
     applyProvider(preset.provider, { setModels: true, loadYaml: true });
     return;
   }
-  if (preset.id === "failover") {
-    const fields = AgwBuilder.llmDefaults(currentBuilderProvider());
+  if (AgwBuilder.isFailoverPreset(preset.id)) {
+    const primary = currentBuilderProvider();
+    const fields = AgwBuilder.llmDefaults(primary);
     fields.namespace = clusterNamespaceOrDefault();
     fields.failover = true;
-    fields.preset = "failover";
+    fields.preset = preset.id;
+    fields.name = preset.id;
+    fields.routePath = "/model";
+    if (preset.id === "provider-failover") {
+      const fallbackId = primary === "openai" ? "claude" : "openai";
+      const fallback = AgwBuilder.llmDefaults(fallbackId);
+      fields.fallbackProvider = fallbackId;
+      fields.fallbackModel = fallback.model;
+      fields.fallbackSecretRef = fallback.secretRef;
+    }
     fillLlmBuilder(fields);
+    syncFailoverTestFromBuilder();
   } else if (preset.id === "httproute") {
     const fields = AgwBuilder.llmDefaults(currentBuilderProvider());
     fields.namespace = clusterNamespaceOrDefault();
@@ -2829,9 +3054,23 @@ function loadDeployExamples(stored) {
   llmFields.port = stored.llmPort || llmFields.port;
   llmFields.providerPath = stored.llmProviderPath || llmFields.providerPath;
   llmFields.region = stored.llmRegion || llmFields.region;
+  llmFields.fallbackProvider =
+    stored.llmFallbackProvider || llmFields.fallbackProvider;
+  llmFields.fallbackSecretRef =
+    stored.llmFallbackSecret || llmFields.fallbackSecretRef;
+  llmFields.unhealthyCondition =
+    stored.llmUnhealthyCondition || llmFields.unhealthyCondition;
+  llmFields.evictionDuration =
+    stored.llmEvictionDuration || llmFields.evictionDuration;
+  llmFields.consecutiveFailures =
+    stored.llmConsecutiveFailures || llmFields.consecutiveFailures;
   llmFields.preset = (els.llmPreset && els.llmPreset.value) || provider;
-  llmFields.failover = llmFields.preset === "failover";
+  llmFields.failover = AgwBuilder.isFailoverPreset(llmFields.preset);
   fillLlmBuilder(llmFields);
+  if (stored.failoverPrimaryProvider || stored.failoverFallbackProvider) {
+    appliedFailoverProviders.primary = stored.failoverPrimaryProvider || "";
+    appliedFailoverProviders.fallback = stored.failoverFallbackProvider || "";
+  }
   updateLlmBuilderVisibility();
   els.llmYaml.value =
     stored.llmYaml || AgwBuilder.generateLlmYaml(currentLlmBuilderFields());
@@ -3327,7 +3566,12 @@ function filterInventoryGroups(groups, mode) {
       );
       return { ...group, items };
     })
-    .filter((group) => group.kind !== "EnterpriseAgentgatewayPolicy" || mode === "cluster");
+    .filter((group) => {
+      if (group.kind !== "EnterpriseAgentgatewayPolicy") {
+        return true;
+      }
+      return mode === "cluster" || mode === "llm";
+    });
 }
 
 async function refreshInventory(which) {
@@ -3345,7 +3589,14 @@ async function refreshInventory(which) {
   const kinds =
     which === "cluster"
       ? INVENTORY_KINDS
-      : ["Gateway", "HTTPRoute", "EnterpriseAgentgatewayBackend"];
+      : which === "llm"
+        ? [
+            "Gateway",
+            "HTTPRoute",
+            "EnterpriseAgentgatewayBackend",
+            "EnterpriseAgentgatewayPolicy",
+          ]
+        : ["Gateway", "HTTPRoute", "EnterpriseAgentgatewayBackend"];
   const groups = [];
   for (const kind of kinds) {
     groups.push(await listKind(settings, kind));
@@ -3384,8 +3635,65 @@ function backendsFromGroups(groups) {
   return (backendGroup && backendGroup.items) || [];
 }
 
+function policiesFromGroups(groups) {
+  const policyGroup = (groups || []).find(
+    (group) => group.kind === "EnterpriseAgentgatewayPolicy"
+  );
+  return (policyGroup && policyGroup.items) || [];
+}
+
+function matchingHealthPolicy(policies, backendName) {
+  return (policies || []).find((item) => {
+    const refs = (item.spec && item.spec.targetRefs) || [];
+    return refs.some(
+      (ref) =>
+        ref &&
+        ref.kind === "EnterpriseAgentgatewayBackend" &&
+        ref.name === backendName
+    );
+  });
+}
+
 function loadLlmInventoryItem(kind, item, groups) {
   const routes = routesFromGroups(groups);
+  const policies = policiesFromGroups(groups);
+  if (kind === "EnterpriseAgentgatewayPolicy") {
+    if (!AgwBuilder.isHealthPolicy(item)) {
+      els.llmYaml.value = AgwBuilder.resourceToYaml(item);
+      persistLlmBuilder();
+      return;
+    }
+    const health = AgwBuilder.fieldsFromHealthPolicy(item);
+    const backend = backendsFromGroups(groups).find(
+      (entry) =>
+        entry.metadata &&
+        entry.metadata.name === health.targetBackend &&
+        AgwBuilder.isAiBackend(entry)
+    );
+    if (backend) {
+      const route = AgwBuilder.matchingRoute(
+        routes,
+        backend.metadata && backend.metadata.name
+      );
+      const fields = AgwBuilder.fieldsFromLlmResource(backend, route, item);
+      if (PROVIDERS[fields.provider]) {
+        setProviderSelect(els.llmBuilderProvider, fields.provider);
+      }
+      fillLlmBuilder(fields);
+    } else {
+      fillLlmBuilder({
+        ...currentLlmBuilderFields(),
+        ...health,
+        name: health.targetBackend || currentLlmBuilderFields().name,
+        preset: "model-failover",
+        failover: true,
+      });
+    }
+    updateLlmBuilderVisibility();
+    regenLlmYaml();
+    syncFailoverTestFromBuilder();
+    return;
+  }
   if (kind === "Gateway") {
     els.llmGateway.value = (item.metadata && item.metadata.name) || AgwBuilder.DEFAULT_GATEWAY;
     els.llmNamespace.value =
@@ -3404,9 +3712,13 @@ function loadLlmInventoryItem(kind, item, groups) {
         AgwBuilder.isAiBackend(entry)
     );
     if (backend) {
-      const fields = AgwBuilder.fieldsFromLlmResource(backend, item);
+      const policy = matchingHealthPolicy(
+        policies,
+        backend.metadata && backend.metadata.name
+      );
+      const fields = AgwBuilder.fieldsFromLlmResource(backend, item, policy);
       if (PROVIDERS[fields.provider]) {
-        setProviderSelects(fields.provider);
+        setProviderSelect(els.llmBuilderProvider, fields.provider);
       }
       fillLlmBuilder(fields);
     } else {
@@ -3422,13 +3734,17 @@ function loadLlmInventoryItem(kind, item, groups) {
     return;
   }
   const route = AgwBuilder.matchingRoute(routes, item.metadata && item.metadata.name);
-  const fields = AgwBuilder.fieldsFromLlmResource(item, route);
+  const policy = matchingHealthPolicy(policies, item.metadata && item.metadata.name);
+  const fields = AgwBuilder.fieldsFromLlmResource(item, route, policy);
   if (PROVIDERS[fields.provider]) {
-    setProviderSelects(fields.provider);
+    setProviderSelect(els.llmBuilderProvider, fields.provider);
   }
   fillLlmBuilder(fields);
   updateLlmBuilderVisibility();
   regenLlmYaml();
+  if (AgwBuilder.isFailoverPreset(fields.preset)) {
+    syncFailoverTestFromBuilder();
+  }
 }
 
 function loadMcpInventoryItem(kind, item, groups) {
@@ -3716,10 +4032,15 @@ bindBuilderFields(
     "llm-port",
     "llm-provider-path",
     "llm-region",
+    "llm-fallback-secret",
+    "llm-unhealthy",
+    "llm-eviction",
+    "llm-failures",
   ],
   () => {
     updateLlmBuilderVisibility();
     regenLlmYaml();
+    syncFailoverTestFromBuilder();
   }
 );
 els.llmYaml.addEventListener("change", () => {
@@ -3798,6 +4119,7 @@ if (els.mcpInvRefresh) {
 
 els.applyLlm.addEventListener("click", () => {
   applyYamlDocuments(els.llmYaml.value, els.llmApplyResult, els.applyLlm, () => {
+    syncFailoverTestFromBuilder();
     refreshInventory("llm");
   });
 });

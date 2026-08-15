@@ -209,7 +209,10 @@
           <div class="test-head">
             <div class="test-copy">
               <div class="test-name">Model failover</div>
-              <p class="hint">Primary, then fallback if it fails.</p>
+              <p class="hint">
+                Primary, then fallback if it fails. Tiles follow the Build
+                &amp; apply failover providers after you apply a policy.
+              </p>
             </div>
             <button id="run-failover" type="button" class="btn btn-run">
               Run
@@ -374,6 +377,19 @@
             <div id="llm-inventory" class="inventory" hidden></div>
             <label class="field-label" for="llm-preset">Preset</label>
             <select id="llm-preset"></select>
+            <p class="hint" id="llm-policy-hint" hidden>
+              Policies add priority groups on one
+              <code>EnterpriseAgentgatewayBackend</code> plus a required
+              <code>EnterpriseAgentgatewayPolicy</code> health policy. Without
+              the health policy, backends are not evicted and failover does not
+              occur.
+              <a
+                href="https://docs.solo.io/agentgateway/latest/llm/failover/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Failover docs</a
+              >.
+            </p>
             <span class="field-label" id="llm-builder-provider-label">
               Provider
             </span>
@@ -407,7 +423,9 @@
                 />
               </div>
               <div>
-                <label class="field-label" for="llm-model">Model</label>
+                <label class="field-label" for="llm-model" id="llm-model-label">
+                  Model
+                </label>
                 <input
                   id="llm-model"
                   class="builder-field"
@@ -419,7 +437,7 @@
               </div>
               <div id="llm-fallback-wrap" hidden>
                 <label class="field-label" for="llm-fallback">
-                  Fallback model
+                  Fallback model(s)
                 </label>
                 <input
                   id="llm-fallback"
@@ -427,7 +445,7 @@
                   type="text"
                   spellcheck="false"
                   autocomplete="off"
-                  placeholder="gpt-4o"
+                  placeholder="gpt-4o, gpt-3.5-turbo"
                 />
               </div>
               <div>
@@ -512,6 +530,84 @@
                   autocomplete="off"
                   placeholder="us-east-1"
                 />
+              </div>
+            </div>
+            <div id="llm-fallback-provider-wrap" hidden>
+              <span class="builder-subhead">Fallback provider</span>
+              <span class="field-label" id="llm-fallback-provider-label">
+                Fallback provider
+              </span>
+              <div
+                class="provider-switch"
+                id="llm-fallback-provider"
+                data-scope="fallback"
+                role="radiogroup"
+                aria-labelledby="llm-fallback-provider-label"
+              ></div>
+              <div class="field-grid">
+                <div>
+                  <label class="field-label" for="llm-fallback-secret">
+                    Fallback secretRef
+                  </label>
+                  <input
+                    id="llm-fallback-secret"
+                    class="builder-field"
+                    type="text"
+                    spellcheck="false"
+                    autocomplete="off"
+                    placeholder="anthropic-secret"
+                  />
+                </div>
+              </div>
+            </div>
+            <div id="llm-health-wrap" hidden>
+              <span class="builder-subhead">Health policy</span>
+              <p class="hint">
+                Evicts the current priority group on matching responses so
+                traffic moves to the next group.
+              </p>
+              <div class="field-grid">
+                <div class="field-span">
+                  <label class="field-label" for="llm-unhealthy">
+                    unhealthyCondition
+                  </label>
+                  <input
+                    id="llm-unhealthy"
+                    class="builder-field"
+                    type="text"
+                    spellcheck="false"
+                    autocomplete="off"
+                    placeholder="response.code >= 500 || response.code == 429"
+                  />
+                </div>
+                <div>
+                  <label class="field-label" for="llm-eviction">
+                    Eviction duration
+                  </label>
+                  <input
+                    id="llm-eviction"
+                    class="builder-field"
+                    type="text"
+                    spellcheck="false"
+                    autocomplete="off"
+                    placeholder="10s"
+                  />
+                </div>
+                <div>
+                  <label class="field-label" for="llm-failures">
+                    consecutiveFailures
+                  </label>
+                  <input
+                    id="llm-failures"
+                    class="builder-field"
+                    type="number"
+                    min="1"
+                    step="1"
+                    spellcheck="false"
+                    autocomplete="off"
+                    placeholder="1"
+                  />
+                </div>
               </div>
             </div>
             <label class="field-label" for="llm-yaml">YAML preview</label>
