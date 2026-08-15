@@ -1,11 +1,13 @@
 # Agentgateway (Chrome extension)
 
-Manifest V3 popup with **Chat**, **Services**, **Cluster**, and a header
-gear for **Settings**.
-Chat and Services talk to a user-configured Agentgateway. The gateway injects
-backend auth, so those areas do **not** store or send an API key or license
-key. Cluster talks to a Kubernetes API server so you can list and apply
-Agentgateway CRDs from the popup.
+Manifest V3 popup with top-level tabs **Chat**, **LLM**, **MCP**, **A2A**,
+and **API/HTTP**, plus a header gear for **Settings** (Solo UI, Demo,
+Hooray, and Cluster).
+Chat and the test tabs talk to a user-configured Agentgateway. The
+gateway injects backend auth, so those areas do **not** store or send an
+API key or license key. Cluster lives in Settings and talks to a
+Kubernetes API server so you can list and apply Agentgateway CRDs from
+the popup.
 
 The popup is a light console: off-white surfaces (`#F3F5F6`, `#FFFFFF`),
 soft gray borders, a refined teal accent (`#0C7469`), tighter system type,
@@ -23,11 +25,13 @@ The story is **Agent → Agentgateway → any LLM**. Provider pills
 a dropdown that defaults the whole UI to OpenAI. Switching updates the
 right-hand flow icon immediately and fills a default model
 (`gpt-4o-mini`, `claude-sonnet-4-5`, `grok-3`, `amazon.nova-micro-v1:0`,
-`gemini-2.0-flash`). The same control appears on Services → LLM.
-Provider, endpoint, and model are saved in `chrome.storage.local`.
+`gemini-2.0-flash`). Chat keeps endpoint, provider, and model for the
+conversation. The same provider control appears on the **LLM** tab for
+the test cards. Provider, endpoint, and model are saved in
+`chrome.storage.local`.
 
-Chat and each Services test show a compact one-row flow
-(AI Agent tile → Agentgateway mark → provider or MCP/A2A tile). Idle
+Chat and each test card show a compact one-row flow
+(AI Agent tile → Agentgateway mark → provider or MCP/A2A/API tile). Idle
 tiles are icon-only — no permanent path caption. **Test** and each named
 **Run** light tiles in order and add short hop labels as they light:
 **Agent sends** → **Gateway routes** → **{Provider} replies**. When the
@@ -50,14 +54,14 @@ estimate.
 
 The header **Demo** control (also a Settings toggle, persisted in
 `chrome.storage.local`, default **off**) grows the popup to 480×640,
-enlarges Services tiles, slows the arrows, and makes hop labels easier
+enlarges test tiles, slows the arrows, and makes hop labels easier
 to read on a projector. Normal mode stays 448×600.
 
 The header gear opens **Settings**. **Hooray** (default on, stored in
 `chrome.storage.local`) plays a short canvas confetti burst after a
 successful Chat **Test**, LLM Chat ping, Failover (when a model
 succeeds), List/call (both steps ok), an MCP or A2A probe that returns
-HTTP 2xx, a Security probe that finishes as designed, or a Cluster
+HTTP 2xx, an API/HTTP probe that finishes as designed, or a Cluster
 **Test connection** success. Turn it off to skip the burst.
 
 ## Load unpacked
@@ -100,10 +104,10 @@ The chat box uses the same saved endpoint and model for follow-up messages.
 Each send is `POST` with JSON `{ "model": "<chosen model>", "messages": [...] }`.
 No API key is included.
 
-## Services
+## Test tabs
 
-Open **Services**, then choose a subnav: **LLM**, **MCP / A2A**, or
-**Security**. Each page lists tests as their own cards. A card has:
+**LLM**, **MCP**, **A2A**, and **API/HTTP** are top-level tabs. Each page
+lists tests as their own cards. A card has:
 
 - Test name and a one-line description
 - A compact one-row flow for that test
@@ -119,11 +123,11 @@ shows cost per attempt when both responses include usage. **Collapse**
 hides the drawer; run again to reopen it. There is no shared Run control
 at the bottom of the page.
 
-**Deploy config** is a secondary accordion on each service page so
+**Deploy config** is a secondary accordion on each test tab so
 tests stay primary. It loads a prebuilt YAML example you can edit, then
-**Apply**s it with the Cluster tab API server, token, and namespace.
+**Apply**s it with the Settings cluster API server, token, and namespace.
 If the cluster is not connected, the hint and Apply state say
-“Connect a cluster in the Cluster tab first.” No API keys are stored
+“Connect a cluster in Settings first.” No API keys are stored
 or sent. `secretRef` uses a name only.
 
 ### LLM
@@ -161,22 +165,29 @@ Prebuilt deploys (from `manifests/` and
 - Gemini backend + HTTPRoute (`gemini-secret`, `gemini-2.0-flash`)
 - Matching failover and HTTPRoute add-on examples per provider
 
-### MCP / A2A
+### MCP
 
 - **MCP initialize** — JSON-RPC `initialize` (GET fallback). Default
   `http://35.226.209.32/mcp`
+
+Prebuilt deploy is a documented stub: MCP backend + `/mcp` HTTPRoute.
+Hostnames are placeholders from the Solo MCP guide.
+
+### A2A
+
 - **A2A agent-card / health** — GET, or POST `{ "probe": "health" }`.
   Default `http://35.226.209.32/.well-known/agent-card.json`
 
-Prebuilt deploys are documented stubs: MCP backend + `/mcp` HTTPRoute,
-and A2A backend + `/myagent` HTTPRoute. Hostnames are placeholders
-from the Solo MCP / A2A guides.
+Prebuilt deploy is a documented stub: A2A backend + `/myagent` HTTPRoute.
+Hostnames are placeholders from the Solo A2A guide.
 
-### Security
+### API/HTTP
 
-Safe connectivity/policy probes only — no exploit or jailbreak
+Generic HTTP and policy connectivity checks — no exploit or jailbreak
 payloads.
 
+- **HTTP request** — GET or POST the configured chat endpoint (URL
+  override allowed). Any HTTP status counts as a connectivity OK
 - **Unauthenticated request** — tiny chat ping, no extra headers
 - **Junk / policy-probe** — short padded `policy-probe` string
 
@@ -197,13 +208,17 @@ The gear in the header opens **Settings**.
 - **Hooray** — “Confetti on a successful test.” Persisted in
   `chrome.storage.local`; default **on**. One ~1s canvas burst, not a
   loop. Honors `prefers-reduced-motion`.
+- **Cluster** — API server, token, namespace, kubeconfig parse, Test
+  connection, and CRD list/apply. Deploy accordions on the test tabs
+  use these fields.
 
 ## Cluster
 
-Switch to the **Cluster** tab to connect to a Kubernetes API and apply
-Agentgateway CRDs. Manifest V3 `host_permissions` let the extension `fetch`
-the API server directly (browser CORS does not apply). Settings are stored
-only in `chrome.storage.local` — never `sync`. Tokens are not logged.
+Cluster is in **Settings**, not a top-level tab. Connect to a Kubernetes
+API and apply Agentgateway CRDs. Manifest V3 `host_permissions` let the
+extension `fetch` the API server directly (browser CORS does not apply).
+Settings are stored only in `chrome.storage.local` — never `sync`.
+Tokens are not logged.
 
 ### Tokens and exec plugins
 

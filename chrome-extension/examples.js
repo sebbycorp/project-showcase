@@ -1,4 +1,4 @@
-/* Prebuilt Scenario deploys. No secret values — secretRef name only. */
+/* Prebuilt tab deploys (LLM / MCP / A2A / API). No secret values — secretRef name only. */
 const DEPLOY_EXAMPLES = {
   llm: {
     gateway: {
@@ -801,6 +801,8 @@ spec:
           kind: EnterpriseAgentgatewayBackend
 `,
     },
+  },
+  a2a: {
     a2a: {
       label: "A2A backend + HTTPRoute",
       yaml: `# Docs: https://docs.solo.io/agentgateway/latest/agent/a2a/
@@ -843,7 +845,7 @@ spec:
 `,
     },
   },
-  security: {
+  api: {
     policy: {
       label: "Prompt-guard policy (PII stub)",
       yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/guardrails/regex/

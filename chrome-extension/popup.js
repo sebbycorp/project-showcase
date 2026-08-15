@@ -9,7 +9,7 @@ const CHAT_PATH = "/v1/chat/completions";
 const TEST_MESSAGE = { role: "user", content: "Reply with the word pong." };
 const JUNK_PROMPT = `policy-probe ${"x".repeat(1024)}`;
 const BODY_SNIPPET = 400;
-const AREAS = ["chat", "services", "cluster", "settings"];
+const AREAS = ["chat", "llm", "mcp", "a2a", "api", "settings"];
 const STORAGE_KEYS = [
   "endpoint",
   "model",
@@ -18,15 +18,21 @@ const STORAGE_KEYS = [
   "fallbackModel",
   "mcpEndpoint",
   "a2aEndpoint",
+  "httpUrl",
+  "httpMethod",
   "area",
   "scenario",
   "chosenModel",
   "llmExample",
   "mcpExample",
+  "a2aExample",
   "securityExample",
+  "apiExample",
   "llmYaml",
   "mcpYaml",
+  "a2aYaml",
   "securityYaml",
+  "apiYaml",
   "clusterType",
   "clusterApiServer",
   "clusterToken",
@@ -186,9 +192,15 @@ spec:
 
 const els = {
   tabChat: document.getElementById("tab-chat"),
-  tabServices: document.getElementById("tab-services"),
+  tabLlm: document.getElementById("tab-llm"),
+  tabMcp: document.getElementById("tab-mcp"),
+  tabA2a: document.getElementById("tab-a2a"),
+  tabApi: document.getElementById("tab-api"),
   areaChat: document.getElementById("area-chat"),
-  areaServices: document.getElementById("area-services"),
+  areaLlm: document.getElementById("area-llm"),
+  areaMcp: document.getElementById("area-mcp"),
+  areaA2a: document.getElementById("area-a2a"),
+  areaApi: document.getElementById("area-api"),
   endpoint: document.getElementById("endpoint"),
   provider: document.getElementById("provider"),
   llmProvider: document.getElementById("llm-provider"),
@@ -199,12 +211,6 @@ const els = {
   form: document.getElementById("chat-form"),
   message: document.getElementById("message"),
   send: document.getElementById("send"),
-  sectionLlm: document.getElementById("section-llm"),
-  sectionMcp: document.getElementById("section-mcp"),
-  sectionSecurity: document.getElementById("section-security"),
-  serviceLlm: document.getElementById("service-llm"),
-  serviceMcp: document.getElementById("service-mcp"),
-  serviceSecurity: document.getElementById("service-security"),
   primaryModel: document.getElementById("primary-model"),
   fallbackModel: document.getElementById("fallback-model"),
   chosenModel: document.getElementById("chosen-model"),
@@ -224,18 +230,26 @@ const els = {
   mcpYaml: document.getElementById("mcp-yaml"),
   applyMcp: document.getElementById("apply-mcp"),
   mcpApplyResult: document.getElementById("mcp-apply-result"),
+  a2aExample: document.getElementById("a2a-example"),
+  a2aYaml: document.getElementById("a2a-yaml"),
+  applyA2a: document.getElementById("apply-a2a"),
+  a2aApplyResult: document.getElementById("a2a-apply-result"),
+  httpMethod: document.getElementById("http-method"),
+  httpUrl: document.getElementById("http-url"),
+  runHttp: document.getElementById("run-http"),
   runUnauth: document.getElementById("run-unauth"),
   runJunk: document.getElementById("run-junk"),
-  securityHint: document.getElementById("security-endpoint-hint"),
-  securityExample: document.getElementById("security-example"),
-  securityYaml: document.getElementById("security-yaml"),
-  applySecurity: document.getElementById("apply-security"),
-  securityApplyResult: document.getElementById("security-apply-result"),
+  apiHint: document.getElementById("api-endpoint-hint"),
+  apiExample: document.getElementById("api-example"),
+  apiYaml: document.getElementById("api-yaml"),
+  applyApi: document.getElementById("apply-api"),
+  apiApplyResult: document.getElementById("api-apply-result"),
   resultChatPing: document.getElementById("result-chat-ping"),
   resultFailover: document.getElementById("result-failover"),
   resultListCall: document.getElementById("result-list-call"),
   resultMcp: document.getElementById("result-mcp"),
   resultA2a: document.getElementById("result-a2a"),
+  resultHttp: document.getElementById("result-http"),
   resultUnauth: document.getElementById("result-unauth"),
   resultJunk: document.getElementById("result-junk"),
   seqChat: document.getElementById("seq-chat"),
@@ -244,10 +258,9 @@ const els = {
   seqListCall: document.getElementById("seq-list-call"),
   seqMcpInit: document.getElementById("seq-mcp-init"),
   seqA2a: document.getElementById("seq-a2a"),
+  seqHttp: document.getElementById("seq-http"),
   seqUnauth: document.getElementById("seq-unauth"),
   seqJunk: document.getElementById("seq-junk"),
-  tabCluster: document.getElementById("tab-cluster"),
-  areaCluster: document.getElementById("area-cluster"),
   clusterType: document.getElementById("cluster-type"),
   clusterHelp: document.getElementById("cluster-help"),
   clusterApiServer: document.getElementById("cluster-api-server"),
@@ -309,27 +322,23 @@ function celebrate() {
   burstConfetti(els.confetti);
 }
 
-const servicePanels = {
-  llm: els.serviceLlm,
-  mcp: els.serviceMcp,
-  security: els.serviceSecurity,
+const AREA_TABS = {
+  chat: els.tabChat,
+  llm: els.tabLlm,
+  mcp: els.tabMcp,
+  a2a: els.tabA2a,
+  api: els.tabApi,
+  settings: els.tabSettings,
 };
 
-const sectionTabs = {
-  llm: els.sectionLlm,
-  mcp: els.sectionMcp,
-  security: els.sectionSecurity,
+const AREA_PANELS = {
+  chat: els.areaChat,
+  llm: els.areaLlm,
+  mcp: els.areaMcp,
+  a2a: els.areaA2a,
+  api: els.areaApi,
+  settings: els.areaSettings,
 };
-
-function normalizeScenario(name) {
-  if (name === "mcp" || name === "a2a") {
-    return "mcp";
-  }
-  if (name === "security") {
-    return "security";
-  }
-  return "llm";
-}
 
 const messages = [];
 
@@ -853,7 +862,10 @@ function updateEndpointHints() {
   const endpoint = normalizeEndpoint(els.endpoint.value);
   const text = `Uses chat endpoint ${endpoint}`;
   els.llmHint.textContent = text;
-  els.securityHint.textContent = text;
+  els.apiHint.textContent = text;
+  if (els.httpUrl && !(els.httpUrl.value || "").trim()) {
+    els.httpUrl.value = endpoint;
+  }
   refreshSeqDiagrams();
 }
 
@@ -864,6 +876,7 @@ const seqTokens = {
   "seq-list-call": 0,
   "seq-mcp-init": 0,
   "seq-a2a": 0,
+  "seq-http": 0,
   "seq-unauth": 0,
   "seq-junk": 0,
 };
@@ -877,6 +890,7 @@ const SEQ_ICONS = {
   mcp: "icons/mcp.svg",
   a2a: "icons/a2a.svg",
   security: "icons/policy.svg",
+  api: "icons/policy.svg",
 };
 
 const SEQ_LABELS = {
@@ -888,6 +902,7 @@ const SEQ_LABELS = {
   mcp: "MCP",
   a2a: "A2A",
   security: "Policy",
+  api: "API",
 };
 
 function providerFromModel(raw) {
@@ -1077,6 +1092,12 @@ function securitySeqConfig() {
   return { viaGateway: true, target: "Policy", targetKind: "security" };
 }
 
+function httpSeqConfig() {
+  const url = (els.httpUrl.value || "").trim() || els.endpoint.value;
+  const viaGateway = mcpUsesGateway(url, els.endpoint.value);
+  return { viaGateway, target: "API", targetKind: "api" };
+}
+
 function failoverSeqConfig() {
   const primaryKind = providerFromModel(els.primaryModel.value);
   const fallbackKind = providerFromModel(els.fallbackModel.value);
@@ -1097,6 +1118,7 @@ function refreshSeqDiagrams() {
   configureSeq(els.seqListCall, llmSeqConfig(els.chosenModel.value));
   configureSeq(els.seqMcpInit, mcpSeqConfig());
   configureSeq(els.seqA2a, a2aSeqConfig());
+  configureSeq(els.seqHttp, httpSeqConfig());
   configureSeq(els.seqUnauth, securitySeqConfig());
   configureSeq(els.seqJunk, securitySeqConfig());
 }
@@ -1538,9 +1560,24 @@ function card(className, extraClass, metaText, bodyText, extras = []) {
   return wrap;
 }
 
-function normalizeArea(name) {
-  if (name === "scenarios") {
-    return "services";
+function normalizeArea(name, scenario) {
+  if (name === "cluster") {
+    return "settings";
+  }
+  if (name === "services" || name === "scenarios") {
+    if (scenario === "security") {
+      return "api";
+    }
+    if (scenario === "a2a") {
+      return "a2a";
+    }
+    if (scenario === "mcp") {
+      return "mcp";
+    }
+    return "llm";
+  }
+  if (name === "security") {
+    return "api";
   }
   return AREAS.includes(name) ? name : "chat";
 }
@@ -1622,31 +1659,17 @@ function resultDrawer(target, { ok, meta, nodes, result }) {
   setTestDrawer(target, [row, ...extras, ...nodes], state);
 }
 
-function setArea(area) {
-  const selected = normalizeArea(area);
-  els.tabChat.classList.toggle("is-active", selected === "chat");
-  els.tabServices.classList.toggle("is-active", selected === "services");
-  els.tabCluster.classList.toggle("is-active", selected === "cluster");
-  els.tabSettings.classList.toggle("is-active", selected === "settings");
-  els.areaChat.classList.toggle("is-active", selected === "chat");
-  els.areaServices.classList.toggle("is-active", selected === "services");
-  els.areaCluster.classList.toggle("is-active", selected === "cluster");
-  els.areaSettings.classList.toggle("is-active", selected === "settings");
-  els.areaChat.hidden = selected !== "chat";
-  els.areaServices.hidden = selected !== "services";
-  els.areaCluster.hidden = selected !== "cluster";
-  els.areaSettings.hidden = selected !== "settings";
-}
-
-function setScenario(name) {
-  const selected = normalizeScenario(name);
-  for (const [key, panel] of Object.entries(servicePanels)) {
-    const active = key === selected;
+function setArea(area, scenario) {
+  const selected = normalizeArea(area, scenario);
+  for (const [key, tab] of Object.entries(AREA_TABS)) {
+    if (tab) {
+      tab.classList.toggle("is-active", selected === key);
+    }
+  }
+  for (const [key, panel] of Object.entries(AREA_PANELS)) {
+    const active = selected === key;
     panel.classList.toggle("is-active", active);
     panel.hidden = !active;
-    if (sectionTabs[key]) {
-      sectionTabs[key].classList.toggle("is-active", active);
-    }
   }
 }
 
@@ -1665,6 +1688,11 @@ async function loadSettings() {
   els.soloUi.value = stored.soloUi || DEFAULT_SOLO_UI;
   els.mcpEndpoint.value = stored.mcpEndpoint || DEFAULT_MCP_ENDPOINT;
   els.a2aEndpoint.value = stored.a2aEndpoint || DEFAULT_A2A_ENDPOINT;
+  els.httpMethod.value =
+    stored.httpMethod === "POST" || stored.httpMethod === "GET"
+      ? stored.httpMethod
+      : "GET";
+  els.httpUrl.value = stored.httpUrl || stored.endpoint || DEFAULT_ENDPOINT;
   els.clusterType.value = CLUSTER_HELP[stored.clusterType]
     ? stored.clusterType
     : "gke";
@@ -1693,32 +1721,47 @@ async function loadSettings() {
   hoorayOn = stored.hooray !== false;
   els.hooray.checked = hoorayOn;
   setDemoStage(stored.demoStage === true);
-  setArea(normalizeArea(stored.area));
-  setScenario(stored.scenario || "llm");
+  const area = normalizeArea(stored.area, stored.scenario);
+  setArea(area);
+  if (area !== stored.area) {
+    persist({ area });
+  }
   updateEndpointHints();
   updateDeployHints();
 }
 
+function switchArea(area) {
+  setArea(area);
+  if (area !== "chat" && area !== "settings") {
+    updateEndpointHints();
+    updateDeployHints();
+    refreshSeqDiagrams();
+  }
+  persist({ area });
+}
+
 els.tabChat.addEventListener("click", () => {
-  setArea("chat");
-  persist({ area: "chat" });
+  switchArea("chat");
 });
 
-els.tabServices.addEventListener("click", () => {
-  setArea("services");
-  updateEndpointHints();
-  updateDeployHints();
-  persist({ area: "services" });
+els.tabLlm.addEventListener("click", () => {
+  switchArea("llm");
 });
 
-els.tabCluster.addEventListener("click", () => {
-  setArea("cluster");
-  persist({ area: "cluster" });
+els.tabMcp.addEventListener("click", () => {
+  switchArea("mcp");
+});
+
+els.tabA2a.addEventListener("click", () => {
+  switchArea("a2a");
+});
+
+els.tabApi.addEventListener("click", () => {
+  switchArea("api");
 });
 
 els.tabSettings.addEventListener("click", () => {
-  setArea("settings");
-  persist({ area: "settings" });
+  switchArea("settings");
 });
 
 els.hooray.addEventListener("change", () => {
@@ -1741,24 +1784,6 @@ els.soloUi.addEventListener("change", () => {
 function onProviderChange(id) {
   applyProvider(id, { setModels: true, loadYaml: true });
 }
-
-els.sectionLlm.addEventListener("click", () => {
-  setScenario("llm");
-  refreshSeqDiagrams();
-  persist({ scenario: "llm" });
-});
-
-els.sectionMcp.addEventListener("click", () => {
-  setScenario("mcp");
-  refreshSeqDiagrams();
-  persist({ scenario: "mcp" });
-});
-
-els.sectionSecurity.addEventListener("click", () => {
-  setScenario("security");
-  refreshSeqDiagrams();
-  persist({ scenario: "security" });
-});
 
 els.endpoint.addEventListener("change", () => {
   saveChatSettings();
@@ -2165,7 +2190,7 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.9.1" },
+      clientInfo: { name: "agentgateway-extension", version: "0.9.2" },
     },
   };
 
@@ -2341,6 +2366,78 @@ els.runJunk.addEventListener("click", () => {
   );
 });
 
+function currentHttpSettings() {
+  const method = els.httpMethod.value === "POST" ? "POST" : "GET";
+  const url =
+    (els.httpUrl.value || "").trim() ||
+    normalizeEndpoint(els.endpoint.value);
+  els.httpMethod.value = method;
+  els.httpUrl.value = url;
+  return { method, url };
+}
+
+els.httpMethod.addEventListener("change", () => {
+  persist({ httpMethod: currentHttpSettings().method });
+  refreshSeqDiagrams();
+});
+
+els.httpUrl.addEventListener("change", () => {
+  persist({ httpUrl: currentHttpSettings().url });
+  refreshSeqDiagrams();
+});
+
+els.httpUrl.addEventListener("input", () => {
+  refreshSeqDiagrams();
+});
+
+els.runHttp.addEventListener("click", async () => {
+  const { method, url } = currentHttpSettings();
+  await persist({ httpMethod: method, httpUrl: url });
+  els.runHttp.disabled = true;
+  runningDrawer(els.resultHttp, `${method} ${requestPath(url) || url}`);
+  const options =
+    method === "POST"
+      ? {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: "{}",
+        }
+      : {
+          method: "GET",
+          headers: { Accept: "application/json, text/plain, */*" },
+        };
+  const result = await runWithSeq(
+    els.seqHttp,
+    () => timedFetch(url, options),
+    {
+      ...httpSeqConfig(),
+      ok: (detail) => !detail.error && detail.status != null,
+      path: requestPath(url),
+    }
+  );
+  const ok = !result.error && result.status != null;
+  const statusText =
+    result.status == null ? "no response" : `HTTP ${result.status}`;
+  const meta = [`HTTP ${method}`, statusText, `${result.latencyMs} ms`];
+  resultDrawer(els.resultHttp, {
+    ok,
+    meta: meta.join(" · "),
+    result,
+    nodes: [
+      card(
+        "check",
+        ok ? "is-ok" : "is-error",
+        meta.join(" · "),
+        snippet(result.error || result.raw || "(empty body)")
+      ),
+    ],
+  });
+  if (ok) {
+    celebrate();
+  }
+  els.runHttp.disabled = false;
+});
+
 function updateClusterHelp() {
   const type = CLUSTER_HELP[els.clusterType.value] ? els.clusterType.value : "gke";
   els.clusterType.value = type;
@@ -2366,7 +2463,7 @@ function currentClusterSettings() {
   };
 }
 
-const CONNECT_CLUSTER_MSG = "Connect a cluster in the Cluster tab first.";
+const CONNECT_CLUSTER_MSG = "Connect a cluster in Settings first.";
 
 function exampleYaml(section, key) {
   const group = DEPLOY_EXAMPLES[section] || {};
@@ -2383,15 +2480,27 @@ function loadDeployExamples(stored) {
   const mcpKey = DEPLOY_EXAMPLES.mcp[stored.mcpExample]
     ? stored.mcpExample
     : "mcp";
-  const secKey = DEPLOY_EXAMPLES.security[stored.securityExample]
-    ? stored.securityExample
-    : "policy";
+  const a2aStored =
+    stored.a2aExample ||
+    (stored.mcpExample === "a2a" ? "a2a" : "a2a");
+  const a2aKey = DEPLOY_EXAMPLES.a2a[a2aStored] ? a2aStored : "a2a";
+  const apiStored = stored.apiExample || stored.securityExample;
+  const apiKey = DEPLOY_EXAMPLES.api[apiStored] ? apiStored : "policy";
   els.llmExample.value = llmKey;
   els.mcpExample.value = mcpKey;
-  els.securityExample.value = secKey;
+  els.a2aExample.value = a2aKey;
+  els.apiExample.value = apiKey;
   els.llmYaml.value = stored.llmYaml || exampleYaml("llm", llmKey);
-  els.mcpYaml.value = stored.mcpYaml || exampleYaml("mcp", mcpKey);
-  els.securityYaml.value = stored.securityYaml || exampleYaml("security", secKey);
+  els.mcpYaml.value =
+    stored.mcpExample === "a2a"
+      ? exampleYaml("mcp", "mcp")
+      : stored.mcpYaml || exampleYaml("mcp", mcpKey);
+  els.a2aYaml.value =
+    stored.a2aYaml ||
+    (stored.mcpExample === "a2a" ? stored.mcpYaml : "") ||
+    exampleYaml("a2a", a2aKey);
+  els.apiYaml.value =
+    stored.apiYaml || stored.securityYaml || exampleYaml("api", apiKey);
 }
 
 function clusterIsReady() {
@@ -2404,14 +2513,15 @@ function clusterIsReady() {
 function updateDeployHints() {
   const connected = clusterIsReady();
   const text = connected
-    ? "Apply uses the Cluster tab API server, token, and namespace."
+    ? "Apply uses the Settings cluster API server, token, and namespace."
     : CONNECT_CLUSTER_MSG;
   document.querySelectorAll("[data-deploy-hint]").forEach((node) => {
     node.textContent = text;
   });
   els.applyLlm.disabled = !connected;
   els.applyMcp.disabled = !connected;
-  els.applySecurity.disabled = !connected;
+  els.applyA2a.disabled = !connected;
+  els.applyApi.disabled = !connected;
 }
 
 async function applyYamlDocuments(yaml, resultEl, applyBtn) {
@@ -2958,13 +3068,8 @@ function bindExampleSelect(select, textarea, section, storageKey, yamlKey) {
 
 bindExampleSelect(els.llmExample, els.llmYaml, "llm", "llmExample", "llmYaml");
 bindExampleSelect(els.mcpExample, els.mcpYaml, "mcp", "mcpExample", "mcpYaml");
-bindExampleSelect(
-  els.securityExample,
-  els.securityYaml,
-  "security",
-  "securityExample",
-  "securityYaml"
-);
+bindExampleSelect(els.a2aExample, els.a2aYaml, "a2a", "a2aExample", "a2aYaml");
+bindExampleSelect(els.apiExample, els.apiYaml, "api", "apiExample", "apiYaml");
 
 els.applyLlm.addEventListener("click", () => {
   applyYamlDocuments(els.llmYaml.value, els.llmApplyResult, els.applyLlm);
@@ -2974,12 +3079,12 @@ els.applyMcp.addEventListener("click", () => {
   applyYamlDocuments(els.mcpYaml.value, els.mcpApplyResult, els.applyMcp);
 });
 
-els.applySecurity.addEventListener("click", () => {
-  applyYamlDocuments(
-    els.securityYaml.value,
-    els.securityApplyResult,
-    els.applySecurity
-  );
+els.applyA2a.addEventListener("click", () => {
+  applyYamlDocuments(els.a2aYaml.value, els.a2aApplyResult, els.applyA2a);
+});
+
+els.applyApi.addEventListener("click", () => {
+  applyYamlDocuments(els.apiYaml.value, els.apiApplyResult, els.applyApi);
 });
 
 els.loadExample.addEventListener("click", () => {

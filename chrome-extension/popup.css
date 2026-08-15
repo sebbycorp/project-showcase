@@ -160,7 +160,6 @@ body {
 }
 
 .area-tabs button,
-.section-tabs button,
 .settings-btn,
 .demo-btn,
 .btn,
@@ -168,7 +167,9 @@ body {
 #crd-kind,
 #llm-example,
 #mcp-example,
-#security-example {
+#a2a-example,
+#api-example,
+#http-method {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -176,14 +177,15 @@ body {
 
 .area-tabs button {
   flex: 1 1 0;
-  padding: 8px 6px 9px;
+  padding: 8px 4px 9px;
   border: 0;
   border-bottom: 2px solid transparent;
   border-radius: 0;
   background: transparent;
   color: var(--muted);
-  font-size: 13px;
-  letter-spacing: -0.015em;
+  font-size: 12px;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
 }
 
 .area-tabs button:hover {
@@ -240,13 +242,17 @@ body {
 #chosen-model,
 #mcp-endpoint,
 #a2a-endpoint,
+#http-url,
+#http-method,
 #solo-ui,
 #llm-example,
 #mcp-example,
-#security-example,
+#a2a-example,
+#api-example,
 #llm-yaml,
 #mcp-yaml,
-#security-yaml,
+#a2a-yaml,
+#api-yaml,
 #cluster-type,
 #cluster-api-server,
 #cluster-token,
@@ -353,53 +359,19 @@ html.demo-stage .provider-pill img {
   line-height: 1.45;
 }
 
-.section-tabs {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 4px;
-  padding: 10px 16px 0;
-  background: var(--bg);
-}
-
-.section-tabs button {
-  flex: 1 1 0;
-  padding: 7px 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.section-tabs button:hover {
-  color: var(--text);
-  border-color: var(--border-strong);
-}
-
-.section-tabs button.is-active {
-  background: var(--accent-soft);
-  border-color: rgb(12 116 105 / 35%);
-  color: var(--accent);
-}
-
-#area-services {
+#area-llm,
+#area-mcp,
+#area-a2a,
+#area-api {
   overflow: hidden;
   background: var(--bg);
 }
 
-.services-body {
+.area-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding: 12px 16px 16px;
-}
-
-.service {
-  display: none;
-}
-
-.service.is-active {
-  display: block;
 }
 
 .service-intro {
@@ -1215,12 +1187,16 @@ html.demo-stage .seq-wire {
 #chosen-model:focus,
 #mcp-endpoint:focus,
 #a2a-endpoint:focus,
+#http-url:focus,
+#http-method:focus,
 #llm-example:focus,
 #mcp-example:focus,
-#security-example:focus,
+#a2a-example:focus,
+#api-example:focus,
 #llm-yaml:focus,
 #mcp-yaml:focus,
-#security-yaml:focus,
+#a2a-yaml:focus,
+#api-yaml:focus,
 #cluster-type:focus,
 #cluster-api-server:focus,
 #cluster-token:focus,
@@ -1234,18 +1210,22 @@ html.demo-stage .seq-wire {
   box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
-#area-cluster,
 #area-settings {
   overflow-y: auto;
 }
 
-#area-cluster .cluster-panel {
+#area-settings .cluster-panel {
   border-bottom: 0;
+}
+
+#area-settings .panel > .cluster-heading:first-child {
+  margin-top: 0;
 }
 
 #llm-yaml,
 #mcp-yaml,
-#security-yaml,
+#a2a-yaml,
+#api-yaml,
 #cluster-kubeconfig,
 #crd-yaml {
   resize: vertical;
