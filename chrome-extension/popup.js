@@ -102,6 +102,14 @@ const STORAGE_KEYS = [
   "hooray",
   "soloUi",
   "demoStage",
+  "entraTenantId",
+  "entraClientId",
+  "entraIssuerVersion",
+  "entraToken",
+  "keycloakIssuer",
+  "keycloakRealm",
+  "keycloakAudience",
+  "keycloakToken",
   "settingsFocus",
   "llmDeployOpen",
   "mcpDeployOpen",
@@ -529,6 +537,21 @@ const els = {
   pfUseLocalhost: document.getElementById("pf-use-localhost"),
   pfCheck: document.getElementById("pf-check"),
   pfResult: document.getElementById("pf-result"),
+  identityPanel: document.getElementById("identity-panel"),
+  entraTenantId: document.getElementById("entra-tenant-id"),
+  entraClientId: document.getElementById("entra-client-id"),
+  entraIssuer: document.getElementById("entra-issuer"),
+  entraToken: document.getElementById("entra-token"),
+  applyEntraJwt: document.getElementById("apply-entra-jwt"),
+  runEntraJwt: document.getElementById("run-entra-jwt"),
+  entraResult: document.getElementById("entra-result"),
+  keycloakIssuer: document.getElementById("keycloak-issuer"),
+  keycloakRealm: document.getElementById("keycloak-realm"),
+  keycloakAudience: document.getElementById("keycloak-audience"),
+  keycloakToken: document.getElementById("keycloak-token"),
+  applyKeycloakJwt: document.getElementById("apply-keycloak-jwt"),
+  runKeycloakJwt: document.getElementById("run-keycloak-jwt"),
+  keycloakResult: document.getElementById("keycloak-result"),
   confetti: document.getElementById("confetti"),
 };
 
@@ -2340,6 +2363,7 @@ async function loadSettings() {
     ? stored.clusterKind
     : "Gateway";
   els.crdYaml.value = stored.clusterManifest || EXAMPLE_MANIFEST;
+  loadIdentitySettings(stored);
   loadDeployExamples(stored);
   updateClusterHelp();
   updateClusterSourceUi();
@@ -2973,7 +2997,7 @@ function mcpSessionId(result) {
 }
 
 function mcpClientInfo() {
-  return { name: "agentgateway-extension", version: "0.10.1" };
+  return { name: "agentgateway-extension", version: "0.11.0" };
 }
 
 function mcpHeaders(sessionId, extra) {
@@ -4037,6 +4061,145 @@ function clusterNamespaceOrDefault() {
   return (els.clusterNamespace.value || "").trim() || DEFAULT_CLUSTER_NAMESPACE;
 }
 
+const Identity =
+  (typeof globalThis !== "undefined" && globalThis.Identity) ||
+  (typeof window !== "undefined" && window.Identity) ||
+  {};
+
+function identityGateway() {
+  const fromLlm = els.llmGateway && (els.llmGateway.value || "").trim();
+  const fromPf = els.pfName && (els.pfName.value || "").trim();
+  return fromLlm || fromPf || "agentgateway-proxy";
+}
+
+function currentIdentitySettings() {
+  return {
+    entraTenantId: els.entraTenantId ? (els.entraTenantId.value || "").trim() : "",
+    entraClientId: els.entraClientId ? (els.entraClientId.value || "").trim() : "",
+    entraIssuerVersion:
+      els.entraIssuer && els.entraIssuer.value === "v2" ? "v2" : "v1",
+    entraToken: els.entraToken ? (els.entraToken.value || "").trim() : "",
+    keycloakIssuer: els.keycloakIssuer
+      ? (els.keycloakIssuer.value || "").trim()
+      : "",
+    keycloakRealm: els.keycloakRealm
+      ? (els.keycloakRealm.value || "").trim()
+      : "",
+    keycloakAudience: els.keycloakAudience
+      ? (els.keycloakAudience.value || "").trim()
+      : "",
+    keycloakToken: els.keycloakToken
+      ? (els.keycloakToken.value || "").trim()
+      : "",
+  };
+}
+
+function loadIdentitySettings(stored) {
+  if (els.entraTenantId) {
+    els.entraTenantId.value = stored.entraTenantId || "";
+  }
+  if (els.entraClientId) {
+    els.entraClientId.value = stored.entraClientId || "";
+  }
+  if (els.entraIssuer) {
+    els.entraIssuer.value = stored.entraIssuerVersion === "v2" ? "v2" : "v1";
+  }
+  if (els.entraToken) {
+    els.entraToken.value = stored.entraToken || "";
+  }
+  if (els.keycloakIssuer) {
+    els.keycloakIssuer.value = stored.keycloakIssuer || "";
+  }
+  if (els.keycloakRealm) {
+    els.keycloakRealm.value = stored.keycloakRealm || "";
+  }
+  if (els.keycloakAudience) {
+    els.keycloakAudience.value = stored.keycloakAudience || "";
+  }
+  if (els.keycloakToken) {
+    els.keycloakToken.value = stored.keycloakToken || "";
+  }
+}
+
+async function saveIdentitySettings() {
+  const settings = currentIdentitySettings();
+  await persist(settings);
+  return settings;
+}
+
+function identityApplyContext() {
+  const settings = currentIdentitySettings();
+  return {
+    ns: clusterNamespaceOrDefault(),
+    gateway: identityGateway(),
+    tenantId: settings.entraTenantId,
+    clientId: settings.entraClientId,
+    issuerVersion: settings.entraIssuerVersion,
+    issuer: settings.keycloakIssuer,
+    realm: settings.keycloakRealm,
+    audience: settings.keycloakAudience,
+  };
+}
+
+function formatJwtClaim(value) {
+  if (value == null || value === "") {
+    return "";
+  }
+  return Array.isArray(value) ? value.join(", ") : String(value);
+}
+
+function jwtClaimsSummary(token, { showTid } = {}) {
+  if (!Identity || typeof Identity.decodeJwtClaims !== "function") {
+    return "";
+  }
+  const claims = Identity.decodeJwtClaims(token);
+  if (!claims) {
+    return "";
+  }
+  const parts = [
+    `iss ${formatJwtClaim(claims.iss) || "—"}`,
+    `aud ${formatJwtClaim(claims.aud) || "—"}`,
+  ];
+  if (showTid) {
+    parts.push(`tid ${formatJwtClaim(claims.tid) || "—"}`);
+  }
+  return parts.join(" · ");
+}
+
+function resolveWorkshopYaml(demo) {
+  if (!demo || !demo.yaml) {
+    return "";
+  }
+  if (typeof demo.yaml === "function") {
+    return demo.yaml(identityApplyContext());
+  }
+  return demo.yaml;
+}
+
+function workshopJwtPrefill(demo) {
+  if (demo.id === "entra-jwt") {
+    return (els.entraToken && els.entraToken.value) || "";
+  }
+  if (demo.id === "keycloak-jwt") {
+    return (els.keycloakToken && els.keycloakToken.value) || "";
+  }
+  return typeof WORKSHOP_JWT === "string" ? WORKSHOP_JWT : "";
+}
+
+function workshopIdentityToken(demo) {
+  const field = workshopFieldValue(demo, "jwt");
+  if (field) {
+    return field;
+  }
+  if (demo.id === "entra-jwt") {
+    return currentIdentitySettings().entraToken;
+  }
+  if (demo.id === "keycloak-jwt") {
+    return currentIdentitySettings().keycloakToken;
+  }
+  return "";
+}
+
 function storedKubeContext() {
   return (
     (els.clusterContext &&
@@ -5078,6 +5241,12 @@ function updateDeployHints() {
   els.applyMcp.disabled = !connected;
   els.applyA2a.disabled = !connected;
   els.applyApi.disabled = !connected;
+  if (els.applyEntraJwt) {
+    els.applyEntraJwt.disabled = !connected;
+  }
+  if (els.applyKeycloakJwt) {
+    els.applyKeycloakJwt.disabled = !connected;
+  }
   if (els.llmInvRefresh) {
     els.llmInvRefresh.disabled = !connected;
   }
@@ -6691,6 +6860,133 @@ els.applyApi.addEventListener("click", () => {
   applyYamlDocuments(els.apiYaml.value, els.apiApplyResult, els.applyApi);
 });
 
+function showIdentityBox(resultEl, body, isError) {
+  showBox(resultEl, {
+    status: null,
+    latencyMs: 0,
+    body,
+    isError,
+  });
+}
+
+async function applyIdentityYaml(kind) {
+  await saveIdentitySettings();
+  const resultEl = kind === "entra" ? els.entraResult : els.keycloakResult;
+  const applyBtn = kind === "entra" ? els.applyEntraJwt : els.applyKeycloakJwt;
+  if (!resultEl || !applyBtn) {
+    return;
+  }
+  const ctx = identityApplyContext();
+  let yaml = "";
+  try {
+    if (kind === "entra") {
+      if (!ctx.tenantId) {
+        showIdentityBox(resultEl, "Tenant ID is required.", true);
+        return;
+      }
+      yaml = Identity.entraYaml(ctx);
+    } else {
+      const parsed =
+        Identity && typeof Identity.parseKeycloakIssuer === "function"
+          ? Identity.parseKeycloakIssuer(ctx.issuer)
+          : null;
+      const realm = ctx.realm || (parsed && parsed.realm) || "";
+      if (!parsed || !realm) {
+        showIdentityBox(
+          resultEl,
+          parsed
+            ? "Realm is required, or use an issuer path like /realms/<name>."
+            : "Issuer URL is required.",
+          true
+        );
+        return;
+      }
+      yaml = Identity.keycloakYaml(ctx);
+    }
+  } catch (error) {
+    showIdentityBox(resultEl, error.message || String(error), true);
+    return;
+  }
+  applyYamlDocuments(yaml, resultEl, applyBtn, () => {
+    applyBtn.disabled = !clusterIsReady();
+  });
+}
+
+async function runIdentitySettingsTest(kind) {
+  await saveIdentitySettings();
+  const settings = currentIdentitySettings();
+  const resultEl = kind === "entra" ? els.entraResult : els.keycloakResult;
+  const runBtn = kind === "entra" ? els.runEntraJwt : els.runKeycloakJwt;
+  if (!resultEl || !runBtn) {
+    return;
+  }
+  runBtn.disabled = true;
+  showPending(
+    resultEl,
+    kind === "entra" ? "POST /openai-entra…" : "POST /openai-keycloak…"
+  );
+  try {
+    const outcome = await runIdentityJwtProbe({
+      demo: {
+        targetKind: "security",
+        hops: {
+          gateway: kind === "entra" ? "Entra JWT" : "Keycloak JWT",
+        },
+      },
+      seq: null,
+      path: kind === "entra" ? "/openai-entra" : "/openai-keycloak",
+      token: kind === "entra" ? settings.entraToken : settings.keycloakToken,
+      showTid: kind === "entra",
+    });
+    resultEl.hidden = false;
+    resultEl.classList.toggle("is-error", !outcome.ok);
+    resultEl.replaceChildren(...outcome.nodes);
+    if (outcome.ok) {
+      celebrate();
+    }
+  } catch (error) {
+    showIdentityBox(resultEl, error.message || String(error), true);
+  } finally {
+    runBtn.disabled = false;
+  }
+}
+
+if (els.applyEntraJwt) {
+  els.applyEntraJwt.addEventListener("click", () => applyIdentityYaml("entra"));
+}
+if (els.runEntraJwt) {
+  els.runEntraJwt.addEventListener("click", () =>
+    runIdentitySettingsTest("entra")
+  );
+}
+if (els.applyKeycloakJwt) {
+  els.applyKeycloakJwt.addEventListener("click", () =>
+    applyIdentityYaml("keycloak")
+  );
+}
+if (els.runKeycloakJwt) {
+  els.runKeycloakJwt.addEventListener("click", () =>
+    runIdentitySettingsTest("keycloak")
+  );
+}
+
+[
+  els.entraTenantId,
+  els.entraClientId,
+  els.entraIssuer,
+  els.entraToken,
+  els.keycloakIssuer,
+  els.keycloakRealm,
+  els.keycloakAudience,
+  els.keycloakToken,
+]
+  .filter(Boolean)
+  .forEach((node) => {
+    node.addEventListener("change", () => {
+      saveIdentitySettings();
+    });
+  });
+
 els.loadExample.addEventListener("click", () => {
   els.crdYaml.value = EXAMPLE_MANIFEST;
   saveClusterSettings();
@@ -6904,10 +7200,7 @@ function renderWorkshopDemos() {
     drawer.id = `result-ws-${demo.id}`;
 
     applyBtn.addEventListener("click", () => {
-      if (!demo.yaml) {
-        return;
-      }
-      applyYamlDocuments(demo.yaml, drawer, applyBtn);
+      applyWorkshopDemoYaml(demo, drawer, applyBtn);
     });
     runBtn.addEventListener("click", () =>
       runWorkshopDemo(demo, { runBtn, applyBtn, drawer, seq, cardEl })
@@ -6931,8 +7224,8 @@ function renderWorkshopDemos() {
         input.className = "workshop-field";
         if (field.value) {
           input.value = field.value;
-        } else if (field.id === "jwt" && typeof WORKSHOP_JWT === "string") {
-          input.value = WORKSHOP_JWT;
+        } else if (field.id === "jwt") {
+          input.value = workshopJwtPrefill(demo);
         }
         fieldsWrap.append(label, input);
       });
@@ -6949,6 +7242,57 @@ function renderWorkshopDemos() {
 function workshopFieldValue(demo, fieldId) {
   const input = document.getElementById(`ws-${demo.id}-${fieldId}`);
   return input ? String(input.value || "").trim() : "";
+}
+
+function applyWorkshopDemoYaml(demo, drawer, applyBtn) {
+  if (!demo.yaml) {
+    return;
+  }
+  if (demo.id === "entra-jwt") {
+    const tenant = currentIdentitySettings().entraTenantId;
+    if (!tenant) {
+      showBox(drawer, {
+        status: null,
+        latencyMs: 0,
+        body: "set Tenant ID in Settings → Identity",
+        isError: true,
+      });
+      return;
+    }
+  }
+  if (demo.id === "keycloak-jwt") {
+    const settings = currentIdentitySettings();
+    const parsed =
+      Identity && typeof Identity.parseKeycloakIssuer === "function"
+        ? Identity.parseKeycloakIssuer(settings.keycloakIssuer)
+        : null;
+    const realm = settings.keycloakRealm || (parsed && parsed.realm) || "";
+    if (!parsed || !realm) {
+      showBox(drawer, {
+        status: null,
+        latencyMs: 0,
+        body: "set Issuer URL in Settings → Identity",
+        isError: true,
+      });
+      return;
+    }
+  }
+  let yaml = "";
+  try {
+    yaml = resolveWorkshopYaml(demo);
+  } catch (error) {
+    showBox(drawer, {
+      status: null,
+      latencyMs: 0,
+      body: error.message || String(error),
+      isError: true,
+    });
+    return;
+  }
+  if (!yaml) {
+    return;
+  }
+  applyYamlDocuments(yaml, drawer, applyBtn);
 }
 
 function workshopOkFromStatuses(checks) {
@@ -7025,6 +7369,68 @@ async function workshopChat(seq, demo, messages, extra) {
       model,
     }
   );
+}
+
+async function runIdentityJwtProbe({ demo, seq, path, token, showTid }) {
+  const url = workshopUrl(path);
+  const { model } = await saveChatSettings();
+  const messages = [{ role: "user", content: "Whats your favorite poem?" }];
+  const seqOpts = {
+    ...(demo
+      ? workshopSeqConfig(demo)
+      : { viaGateway: true, target: "Policy", targetKind: "security" }),
+    ok: () => true,
+    path,
+    model,
+  };
+  const post = (headers) =>
+    postCompletions(url, model, messages, headers ? { headers } : undefined);
+  const run = (fn) => (seq ? runWithSeq(seq, fn, seqOpts) : fn());
+
+  const unauth = await run(() => post());
+  const denied = unauth.status === 401 || unauth.status === 403;
+  const nodes = [
+    workshopCheck(
+      denied,
+      `no JWT · HTTP ${unauth.status} · expect 401/403`,
+      snippet(unauth.raw || unauth.error || "")
+    ),
+  ];
+  if (!token) {
+    nodes.push(
+      workshopCheck(
+        true,
+        "paste JWT",
+        "Optional: paste an access token and Run again for HTTP 200."
+      )
+    );
+    return {
+      ok: denied,
+      meta: denied ? "no JWT → 401/403" : `no JWT → HTTP ${unauth.status}`,
+      result: unauth,
+      nodes,
+    };
+  }
+  const claims = jwtClaimsSummary(token, { showTid });
+  if (claims) {
+    nodes.push(workshopCheck(true, "JWT claims", claims));
+  }
+  const auth = await run(() =>
+    post({ Authorization: `Bearer ${token}` })
+  );
+  nodes.push(
+    workshopCheck(
+      auth.status === 200,
+      `with JWT · HTTP ${auth.status} · expect 200`,
+      snippet(extractAssistantTextSafe(auth.payload) || auth.raw || "")
+    )
+  );
+  return {
+    ok: denied && auth.status === 200,
+    meta: `no JWT ${unauth.status} · JWT ${auth.status}`,
+    result: auth,
+    nodes,
+  };
 }
 
 const WORKSHOP_RUNNERS = {
@@ -7848,6 +8254,26 @@ const WORKSHOP_RUNNERS = {
       result: auth,
       nodes,
     };
+  },
+
+  async entraJwt(demo, seq) {
+    return runIdentityJwtProbe({
+      demo,
+      seq,
+      path: "/openai-entra",
+      token: workshopIdentityToken(demo),
+      showTid: true,
+    });
+  },
+
+  async keycloakJwt(demo, seq) {
+    return runIdentityJwtProbe({
+      demo,
+      seq,
+      path: "/openai-keycloak",
+      token: workshopIdentityToken(demo),
+      showTid: false,
+    });
   },
 };
 

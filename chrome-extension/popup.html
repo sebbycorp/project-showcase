@@ -1674,8 +1674,9 @@
         <div class="workshop-head">
           <span class="field-label">Workshop demos</span>
           <p class="hint">
-            WAF first-pass, direct response / health, and JWT + RBAC on
-            /openai-jwt (Chat without a token still works).
+            WAF first-pass, direct response / health, JWT + RBAC on
+            /openai-jwt, Entra JWT on /openai-entra, and Keycloak JWT on
+            /openai-keycloak (Chat without a token still works).
           </p>
         </div>
         <div id="api-workshop" class="workshop-list"></div>
@@ -2011,6 +2012,117 @@
         </div>
         <div id="crd-apply-result" class="result-box" hidden></div>
       </div>
+
+      <div class="panel" id="identity-panel">
+        <h2 class="cluster-heading">Identity</h2>
+        <p class="hint">
+          Paste Entra ID or Keycloak details, Apply a Strict JWT policy on a
+          dedicated route, then Run. Chat on <code>/openai</code> stays open.
+        </p>
+
+        <h2 class="cluster-heading">Entra ID</h2>
+        <label class="field-label" for="entra-tenant-id">Tenant ID</label>
+        <input
+          id="entra-tenant-id"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="00000000-0000-0000-0000-000000000000"
+        />
+        <label class="field-label" for="entra-client-id">
+          Client ID / audience
+        </label>
+        <input
+          id="entra-client-id"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="optional — used as aud if set"
+        />
+        <label class="field-label" for="entra-issuer">Issuer version</label>
+        <select id="entra-issuer">
+          <option value="v1" selected>v1</option>
+          <option value="v2">v2</option>
+        </select>
+        <label class="field-label" for="entra-token">Access token</label>
+        <input
+          id="entra-token"
+          type="password"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="optional pasted bearer"
+        />
+        <p class="hint">
+          Mint with <code>az account get-access-token</code> (v1) or
+          <code>az account get-access-token --resource api://&lt;client-id&gt;</code>
+          (match issuer/aud).
+        </p>
+        <div class="button-row">
+          <button id="apply-entra-jwt" type="button" class="btn btn-secondary">
+            Apply Entra JWT
+          </button>
+          <button id="run-entra-jwt" type="button" class="btn">
+            Run Entra JWT
+          </button>
+        </div>
+        <div id="entra-result" class="result-box" hidden></div>
+
+        <h2 class="cluster-heading">Keycloak</h2>
+        <label class="field-label" for="keycloak-issuer">Issuer URL</label>
+        <input
+          id="keycloak-issuer"
+          type="url"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="http://10.0.0.5:8080/realms/mcp-enterprise"
+        />
+        <label class="field-label" for="keycloak-realm">Realm</label>
+        <input
+          id="keycloak-realm"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="optional — parsed from /realms/&lt;realm&gt;"
+        />
+        <label class="field-label" for="keycloak-audience">
+          Audience / client ID
+        </label>
+        <input
+          id="keycloak-audience"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="optional"
+        />
+        <label class="field-label" for="keycloak-token">Access token</label>
+        <input
+          id="keycloak-token"
+          type="password"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="optional pasted bearer"
+        />
+        <p class="hint">
+          JWKS is
+          <code>{issuer-host}/realms/&lt;realm&gt;/protocol/openid-connect/certs</code>.
+          In-cluster Keycloak is often HTTP on 8080 (no TLS on the JWKS
+          backend). Public Keycloak is HTTPS:443 with
+          <code>policies.tls: {}</code>. No trailing slash on the issuer.
+        </p>
+        <div class="button-row">
+          <button
+            id="apply-keycloak-jwt"
+            type="button"
+            class="btn btn-secondary"
+          >
+            Apply Keycloak JWT
+          </button>
+          <button id="run-keycloak-jwt" type="button" class="btn">
+            Run Keycloak JWT
+          </button>
+        </div>
+        <div id="keycloak-result" class="result-box" hidden></div>
+      </div>
     </section>
 
     <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
@@ -2018,6 +2130,7 @@
     <script src="kubeconfig.js"></script>
     <script src="portforward.js"></script>
     <script src="examples.js"></script>
+    <script src="identity.js"></script>
     <script src="workshop.js"></script>
     <script src="builder.js"></script>
     <script src="confetti.js"></script>

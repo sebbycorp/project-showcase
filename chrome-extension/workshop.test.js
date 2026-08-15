@@ -6,7 +6,13 @@ const vm = require("vm");
 
 const ctx = {
   DEPLOY_EXAMPLES: { llm: {}, mcp: {}, a2a: {}, api: { policy: { label: "old", yaml: "" } } },
+  URL,
+  Buffer,
 };
+vm.runInNewContext(
+  fs.readFileSync(path.join(__dirname, "identity.js"), "utf8"),
+  ctx
+);
 vm.runInNewContext(
   fs.readFileSync(path.join(__dirname, "workshop.js"), "utf8"),
   ctx
@@ -34,6 +40,8 @@ const required = [
   "waf",
   "direct-response",
   "jwt-llm",
+  "entra-jwt",
+  "keycloak-jwt",
 ];
 for (const id of required) {
   assert.ok(ids.includes(id), `missing workshop demo ${id}`);
@@ -82,6 +90,23 @@ assert.match(ctx.WORKSHOP_YAML.mockOpenai, /llm-d-inference-sim/);
 
 const streaming = ctx.WORKSHOP_DEMOS.find((demo) => demo.id === "streaming");
 assert.equal(streaming.yaml, "");
+
+const entraDemo = ctx.WORKSHOP_DEMOS.find((demo) => demo.id === "entra-jwt");
+const keycloakDemo = ctx.WORKSHOP_DEMOS.find((demo) => demo.id === "keycloak-jwt");
+assert.equal(typeof entraDemo.yaml, "function");
+assert.equal(typeof keycloakDemo.yaml, "function");
+const entraYaml = entraDemo.yaml({
+  ns: "ns1",
+  gateway: "gw1",
+  tenantId: "tid-1",
+});
+assert.match(entraYaml, /\/openai-entra/);
+assert.match(entraYaml, /entra-jwks/);
+const keycloakYaml = keycloakDemo.yaml({
+  issuer: "http://10.0.0.5:8080/realms/foo",
+});
+assert.match(keycloakYaml, /\/openai-keycloak/);
+assert.match(keycloakYaml, /jwksPath: realms\/foo\/protocol\/openid-connect\/certs/);
 
 assert.match(ctx.DEPLOY_EXAMPLES.api.policy.yaml, /promptGuard:/);
 assert.ok(ctx.WORKSHOP_JWT.length > 80);

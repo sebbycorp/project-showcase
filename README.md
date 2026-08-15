@@ -2,7 +2,7 @@
 
 A Chrome extension for chatting, testing, and teaching [Solo Agentgateway](https://docs.solo.io/agentgateway/latest/) (LLM, MCP, A2A, and API/HTTP) against **your** Kubernetes cluster. Point it at a reachable API server, apply Gateway / Agentgateway CRDs from the popup, and run the same hops you would show in a live demo.
 
-The extension is in [`chrome-extension/`](chrome-extension/). Current version: **0.10.1** (`manifest.json`).
+The extension is in [`chrome-extension/`](chrome-extension/). Current version: **0.11.0** (`manifest.json`).
 
 ## Use cases
 
@@ -20,12 +20,13 @@ These match the tabs and header controls in the popup.
 - **MCP: one-click virtual MCP, live status, and tests.** The **MCP** tab has **One-click deploys** (for example **Deploy everything server**, **Deploy website fetcher**, **Deploy virtual MCP**). Virtual examples show a live **Running** / **Pending** / **Error** (or **Missing**) chip. **Run test** and **Run all** probe initialize, list tools, echo, and fetch. Separate cards cover **MCP initialize**, **List tools**, **Call echo**, **Call fetch**, **JWT / unauth**, and **Tool calling**.
 - **A2A and API/HTTP.** **A2A** probes **A2A agent-card / health**. **API/HTTP** runs **HTTP request**, **Unauthenticated request**, and **Junk / policy-probe**. Each tab can **Apply** a prebuilt example when a cluster is connected.
 - **Connect to any cluster and apply CRDs.** In **Settings → Cluster**, choose **Source** **Manual** (GKE, AKS, EKS, or Local) or **Omni** (Sidero Omni). **Test connection**, then apply from the builders or **Resources**.
+- **Corporate IdP JWT on a dedicated LLM route.** In **Settings → Identity**, paste Entra tenant / client / token or Keycloak issuer / realm / audience. **Apply Entra JWT** or **Apply Keycloak JWT** puts Strict JWT on `/openai-entra` or `/openai-keycloak` so Chat on `/openai` stays open. Mint an Entra token with `az account get-access-token` (v1) or `az account get-access-token --resource api://<client-id>`.
 - **Clusters without a public proxy.** **Settings → Port forward** copies a `kubectl port-forward` command. Run it locally, click **Use localhost**, and point Chat / MCP / API tests at `127.0.0.1`. **Check localhost** reports Reachable or Not reachable.
 - **Persistence.** The last top-level tab and the header **Demo** toggle are remembered. A **Connected** / **Not connected** chip (or **Checking** on open) sits in the header; click it to jump to Cluster.
 
 ## Workshop demos
 
-Each of **LLM**, **MCP**, **A2A**, and **API/HTTP** has **Apply** + **Run** cards from the Solo Enterprise Agentgateway workshop (plus a few original flows). Hop labels include promptGuard, prompt.prepend, rateLimit, OpenAPI→REST, WAF, and A2A task. Dedicated paths (`/openai-jwt`, `/mcp-weather`, `/mcp-jwt`) keep default Chat / MCP usable.
+Each of **LLM**, **MCP**, **A2A**, and **API/HTTP** has **Apply** + **Run** cards from the Solo Enterprise Agentgateway workshop (plus a few original flows). Hop labels include promptGuard, prompt.prepend, rateLimit, OpenAPI→REST, WAF, and A2A task. Dedicated paths (`/openai-jwt`, `/openai-entra`, `/openai-keycloak`, `/mcp-weather`, `/mcp-jwt`) keep default Chat / MCP usable.
 
 **LLM**
 
@@ -64,6 +65,8 @@ Each of **LLM**, **MCP**, **A2A**, and **API/HTTP** has **Apply** + **Run** card
 - **WAF first-pass** — WAFPolicy model allow-list + `rm -rf` signature on `/openai-waf`; allowed 200, disallowed model or `rm -rf` → 403
 - **Direct response / health** — HTTPRoute `/health` returns a fixed body (no backend)
 - **JWT + RBAC on LLM** — Strict JWT + CEL on `/openai-jwt` so Chat without a token still works
+- **Entra JWT on LLM** — Strict JWT on `/openai-entra` from **Settings → Identity** (tenant, client, v1/v2 issuer, optional token)
+- **Keycloak JWT on LLM** — Strict JWT on `/openai-keycloak` from **Settings → Identity** (issuer, realm, audience, optional token)
 
 ![API/HTTP workshop demos](docs/images/api-waf.png)
 
@@ -78,7 +81,7 @@ Load the unpacked extension in Chrome (desktop). This is not on the Chrome Web S
 5. Select the **`chrome-extension`** folder — the folder that contains `manifest.json`, not the repo root.
 6. Pin **Agentgateway** from the extensions menu so the toolbar icon stays visible.
 
-Click the toolbar icon to open the popup. Version **0.10.1** is the `version` field in `chrome-extension/manifest.json`. If you already had 0.10.0 loaded, click **Reload** on the unpacked card so you pick up the PortForward crash fix.
+Click the toolbar icon to open the popup. Version **0.11.0** is the `version` field in `chrome-extension/manifest.json`. If you already had 0.10.1 loaded, click **Reload** on the unpacked card so you pick up **Settings → Identity**.
 
 ## Configure it to your cluster
 
@@ -163,6 +166,22 @@ MCP defaults to the Chat gateway host + `/mcp` unless you override **MCP endpoin
 In **Settings**, set **Solo UI URL** to the Solo UI app base (path `/age/`). After a **Test** or **Run**, **Open in Solo UI** opens the traces page (`/age/tracing`, or `/age/tracing/<id>` when a trace id is in the response headers).
 
 **Demo stage** (header **Demo**, or the Settings toggle) grows the popup for a projector. **Hooray** plays a short confetti burst after a successful test.
+
+### Identity (Entra ID / Keycloak)
+
+Under **Settings → Identity**, paste corporate IdP details. Fields persist in `chrome.storage.local` (tokens are password fields and are not logged).
+
+**Entra ID** — Tenant ID (required to Apply), optional Client ID / audience, issuer **v1** (`https://sts.windows.net/<tenant>/`) or **v2**, optional access token. **Apply Entra JWT** targets HTTPRoute `/openai-entra`. Mint a token with:
+
+```bash
+az account get-access-token
+# or, to match a client audience
+az account get-access-token --resource api://<client-id>
+```
+
+**Keycloak** — Issuer URL with no trailing slash (for example `http://10.0.0.5:8080/realms/mcp-enterprise`), optional realm (parsed from `/realms/<name>` if empty), optional audience, optional access token. **Apply Keycloak JWT** targets `/openai-keycloak`.
+
+**Run** posts chat completions with no token (expect 401/403), then with the pasted bearer if present (expect 200). The result shows `iss` / `aud` (and Entra `tid`) from the JWT payload — never the raw token.
 
 ## Quick start after connect
 

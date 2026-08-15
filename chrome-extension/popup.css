@@ -276,6 +276,7 @@ body {
 #cluster-type,
 #cluster-source,
 #cluster-context,
+#entra-issuer,
 #crd-kind,
 #llm-preset,
 #mcp-preset,
@@ -378,6 +379,14 @@ body {
 #cluster-kubeconfig,
 #omni-url,
 #omni-sa-key,
+#entra-tenant-id,
+#entra-client-id,
+#entra-issuer,
+#entra-token,
+#keycloak-issuer,
+#keycloak-realm,
+#keycloak-audience,
+#keycloak-token,
 #pf-resource,
 #pf-name,
 #pf-namespace,
@@ -1228,6 +1237,10 @@ html.demo-stage .seq-wire {
 #pf-check,
 #apply-crds,
 #load-example,
+#apply-entra-jwt,
+#run-entra-jwt,
+#apply-keycloak-jwt,
+#run-keycloak-jwt,
 #llm-regen,
 #mcp-regen {
   display: block;
@@ -1244,7 +1257,11 @@ html.demo-stage .seq-wire {
 .button-row #load-example,
 .button-row #pf-copy,
 .button-row #pf-use-localhost,
-.button-row #pf-check {
+.button-row #pf-check,
+.button-row #apply-entra-jwt,
+.button-row #run-entra-jwt,
+.button-row #apply-keycloak-jwt,
+.button-row #run-keycloak-jwt {
   width: auto;
   margin-top: 0;
 }
@@ -1354,6 +1371,14 @@ html.demo-stage .seq-wire {
 #cluster-kubeconfig:focus,
 #omni-url:focus,
 #omni-sa-key:focus,
+#entra-tenant-id:focus,
+#entra-client-id:focus,
+#entra-issuer:focus,
+#entra-token:focus,
+#keycloak-issuer:focus,
+#keycloak-realm:focus,
+#keycloak-audience:focus,
+#keycloak-token:focus,
 #pf-resource:focus,
 #pf-name:focus,
 #pf-namespace:focus,
@@ -1374,6 +1399,10 @@ html.demo-stage .seq-wire {
 }
 
 #area-settings .cluster-panel {
+  border-bottom: 1px solid var(--border);
+}
+
+#area-settings #identity-panel {
   border-bottom: 0;
 }
 
@@ -1413,7 +1442,8 @@ html.demo-stage .seq-wire {
   flex: 1 1 0;
 }
 
-#port-forward-section .button-row button {
+#port-forward-section .button-row button,
+#identity-panel .button-row button {
   flex: 1 1 110px;
 }
 
