@@ -120,9 +120,10 @@ The project uses `deletion_policy = PREVENT` by default so `terraform destroy` w
 
 `chrome-extension/` is a Manifest V3 popup for Chat, LLM tests (OpenAI /
 Claude / Grok / Bedrock / Gemini), MCP, A2A, API/HTTP, plus LLM/MCP
-cluster config builders and Cluster CRD apply in Settings through a
-configurable Agentgateway endpoint (saved in `chrome.storage.local`; no
-API keys). Load it unpacked from that folder — see
+cluster config catalog (Connect / Route / Protect / Control, including
+failover Policies) and Cluster CRD apply in Settings through a configurable
+Agentgateway endpoint (saved in `chrome.storage.local`; no API keys).
+Load it unpacked from that folder — see
 [chrome-extension/README.md](chrome-extension/README.md).
 
 ## CI

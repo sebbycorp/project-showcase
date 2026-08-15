@@ -40,6 +40,28 @@ const STORAGE_KEYS = [
   "llmPort",
   "llmProviderPath",
   "llmRegion",
+  "llmFallbackProvider",
+  "llmFallbackSecret",
+  "llmUnhealthyCondition",
+  "llmEvictionDuration",
+  "llmConsecutiveFailures",
+  "failoverPrimaryProvider",
+  "failoverFallbackProvider",
+  "llmTargetRoute",
+  "llmPrompt",
+  "llmPromptAppend",
+  "llmRegex",
+  "llmHeaderName",
+  "llmHeaderValue",
+  "llmTransformField",
+  "llmCel",
+  "llmAliasName",
+  "llmAliasTarget",
+  "llmRateLimitCount",
+  "llmRateLimitUnit",
+  "llmRateLimitType",
+  "llmBudgetAmount",
+  "llmBudgetWindow",
   "mcpPreset",
   "mcpName",
   "mcpBuilderNamespace",
@@ -160,6 +182,21 @@ const K8S_KINDS = {
     version: "v1alpha1",
     plural: "enterpriseagentgatewaypolicies",
   },
+  AgentgatewayModel: {
+    group: "agentgateway.dev",
+    version: "v1alpha1",
+    plural: "agentgatewaymodels",
+  },
+  RateLimitConfig: {
+    group: "ratelimit.solo.io",
+    version: "v1alpha1",
+    plural: "ratelimitconfigs",
+  },
+  EnterpriseAgentgatewayBudget: {
+    group: "enterpriseagentgateway.solo.io",
+    version: "v1alpha1",
+    plural: "enterpriseagentgatewaybudgets",
+  },
 };
 const EXAMPLE_MANIFEST = `apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -243,6 +280,14 @@ const els = {
   llmHint: document.getElementById("llm-endpoint-hint"),
   llmExample: document.getElementById("llm-example"),
   llmPreset: document.getElementById("llm-preset"),
+  llmCatalog: document.getElementById("llm-catalog"),
+  llmCatalogSearch: document.getElementById("llm-catalog-search"),
+  llmCatalogTitle: document.getElementById("llm-catalog-title"),
+  llmCatalogBlurb: document.getElementById("llm-catalog-blurb"),
+  llmDocsLink: document.getElementById("llm-docs-link"),
+  llmDocsOnly: document.getElementById("llm-docs-only"),
+  llmFormWrap: document.getElementById("llm-form-wrap"),
+  llmApplyWrap: document.getElementById("llm-apply-wrap"),
   llmBuilderProvider: document.getElementById("llm-builder-provider"),
   llmName: document.getElementById("llm-name"),
   llmNamespace: document.getElementById("llm-namespace"),
@@ -260,6 +305,39 @@ const els = {
   llmProviderPath: document.getElementById("llm-provider-path"),
   llmRegionWrap: document.getElementById("llm-region-wrap"),
   llmRegion: document.getElementById("llm-region"),
+  llmPolicyHint: document.getElementById("llm-policy-hint"),
+  llmModelLabel: document.getElementById("llm-model-label"),
+  llmFallbackProviderWrap: document.getElementById("llm-fallback-provider-wrap"),
+  llmFallbackProvider: document.getElementById("llm-fallback-provider"),
+  llmFallbackSecret: document.getElementById("llm-fallback-secret"),
+  llmHealthWrap: document.getElementById("llm-health-wrap"),
+  llmUnhealthy: document.getElementById("llm-unhealthy"),
+  llmEviction: document.getElementById("llm-eviction"),
+  llmFailures: document.getElementById("llm-failures"),
+  llmTargetWrap: document.getElementById("llm-target-wrap"),
+  llmTargetRoute: document.getElementById("llm-target-route"),
+  llmPromptWrap: document.getElementById("llm-prompt-wrap"),
+  llmPrompt: document.getElementById("llm-prompt"),
+  llmPromptAppendWrap: document.getElementById("llm-prompt-append-wrap"),
+  llmPromptAppend: document.getElementById("llm-prompt-append"),
+  llmRegexWrap: document.getElementById("llm-regex-wrap"),
+  llmRegex: document.getElementById("llm-regex"),
+  llmHeaderWrap: document.getElementById("llm-header-wrap"),
+  llmHeaderName: document.getElementById("llm-header-name"),
+  llmHeaderValue: document.getElementById("llm-header-value"),
+  llmTransformWrap: document.getElementById("llm-transform-wrap"),
+  llmTransformField: document.getElementById("llm-transform-field"),
+  llmCel: document.getElementById("llm-cel"),
+  llmAliasWrap: document.getElementById("llm-alias-wrap"),
+  llmAliasName: document.getElementById("llm-alias-name"),
+  llmAliasTarget: document.getElementById("llm-alias-target"),
+  llmRatelimitWrap: document.getElementById("llm-ratelimit-wrap"),
+  llmRlCount: document.getElementById("llm-rl-count"),
+  llmRlUnit: document.getElementById("llm-rl-unit"),
+  llmRlType: document.getElementById("llm-rl-type"),
+  llmBudgetWrap: document.getElementById("llm-budget-wrap"),
+  llmBudgetAmount: document.getElementById("llm-budget-amount"),
+  llmBudgetWindow: document.getElementById("llm-budget-window"),
   llmRegen: document.getElementById("llm-regen"),
   llmInvRefresh: document.getElementById("llm-inv-refresh"),
   llmInventory: document.getElementById("llm-inventory"),
@@ -488,43 +566,64 @@ function currentProvider() {
   return PROVIDERS[raw] ? raw : providerFromModel(els.model.value);
 }
 
-function setProviderSelects(id) {
+function setProviderSelect(root, id) {
+  if (!root) {
+    return;
+  }
   const spec = providerSpec(id);
-  document.querySelectorAll(".provider-switch").forEach((root) => {
-    root.querySelectorAll(".provider-pill").forEach((btn) => {
-      const on = btn.dataset.provider === spec.id;
-      btn.classList.toggle("is-active", on);
-      btn.setAttribute("aria-checked", on ? "true" : "false");
-    });
+  root.querySelectorAll(".provider-pill").forEach((btn) => {
+    const on = btn.dataset.provider === spec.id;
+    btn.classList.toggle("is-active", on);
+    btn.setAttribute("aria-checked", on ? "true" : "false");
   });
 }
 
-function buildProviderSwitches(selected) {
-  const spec = providerSpec(selected);
-  document.querySelectorAll(".provider-switch").forEach((root) => {
-    root.replaceChildren();
-    for (const item of Object.values(PROVIDERS)) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "provider-pill";
-      btn.dataset.provider = item.id;
-      btn.setAttribute("role", "radio");
-      btn.setAttribute("aria-checked", item.id === spec.id ? "true" : "false");
-      if (item.id === spec.id) {
-        btn.classList.add("is-active");
-      }
-      const img = document.createElement("img");
-      img.src = SEQ_ICONS[item.id] || SEQ_ICONS.openai;
-      img.alt = "";
-      const name = document.createElement("span");
-      name.textContent = item.label;
-      btn.append(img, name);
-      btn.addEventListener("click", () => {
-        onProviderChange(item.id);
-      });
-      root.append(btn);
-    }
+function setProviderSelects(id) {
+  document.querySelectorAll(".provider-switch:not([data-scope])").forEach((root) => {
+    setProviderSelect(root, id);
   });
+}
+
+function fillProviderSwitch(root, selected, onPick) {
+  if (!root) {
+    return;
+  }
+  const spec = providerSpec(selected);
+  root.replaceChildren();
+  for (const item of Object.values(PROVIDERS)) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "provider-pill";
+    btn.dataset.provider = item.id;
+    btn.setAttribute("role", "radio");
+    btn.setAttribute("aria-checked", item.id === spec.id ? "true" : "false");
+    if (item.id === spec.id) {
+      btn.classList.add("is-active");
+    }
+    const img = document.createElement("img");
+    img.src = SEQ_ICONS[item.id] || SEQ_ICONS.openai;
+    img.alt = "";
+    const name = document.createElement("span");
+    name.textContent = item.label;
+    btn.append(img, name);
+    btn.addEventListener("click", () => {
+      onPick(item.id);
+    });
+    root.append(btn);
+  }
+}
+
+function buildProviderSwitches(selected) {
+  document.querySelectorAll(".provider-switch:not([data-scope])").forEach((root) => {
+    const handler =
+      root.id === "llm-builder-provider" ? onBuilderProviderChange : onProviderChange;
+    fillProviderSwitch(root, selected, handler);
+  });
+  fillProviderSwitch(
+    els.llmFallbackProvider,
+    "claude",
+    onFallbackProviderChange
+  );
 }
 
 function providerDeployOptions(id) {
@@ -1160,9 +1259,21 @@ function httpSeqConfig() {
   return { viaGateway, target: "API", targetKind: "api" };
 }
 
+const appliedFailoverProviders = { primary: "", fallback: "" };
+
 function failoverSeqConfig() {
-  const primaryKind = providerFromModel(els.primaryModel.value);
-  const fallbackKind = providerFromModel(els.fallbackModel.value);
+  const fields = els.llmPreset ? currentLlmBuilderFields() : {};
+  const failover = AgwBuilder.isFailoverPreset(fields.preset);
+  const primaryKind = failover
+    ? fields.provider
+    : appliedFailoverProviders.primary ||
+      providerFromModel(els.primaryModel.value);
+  const fallbackKind = failover
+    ? fields.preset === "provider-failover"
+      ? fields.fallbackProvider
+      : fields.provider
+    : appliedFailoverProviders.fallback ||
+      providerFromModel(els.fallbackModel.value);
   return {
     viaGateway: true,
     target: providerLabel(primaryKind),
@@ -1171,6 +1282,39 @@ function failoverSeqConfig() {
     fallbackKind,
     fallbackTarget: providerLabel(fallbackKind),
   };
+}
+
+function firstFallbackModel(raw, fallback) {
+  const listed = AgwBuilder.parseModelList(raw);
+  return listed[0] || fallback;
+}
+
+function syncFailoverTestFromBuilder() {
+  if (!els.primaryModel || !els.llmPreset) {
+    return;
+  }
+  const fields = currentLlmBuilderFields();
+  if (!AgwBuilder.isFailoverPreset(fields.preset)) {
+    return;
+  }
+  const fallbackModel =
+    fields.preset === "provider-failover"
+      ? fields.fallbackModel
+      : firstFallbackModel(fields.fallbackModel, fields.fallbackModel);
+  els.primaryModel.value = fields.model || els.primaryModel.value;
+  els.fallbackModel.value = fallbackModel || els.fallbackModel.value;
+  appliedFailoverProviders.primary = fields.provider;
+  appliedFailoverProviders.fallback =
+    fields.preset === "provider-failover"
+      ? fields.fallbackProvider
+      : fields.provider;
+  persist({
+    primaryModel: els.primaryModel.value,
+    fallbackModel: els.fallbackModel.value,
+    failoverPrimaryProvider: appliedFailoverProviders.primary,
+    failoverFallbackProvider: appliedFailoverProviders.fallback,
+  });
+  refreshSeqDiagrams();
 }
 
 function refreshSeqDiagrams() {
@@ -1859,6 +2003,42 @@ function onProviderChange(id) {
   applyProvider(id, { setModels: true, loadYaml: true });
 }
 
+function onBuilderProviderChange(id) {
+  const preset = (els.llmPreset && els.llmPreset.value) || "";
+  if (AgwBuilder.isFailoverPreset(preset)) {
+    setProviderSelect(els.llmBuilderProvider, id);
+    const defaults = AgwBuilder.llmDefaults(id);
+    els.llmBuilderModel.value = defaults.model;
+    if (preset !== "provider-failover") {
+      els.llmBuilderFallback.value = defaults.fallbackModel;
+    }
+    els.llmSecret.value = defaults.secretRef;
+    els.llmHost.value = defaults.host || "";
+    els.llmPort.value = defaults.port || "";
+    els.llmProviderPath.value = defaults.providerPath || "";
+    els.llmRegion.value = defaults.region || "";
+    updateLlmBuilderVisibility();
+    regenLlmYaml();
+    syncFailoverTestFromBuilder();
+    return;
+  }
+  onProviderChange(id);
+}
+
+function onFallbackProviderChange(id) {
+  setProviderSelect(els.llmFallbackProvider, id);
+  const defaults = AgwBuilder.llmDefaults(id);
+  if (els.llmBuilderFallback) {
+    els.llmBuilderFallback.value = defaults.model;
+  }
+  if (els.llmFallbackSecret) {
+    els.llmFallbackSecret.value = defaults.secretRef;
+  }
+  updateLlmBuilderVisibility();
+  regenLlmYaml();
+  syncFailoverTestFromBuilder();
+}
+
 els.endpoint.addEventListener("change", () => {
   saveChatSettings();
 });
@@ -2264,7 +2444,7 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.9.3" },
+      clientInfo: { name: "agentgateway-extension", version: "0.9.4" },
     },
   };
 
@@ -2543,12 +2723,18 @@ const INVENTORY_KINDS = [
   "EnterpriseAgentgatewayBackend",
   "HTTPRoute",
   "EnterpriseAgentgatewayPolicy",
+  "AgentgatewayModel",
+  "RateLimitConfig",
+  "EnterpriseAgentgatewayBudget",
 ];
 const KIND_LABELS = {
   Gateway: "Gateway",
   HTTPRoute: "HTTPRoute",
   EnterpriseAgentgatewayBackend: "Backend",
   EnterpriseAgentgatewayPolicy: "Policy",
+  AgentgatewayModel: "Model",
+  RateLimitConfig: "RateLimit",
+  EnterpriseAgentgatewayBudget: "Budget",
 };
 const inventoryCache = { llm: [], mcp: [], cluster: [] };
 let mcpTargetName = "mcp-target";
@@ -2568,14 +2754,83 @@ function fillPresetSelect(select, presets, selected) {
     return;
   }
   select.replaceChildren();
+  const ungrouped = [];
+  const groups = new Map();
   for (const preset of presets) {
+    if (preset.group) {
+      if (!groups.has(preset.group)) {
+        groups.set(preset.group, []);
+      }
+      groups.get(preset.group).push(preset);
+    } else {
+      ungrouped.push(preset);
+    }
+  }
+  const addOption = (parent, preset) => {
     const option = document.createElement("option");
     option.value = preset.id;
     option.textContent = preset.label;
-    select.append(option);
+    parent.append(option);
+  };
+  for (const preset of ungrouped) {
+    addOption(select, preset);
   }
-  const valid = presets.some((preset) => preset.id === selected);
-  select.value = valid ? selected : presets[0].id;
+  for (const [label, items] of groups) {
+    const group = document.createElement("optgroup");
+    group.label = label;
+    for (const preset of items) {
+      addOption(group, preset);
+    }
+    select.append(group);
+  }
+  const mapped =
+    selected === "failover" ? "model-failover" : selected;
+  const valid = presets.some((preset) => preset.id === mapped);
+  select.value = valid ? mapped : presets[0].id;
+}
+
+function renderLlmCatalog(query) {
+  if (!els.llmCatalog) {
+    return;
+  }
+  const needle = String(query || "").trim().toLowerCase();
+  const selected = (els.llmPreset && els.llmPreset.value) || "openai";
+  const groups = new Map();
+  for (const item of AgwBuilder.LLM_CATALOG) {
+    const hay = `${item.group} ${item.label} ${item.blurb}`.toLowerCase();
+    if (needle && !hay.includes(needle)) {
+      continue;
+    }
+    if (!groups.has(item.group)) {
+      groups.set(item.group, []);
+    }
+    groups.get(item.group).push(item);
+  }
+  els.llmCatalog.replaceChildren();
+  for (const [label, items] of groups) {
+    const heading = document.createElement("div");
+    heading.className = "catalog-group";
+    heading.textContent = label;
+    els.llmCatalog.append(heading);
+    for (const item of items) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "catalog-item";
+      if (item.id === selected) {
+        btn.classList.add("is-active");
+      }
+      if (item.apply === false) {
+        btn.classList.add("is-docs");
+        btn.textContent = `${item.label} — see docs`;
+      } else {
+        btn.textContent = item.label;
+      }
+      btn.addEventListener("click", () => {
+        applyLlmPreset(item.id);
+      });
+      els.llmCatalog.append(btn);
+    }
+  }
 }
 
 function currentBuilderProvider() {
@@ -2584,6 +2839,14 @@ function currentBuilderProvider() {
     els.llmBuilderProvider.querySelector(".provider-pill.is-active");
   const raw = (active && active.dataset.provider) || "";
   return PROVIDERS[raw] ? raw : currentProvider();
+}
+
+function currentFallbackProvider() {
+  const active =
+    els.llmFallbackProvider &&
+    els.llmFallbackProvider.querySelector(".provider-pill.is-active");
+  const raw = (active && active.dataset.provider) || "";
+  return PROVIDERS[raw] ? raw : "claude";
 }
 
 function fillLlmBuilder(fields) {
@@ -2601,10 +2864,80 @@ function fillLlmBuilder(fields) {
   els.llmPort.value = fields.port || "";
   els.llmProviderPath.value = fields.providerPath || "";
   els.llmRegion.value = fields.region || "";
+  if (els.llmFallbackSecret) {
+    els.llmFallbackSecret.value = fields.fallbackSecretRef || "";
+  }
+  if (els.llmUnhealthy) {
+    els.llmUnhealthy.value =
+      fields.unhealthyCondition || AgwBuilder.HEALTH_DEFAULTS.unhealthyCondition;
+  }
+  if (els.llmEviction) {
+    els.llmEviction.value =
+      fields.evictionDuration || AgwBuilder.HEALTH_DEFAULTS.evictionDuration;
+  }
+  if (els.llmFailures) {
+    els.llmFailures.value =
+      fields.consecutiveFailures != null
+        ? fields.consecutiveFailures
+        : AgwBuilder.HEALTH_DEFAULTS.consecutiveFailures;
+  }
+  if (els.llmTargetRoute) {
+    els.llmTargetRoute.value = fields.targetRoute || fields.name || "openai";
+  }
+  if (els.llmPrompt) {
+    els.llmPrompt.value = fields.prompt || "";
+  }
+  if (els.llmPromptAppend) {
+    els.llmPromptAppend.value = fields.promptAppend || "";
+  }
+  if (els.llmRegex) {
+    els.llmRegex.value = fields.regex || "credit card";
+  }
+  if (els.llmHeaderName) {
+    els.llmHeaderName.value = fields.headerName || "x-llm";
+  }
+  if (els.llmHeaderValue) {
+    els.llmHeaderValue.value = fields.headerValue || "gemini";
+  }
+  if (els.llmTransformField) {
+    els.llmTransformField.value = fields.transformField || "max_completion_tokens";
+  }
+  if (els.llmCel) {
+    els.llmCel.value = fields.cel || "min(llmRequest.max_completion_tokens, 10)";
+  }
+  if (els.llmAliasName) {
+    els.llmAliasName.value = fields.aliasName || "fast";
+  }
+  if (els.llmAliasTarget) {
+    els.llmAliasTarget.value = fields.aliasTarget || "gpt-3.5-turbo";
+  }
+  if (els.llmRlCount) {
+    els.llmRlCount.value = fields.rateLimitCount || 5;
+  }
+  if (els.llmRlUnit) {
+    els.llmRlUnit.value = fields.rateLimitUnit || "MINUTE";
+  }
+  if (els.llmRlType) {
+    els.llmRlType.value = fields.rateLimitType || "REQUEST";
+  }
+  if (els.llmBudgetAmount) {
+    els.llmBudgetAmount.value = fields.budgetAmount || 100000;
+  }
+  if (els.llmBudgetWindow) {
+    els.llmBudgetWindow.value = fields.budgetWindow || "Day";
+  }
+  if (fields.provider && els.llmBuilderProvider) {
+    setProviderSelect(els.llmBuilderProvider, fields.provider);
+  }
+  if (fields.fallbackProvider && els.llmFallbackProvider) {
+    setProviderSelect(els.llmFallbackProvider, fields.fallbackProvider);
+  }
   if (fields.preset && els.llmPreset) {
-    const known = AgwBuilder.LLM_PRESETS.some((preset) => preset.id === fields.preset);
+    const mapped =
+      fields.preset === "failover" ? "model-failover" : fields.preset;
+    const known = AgwBuilder.LLM_PRESETS.some((preset) => preset.id === mapped);
     if (known) {
-      els.llmPreset.value = fields.preset;
+      els.llmPreset.value = mapped;
     }
   }
 }
@@ -2612,14 +2945,17 @@ function fillLlmBuilder(fields) {
 function currentLlmBuilderFields() {
   const provider = currentBuilderProvider();
   const preset = (els.llmPreset && els.llmPreset.value) || provider;
+  const failover = AgwBuilder.isFailoverPreset(preset);
   return {
     provider,
     preset,
-    failover: preset === "failover",
+    failover,
     name: els.llmName.value,
     namespace: els.llmNamespace.value || clusterNamespaceOrDefault(),
     model: els.llmBuilderModel.value,
     fallbackModel: els.llmBuilderFallback.value,
+    fallbackProvider: currentFallbackProvider(),
+    fallbackSecretRef: els.llmFallbackSecret ? els.llmFallbackSecret.value : "",
     secretRef: els.llmSecret.value,
     routePath: els.llmPath.value,
     gateway: els.llmGateway.value || AgwBuilder.DEFAULT_GATEWAY,
@@ -2627,8 +2963,31 @@ function currentLlmBuilderFields() {
     port: els.llmPort.value,
     providerPath: els.llmProviderPath.value,
     region: els.llmRegion.value,
+    unhealthyCondition: els.llmUnhealthy ? els.llmUnhealthy.value : "",
+    evictionDuration: els.llmEviction ? els.llmEviction.value : "",
+    consecutiveFailures: els.llmFailures ? els.llmFailures.value : "",
+    targetRoute: els.llmTargetRoute ? els.llmTargetRoute.value : "",
+    prompt: els.llmPrompt ? els.llmPrompt.value : "",
+    promptAppend: els.llmPromptAppend ? els.llmPromptAppend.value : "",
+    regex: els.llmRegex ? els.llmRegex.value : "",
+    headerName: els.llmHeaderName ? els.llmHeaderName.value : "",
+    headerValue: els.llmHeaderValue ? els.llmHeaderValue.value : "",
+    transformField: els.llmTransformField ? els.llmTransformField.value : "",
+    cel: els.llmCel ? els.llmCel.value : "",
+    aliasName: els.llmAliasName ? els.llmAliasName.value : "",
+    aliasTarget: els.llmAliasTarget ? els.llmAliasTarget.value : "",
+    rateLimitCount: els.llmRlCount ? els.llmRlCount.value : "",
+    rateLimitUnit: els.llmRlUnit ? els.llmRlUnit.value : "",
+    rateLimitType: els.llmRlType ? els.llmRlType.value : "",
+    budgetAmount: els.llmBudgetAmount ? els.llmBudgetAmount.value : "",
+    budgetWindow: els.llmBudgetWindow ? els.llmBudgetWindow.value : "",
     rewriteTo: preset === "httproute" ? "/v1/chat/completions" : "",
   };
+}
+
+function recipeFields(preset) {
+  const recipe = AgwBuilder.catalogRecipe(preset);
+  return new Set(recipe && recipe.fields ? recipe.fields : ["core"]);
 }
 
 function updateLlmBuilderVisibility() {
@@ -2637,13 +2996,101 @@ function updateLlmBuilderVisibility() {
   }
   const provider = currentBuilderProvider();
   const preset = (els.llmPreset && els.llmPreset.value) || provider;
-  const compat = provider === "grok" && preset !== "gateway";
-  const bedrock = provider === "bedrock" && preset !== "gateway";
-  els.llmFallbackWrap.hidden = preset !== "failover";
-  els.llmHostWrap.hidden = !compat;
-  els.llmPortWrap.hidden = !compat;
-  els.llmProviderPathWrap.hidden = !compat;
-  els.llmRegionWrap.hidden = !bedrock;
+  const recipe = AgwBuilder.catalogRecipe(preset);
+  const wanted = recipeFields(preset);
+  const docsOnly = recipe && recipe.apply === false;
+  const failover = AgwBuilder.isFailoverPreset(preset);
+  const providerFailover =
+    preset === "provider-failover" || preset === "load-balance";
+  if (els.llmFormWrap) {
+    els.llmFormWrap.hidden = Boolean(docsOnly);
+  }
+  if (els.llmApplyWrap) {
+    els.llmApplyWrap.hidden = Boolean(docsOnly);
+  }
+  if (els.llmDocsOnly) {
+    els.llmDocsOnly.hidden = !docsOnly;
+    els.llmDocsOnly.textContent = docsOnly
+      ? `${recipe.blurb} Open the Docs link for the client example.`
+      : "";
+  }
+  if (els.applyLlm) {
+    els.applyLlm.disabled = docsOnly || !clusterIsReady();
+  }
+  const show = (node, on) => {
+    if (node) {
+      node.hidden = !on;
+    }
+  };
+  const showCore = wanted.has("core") && !docsOnly;
+  const nameWrap = els.llmName && els.llmName.closest("div");
+  const nsWrap = els.llmNamespace && els.llmNamespace.closest("div");
+  const modelWrap = els.llmBuilderModel && els.llmBuilderModel.closest("div");
+  const secretWrap = els.llmSecret && els.llmSecret.closest("div");
+  const pathWrap = els.llmPath && els.llmPath.closest("div");
+  const gwWrap = els.llmGateway && els.llmGateway.closest("div");
+  show(nameWrap, showCore);
+  show(nsWrap, showCore);
+  show(modelWrap, wanted.has("model"));
+  show(secretWrap, wanted.has("secret"));
+  show(pathWrap, wanted.has("path"));
+  show(gwWrap, wanted.has("gateway"));
+  show(els.llmBuilderProvider, wanted.has("provider"));
+  const providerLabel = document.getElementById("llm-builder-provider-label");
+  if (providerLabel) {
+    providerLabel.hidden = !wanted.has("provider");
+    providerLabel.textContent = providerFailover ? "Primary provider" : "Provider";
+  }
+  els.llmFallbackWrap.hidden = !wanted.has("fallback");
+  const fallbackLabel = document.querySelector('label[for="llm-fallback"]');
+  if (fallbackLabel) {
+    fallbackLabel.textContent =
+      preset === "model-failover" ? "Fallback model(s)" : "Fallback model";
+  }
+  show(
+    els.llmFallbackProviderWrap,
+    wanted.has("fallbackProvider") || wanted.has("fallbackSecret")
+  );
+  if (els.llmFallbackProvider) {
+    els.llmFallbackProvider.hidden = !wanted.has("fallbackProvider");
+  }
+  const fallbackProviderLabel = document.getElementById(
+    "llm-fallback-provider-label"
+  );
+  if (fallbackProviderLabel) {
+    fallbackProviderLabel.hidden = !wanted.has("fallbackProvider");
+  }
+  show(els.llmHealthWrap, wanted.has("health"));
+  if (els.llmPolicyHint) {
+    els.llmPolicyHint.hidden = !wanted.has("health");
+  }
+  if (els.llmModelLabel) {
+    els.llmModelLabel.textContent = failover || providerFailover ? "Primary model" : "Model";
+  }
+  const compat = wanted.has("compat") || (provider === "grok" && wanted.has("provider"));
+  const bedrock = wanted.has("region") || (provider === "bedrock" && wanted.has("provider"));
+  show(els.llmHostWrap, compat);
+  show(els.llmPortWrap, compat);
+  show(els.llmProviderPathWrap, compat);
+  show(els.llmRegionWrap, bedrock);
+  show(els.llmTargetWrap, wanted.has("targetRoute"));
+  show(els.llmPromptWrap, wanted.has("prompt"));
+  show(els.llmPromptAppendWrap, wanted.has("promptAppend"));
+  show(els.llmRegexWrap, wanted.has("regex"));
+  show(els.llmHeaderWrap, wanted.has("header"));
+  show(els.llmTransformWrap, wanted.has("transform"));
+  show(els.llmAliasWrap, wanted.has("alias"));
+  show(els.llmRatelimitWrap, wanted.has("rateLimit"));
+  show(els.llmBudgetWrap, wanted.has("budget"));
+  if (els.llmCatalogTitle && recipe) {
+    els.llmCatalogTitle.textContent = recipe.label;
+  }
+  if (els.llmCatalogBlurb && recipe) {
+    els.llmCatalogBlurb.textContent = recipe.blurb || "";
+  }
+  if (els.llmDocsLink && recipe) {
+    els.llmDocsLink.href = recipe.docs;
+  }
 }
 
 function persistLlmBuilder() {
@@ -2660,6 +3107,26 @@ function persistLlmBuilder() {
     llmPort: els.llmPort.value,
     llmProviderPath: els.llmProviderPath.value,
     llmRegion: els.llmRegion.value,
+    llmFallbackProvider: currentFallbackProvider(),
+    llmFallbackSecret: els.llmFallbackSecret ? els.llmFallbackSecret.value : "",
+    llmUnhealthyCondition: els.llmUnhealthy ? els.llmUnhealthy.value : "",
+    llmEvictionDuration: els.llmEviction ? els.llmEviction.value : "",
+    llmConsecutiveFailures: els.llmFailures ? els.llmFailures.value : "",
+    llmTargetRoute: els.llmTargetRoute ? els.llmTargetRoute.value : "",
+    llmPrompt: els.llmPrompt ? els.llmPrompt.value : "",
+    llmPromptAppend: els.llmPromptAppend ? els.llmPromptAppend.value : "",
+    llmRegex: els.llmRegex ? els.llmRegex.value : "",
+    llmHeaderName: els.llmHeaderName ? els.llmHeaderName.value : "",
+    llmHeaderValue: els.llmHeaderValue ? els.llmHeaderValue.value : "",
+    llmTransformField: els.llmTransformField ? els.llmTransformField.value : "",
+    llmCel: els.llmCel ? els.llmCel.value : "",
+    llmAliasName: els.llmAliasName ? els.llmAliasName.value : "",
+    llmAliasTarget: els.llmAliasTarget ? els.llmAliasTarget.value : "",
+    llmRateLimitCount: els.llmRlCount ? els.llmRlCount.value : "",
+    llmRateLimitUnit: els.llmRlUnit ? els.llmRlUnit.value : "",
+    llmRateLimitType: els.llmRlType ? els.llmRlType.value : "",
+    llmBudgetAmount: els.llmBudgetAmount ? els.llmBudgetAmount.value : "",
+    llmBudgetWindow: els.llmBudgetWindow ? els.llmBudgetWindow.value : "",
     llmYaml: els.llmYaml.value,
   });
 }
@@ -2676,22 +3143,135 @@ function applyLlmProviderDefaults(provider) {
   fillLlmBuilder(fields);
   updateLlmBuilderVisibility();
   regenLlmYaml();
+  renderLlmCatalog(els.llmCatalogSearch ? els.llmCatalogSearch.value : "");
 }
 
 function applyLlmPreset(presetId) {
-  const preset =
-    AgwBuilder.LLM_PRESETS.find((item) => item.id === presetId) ||
-    AgwBuilder.LLM_PRESETS[0];
+  const recipe = AgwBuilder.catalogRecipe(presetId);
+  const preset = recipe || AgwBuilder.LLM_PRESETS[0];
   els.llmPreset.value = preset.id;
-  if (preset.provider) {
+  renderLlmCatalog(els.llmCatalogSearch ? els.llmCatalogSearch.value : "");
+  if (preset.provider && ["openai", "claude", "grok", "bedrock", "gemini"].includes(preset.id)) {
     applyProvider(preset.provider, { setModels: true, loadYaml: true });
     return;
   }
-  if (preset.id === "failover") {
-    const fields = AgwBuilder.llmDefaults(currentBuilderProvider());
+  if (AgwBuilder.isFailoverPreset(preset.id)) {
+    const primary = currentBuilderProvider();
+    const fields = AgwBuilder.llmDefaults(primary);
     fields.namespace = clusterNamespaceOrDefault();
     fields.failover = true;
-    fields.preset = "failover";
+    fields.preset = preset.id;
+    fields.name = preset.id;
+    fields.routePath = "/model";
+    if (preset.id === "provider-failover") {
+      const fallbackId = primary === "openai" ? "claude" : "openai";
+      const fallback = AgwBuilder.llmDefaults(fallbackId);
+      fields.fallbackProvider = fallbackId;
+      fields.fallbackModel = fallback.model;
+      fields.fallbackSecretRef = fallback.secretRef;
+    }
+    fillLlmBuilder(fields);
+    syncFailoverTestFromBuilder();
+  } else if (preset.id === "load-balance") {
+    const primary = currentBuilderProvider();
+    const fields = AgwBuilder.llmDefaults(primary);
+    fields.namespace = clusterNamespaceOrDefault();
+    fields.preset = "load-balance";
+    fields.name = "loadbalanced-backend";
+    fields.routePath = "/chat";
+    const fallbackId = primary === "openai" ? "claude" : "openai";
+    const fallback = AgwBuilder.llmDefaults(fallbackId);
+    fields.fallbackProvider = fallbackId;
+    fields.fallbackModel = fallback.model;
+    fields.fallbackSecretRef = fallback.secretRef;
+    fillLlmBuilder(fields);
+  } else if (preset.id === "content-routing") {
+    const fields = AgwBuilder.llmDefaults("openai");
+    fields.namespace = clusterNamespaceOrDefault();
+    fields.preset = "content-routing";
+    fields.name = "content-routing";
+    fields.fallbackSecretRef = "anthropic-secret";
+    fillLlmBuilder(fields);
+  } else if (preset.id === "secretref") {
+    const fields = AgwBuilder.llmDefaults(currentBuilderProvider());
+    fields.namespace = clusterNamespaceOrDefault();
+    fields.preset = "secretref";
+    fillLlmBuilder(fields);
+  } else if (preset.id === "agw-model") {
+    const fields = AgwBuilder.llmDefaults(currentBuilderProvider());
+    fields.namespace = clusterNamespaceOrDefault();
+    fields.preset = "agw-model";
+    fields.name = fields.model || "gpt-4";
+    fillLlmBuilder(fields);
+  } else if (preset.id === "virtual-model") {
+    const fields = AgwBuilder.llmDefaults(currentBuilderProvider());
+    fields.namespace = clusterNamespaceOrDefault();
+    fields.preset = "virtual-model";
+    fields.name = "resilient";
+    fillLlmBuilder(fields);
+  } else if (preset.id === "prompt-guard") {
+    const fields = currentLlmBuilderFields();
+    fields.preset = "prompt-guard";
+    fields.name = "openai-prompt-guard";
+    fields.targetRoute = "openai";
+    fields.regex = "credit card";
+    fillLlmBuilder(fields);
+  } else if (preset.id === "prompt-enrichment") {
+    const fields = currentLlmBuilderFields();
+    fields.preset = "prompt-enrichment";
+    fields.name = "openai-opt";
+    fields.targetRoute = "openai";
+    fields.prompt = "Parse the unstructured text into CSV format.";
+    fillLlmBuilder(fields);
+  } else if (preset.id === "prompt-template") {
+    const fields = currentLlmBuilderFields();
+    fields.preset = "prompt-template";
+    fields.name = "static-prompt-template";
+    fields.targetRoute = "openai";
+    fields.prompt =
+      "You are a helpful customer service assistant. Always be polite and professional.";
+    fields.promptAppend =
+      "If you cannot answer a question, say so clearly rather than making up information.";
+    fillLlmBuilder(fields);
+  } else if (preset.id === "transformation") {
+    const fields = currentLlmBuilderFields();
+    fields.preset = "transformation";
+    fields.name = "cap-max-tokens";
+    fields.targetRoute = "openai";
+    fields.transformField = "max_completion_tokens";
+    fields.cel = "min(llmRequest.max_completion_tokens, 10)";
+    fillLlmBuilder(fields);
+  } else if (preset.id === "rate-limit") {
+    const fields = currentLlmBuilderFields();
+    fields.preset = "rate-limit";
+    fields.name = "openai-rate-limit";
+    fields.targetRoute = "openai";
+    fields.rateLimitCount = 5;
+    fields.rateLimitUnit = "MINUTE";
+    fields.rateLimitType = "REQUEST";
+    fillLlmBuilder(fields);
+  } else if (preset.id === "alias") {
+    const fields = AgwBuilder.llmDefaults(currentBuilderProvider());
+    fields.namespace = clusterNamespaceOrDefault();
+    fields.preset = "alias";
+    fields.aliasName = "fast";
+    fields.aliasTarget = "gpt-3.5-turbo";
+    fillLlmBuilder(fields);
+  } else if (preset.id === "rbac") {
+    const fields = currentLlmBuilderFields();
+    fields.preset = "rbac";
+    fields.name = "rbac-policy";
+    fields.targetRoute = "google";
+    fields.headerName = "x-llm";
+    fields.headerValue = "gemini";
+    fillLlmBuilder(fields);
+  } else if (preset.id === "budget") {
+    const fields = currentLlmBuilderFields();
+    fields.preset = "budget";
+    fields.name = "route-budget";
+    fields.targetRoute = "openai";
+    fields.budgetAmount = 100000;
+    fields.budgetWindow = "Day";
     fillLlmBuilder(fields);
   } else if (preset.id === "httproute") {
     const fields = AgwBuilder.llmDefaults(currentBuilderProvider());
@@ -2795,9 +3375,12 @@ function loadDeployExamples(stored) {
   const provider = currentProvider();
   fillPresetSelect(
     els.llmPreset,
-    AgwBuilder.LLM_PRESETS,
+    AgwBuilder.LLM_PRESETS.concat(
+      AgwBuilder.LLM_CATALOG.filter((item) => item.apply === false)
+    ),
     stored.llmPreset || provider
   );
+  renderLlmCatalog("");
   fillPresetSelect(
     els.mcpPreset,
     AgwBuilder.MCP_PRESETS,
@@ -2829,9 +3412,23 @@ function loadDeployExamples(stored) {
   llmFields.port = stored.llmPort || llmFields.port;
   llmFields.providerPath = stored.llmProviderPath || llmFields.providerPath;
   llmFields.region = stored.llmRegion || llmFields.region;
+  llmFields.fallbackProvider =
+    stored.llmFallbackProvider || llmFields.fallbackProvider;
+  llmFields.fallbackSecretRef =
+    stored.llmFallbackSecret || llmFields.fallbackSecretRef;
+  llmFields.unhealthyCondition =
+    stored.llmUnhealthyCondition || llmFields.unhealthyCondition;
+  llmFields.evictionDuration =
+    stored.llmEvictionDuration || llmFields.evictionDuration;
+  llmFields.consecutiveFailures =
+    stored.llmConsecutiveFailures || llmFields.consecutiveFailures;
   llmFields.preset = (els.llmPreset && els.llmPreset.value) || provider;
-  llmFields.failover = llmFields.preset === "failover";
+  llmFields.failover = AgwBuilder.isFailoverPreset(llmFields.preset);
   fillLlmBuilder(llmFields);
+  if (stored.failoverPrimaryProvider || stored.failoverFallbackProvider) {
+    appliedFailoverProviders.primary = stored.failoverPrimaryProvider || "";
+    appliedFailoverProviders.fallback = stored.failoverFallbackProvider || "";
+  }
   updateLlmBuilderVisibility();
   els.llmYaml.value =
     stored.llmYaml || AgwBuilder.generateLlmYaml(currentLlmBuilderFields());
@@ -2877,7 +3474,10 @@ function updateDeployHints() {
   document.querySelectorAll("[data-deploy-hint]").forEach((node) => {
     node.textContent = text;
   });
-  els.applyLlm.disabled = !connected;
+  const recipe = AgwBuilder.catalogRecipe(
+    (els.llmPreset && els.llmPreset.value) || "openai"
+  );
+  els.applyLlm.disabled = !connected || (recipe && recipe.apply === false);
   els.applyMcp.disabled = !connected;
   els.applyA2a.disabled = !connected;
   els.applyApi.disabled = !connected;
@@ -3327,7 +3927,12 @@ function filterInventoryGroups(groups, mode) {
       );
       return { ...group, items };
     })
-    .filter((group) => group.kind !== "EnterpriseAgentgatewayPolicy" || mode === "cluster");
+    .filter((group) => {
+      if (group.kind !== "EnterpriseAgentgatewayPolicy") {
+        return true;
+      }
+      return mode === "cluster" || mode === "llm";
+    });
 }
 
 async function refreshInventory(which) {
@@ -3345,7 +3950,17 @@ async function refreshInventory(which) {
   const kinds =
     which === "cluster"
       ? INVENTORY_KINDS
-      : ["Gateway", "HTTPRoute", "EnterpriseAgentgatewayBackend"];
+      : which === "llm"
+        ? [
+            "Gateway",
+            "HTTPRoute",
+            "EnterpriseAgentgatewayBackend",
+            "EnterpriseAgentgatewayPolicy",
+            "AgentgatewayModel",
+            "RateLimitConfig",
+            "EnterpriseAgentgatewayBudget",
+          ]
+        : ["Gateway", "HTTPRoute", "EnterpriseAgentgatewayBackend"];
   const groups = [];
   for (const kind of kinds) {
     groups.push(await listKind(settings, kind));
@@ -3384,8 +3999,80 @@ function backendsFromGroups(groups) {
   return (backendGroup && backendGroup.items) || [];
 }
 
+function policiesFromGroups(groups) {
+  const policyGroup = (groups || []).find(
+    (group) => group.kind === "EnterpriseAgentgatewayPolicy"
+  );
+  return (policyGroup && policyGroup.items) || [];
+}
+
+function matchingHealthPolicy(policies, backendName) {
+  return (policies || []).find((item) => {
+    const refs = (item.spec && item.spec.targetRefs) || [];
+    return refs.some(
+      (ref) =>
+        ref &&
+        ref.kind === "EnterpriseAgentgatewayBackend" &&
+        ref.name === backendName
+    );
+  });
+}
+
 function loadLlmInventoryItem(kind, item, groups) {
   const routes = routesFromGroups(groups);
+  const policies = policiesFromGroups(groups);
+  if (
+    kind === "AgentgatewayModel" ||
+    kind === "RateLimitConfig" ||
+    kind === "EnterpriseAgentgatewayBudget"
+  ) {
+    if (kind === "AgentgatewayModel") {
+      els.llmPreset.value =
+        item.spec && item.spec.virtualModel ? "virtual-model" : "agw-model";
+    }
+    els.llmYaml.value = AgwBuilder.resourceToYaml(item);
+    updateLlmBuilderVisibility();
+    renderLlmCatalog(els.llmCatalogSearch ? els.llmCatalogSearch.value : "");
+    persistLlmBuilder();
+    return;
+  }
+  if (kind === "EnterpriseAgentgatewayPolicy") {
+    if (!AgwBuilder.isHealthPolicy(item)) {
+      els.llmYaml.value = AgwBuilder.resourceToYaml(item);
+      persistLlmBuilder();
+      return;
+    }
+    const health = AgwBuilder.fieldsFromHealthPolicy(item);
+    const backend = backendsFromGroups(groups).find(
+      (entry) =>
+        entry.metadata &&
+        entry.metadata.name === health.targetBackend &&
+        AgwBuilder.isAiBackend(entry)
+    );
+    if (backend) {
+      const route = AgwBuilder.matchingRoute(
+        routes,
+        backend.metadata && backend.metadata.name
+      );
+      const fields = AgwBuilder.fieldsFromLlmResource(backend, route, item);
+      if (PROVIDERS[fields.provider]) {
+        setProviderSelect(els.llmBuilderProvider, fields.provider);
+      }
+      fillLlmBuilder(fields);
+    } else {
+      fillLlmBuilder({
+        ...currentLlmBuilderFields(),
+        ...health,
+        name: health.targetBackend || currentLlmBuilderFields().name,
+        preset: "model-failover",
+        failover: true,
+      });
+    }
+    updateLlmBuilderVisibility();
+    regenLlmYaml();
+    syncFailoverTestFromBuilder();
+    return;
+  }
   if (kind === "Gateway") {
     els.llmGateway.value = (item.metadata && item.metadata.name) || AgwBuilder.DEFAULT_GATEWAY;
     els.llmNamespace.value =
@@ -3404,9 +4091,13 @@ function loadLlmInventoryItem(kind, item, groups) {
         AgwBuilder.isAiBackend(entry)
     );
     if (backend) {
-      const fields = AgwBuilder.fieldsFromLlmResource(backend, item);
+      const policy = matchingHealthPolicy(
+        policies,
+        backend.metadata && backend.metadata.name
+      );
+      const fields = AgwBuilder.fieldsFromLlmResource(backend, item, policy);
       if (PROVIDERS[fields.provider]) {
-        setProviderSelects(fields.provider);
+        setProviderSelect(els.llmBuilderProvider, fields.provider);
       }
       fillLlmBuilder(fields);
     } else {
@@ -3422,13 +4113,17 @@ function loadLlmInventoryItem(kind, item, groups) {
     return;
   }
   const route = AgwBuilder.matchingRoute(routes, item.metadata && item.metadata.name);
-  const fields = AgwBuilder.fieldsFromLlmResource(item, route);
+  const policy = matchingHealthPolicy(policies, item.metadata && item.metadata.name);
+  const fields = AgwBuilder.fieldsFromLlmResource(item, route, policy);
   if (PROVIDERS[fields.provider]) {
-    setProviderSelects(fields.provider);
+    setProviderSelect(els.llmBuilderProvider, fields.provider);
   }
   fillLlmBuilder(fields);
   updateLlmBuilderVisibility();
   regenLlmYaml();
+  if (AgwBuilder.isFailoverPreset(fields.preset)) {
+    syncFailoverTestFromBuilder();
+  }
 }
 
 function loadMcpInventoryItem(kind, item, groups) {
@@ -3703,6 +4398,11 @@ if (els.llmPreset) {
     applyLlmPreset(els.llmPreset.value);
   });
 }
+if (els.llmCatalogSearch) {
+  els.llmCatalogSearch.addEventListener("input", () => {
+    renderLlmCatalog(els.llmCatalogSearch.value);
+  });
+}
 bindBuilderFields(
   [
     "llm-name",
@@ -3716,10 +4416,30 @@ bindBuilderFields(
     "llm-port",
     "llm-provider-path",
     "llm-region",
+    "llm-fallback-secret",
+    "llm-unhealthy",
+    "llm-eviction",
+    "llm-failures",
+    "llm-target-route",
+    "llm-prompt",
+    "llm-prompt-append",
+    "llm-regex",
+    "llm-header-name",
+    "llm-header-value",
+    "llm-transform-field",
+    "llm-cel",
+    "llm-alias-name",
+    "llm-alias-target",
+    "llm-rl-count",
+    "llm-rl-unit",
+    "llm-rl-type",
+    "llm-budget-amount",
+    "llm-budget-window",
   ],
   () => {
     updateLlmBuilderVisibility();
     regenLlmYaml();
+    syncFailoverTestFromBuilder();
   }
 );
 els.llmYaml.addEventListener("change", () => {
@@ -3798,6 +4518,7 @@ if (els.mcpInvRefresh) {
 
 els.applyLlm.addEventListener("click", () => {
   applyYamlDocuments(els.llmYaml.value, els.llmApplyResult, els.applyLlm, () => {
+    syncFailoverTestFromBuilder();
     refreshInventory("llm");
   });
 });

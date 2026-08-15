@@ -1,0 +1,69 @@
+# Optional sample — not applied by Terraform.
+# Docs: https://docs.solo.io/agentgateway/latest/llm/failover/
+# Create openai-secret first. secretRef name only — no API keys.
+#
+#   kubectl -n agentgateway-system create secret generic openai-secret \
+#     --from-literal=Authorization="${OPENAI_API_KEY}"
+#
+# Without the health policy, backends are not evicted and failover does not occur.
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: model-failover
+  namespace: agentgateway-system
+spec:
+  ai:
+    groups:
+      - providers:
+          - name: openai-primary
+            openai:
+              model: gpt-4o-mini
+            policies:
+              auth:
+                secretRef:
+                  name: openai-secret
+      - providers:
+          - name: openai-fallback
+            openai:
+              model: gpt-4o
+            policies:
+              auth:
+                secretRef:
+                  name: openai-secret
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: model-failover
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /model
+      backendRefs:
+        - name: model-failover
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: model-failover-health
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
+      name: model-failover
+  backend:
+    health:
+      unhealthyCondition: "response.code >= 500 || response.code == 429"
+      eviction:
+        duration: 10s
+        consecutiveFailures: 1

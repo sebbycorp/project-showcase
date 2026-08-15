@@ -64,16 +64,247 @@
     },
   };
 
-  const LLM_PRESETS = [
-    { id: "openai", label: "OpenAI backend + HTTPRoute", provider: "openai" },
-    { id: "claude", label: "Claude backend + HTTPRoute", provider: "claude" },
-    { id: "grok", label: "Grok (OpenAI-compat) + HTTPRoute", provider: "grok" },
-    { id: "bedrock", label: "Bedrock backend + HTTPRoute", provider: "bedrock" },
-    { id: "gemini", label: "Gemini backend + HTTPRoute", provider: "gemini" },
-    { id: "failover", label: "Failover backend (primary + fallback)" },
-    { id: "httproute", label: "HTTPRoute add-on only" },
-    { id: "gateway", label: "Gateway (HTTP :80)" },
+  const HEALTH_DEFAULTS = {
+    unhealthyCondition: "response.code >= 500 || response.code == 429",
+    evictionDuration: "10s",
+    consecutiveFailures: 1,
+  };
+
+  const LLM_CATALOG = [
+    {
+      id: "openai",
+      group: "Connect",
+      label: "OpenAI backend",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/providers/openai/",
+      blurb: "EnterpriseAgentgatewayBackend + HTTPRoute for OpenAI.",
+      provider: "openai",
+      fields: ["core", "provider", "model", "secret", "path", "gateway"],
+    },
+    {
+      id: "claude",
+      group: "Connect",
+      label: "Claude backend",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/providers/anthropic/",
+      blurb: "Anthropic Claude backend + HTTPRoute.",
+      provider: "claude",
+      fields: ["core", "provider", "model", "secret", "path", "gateway"],
+    },
+    {
+      id: "grok",
+      group: "Connect",
+      label: "Grok backend",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/providers/openai-compatible/",
+      blurb: "OpenAI-compatible Grok backend (host api.x.ai).",
+      provider: "grok",
+      fields: ["core", "provider", "model", "secret", "path", "gateway", "compat"],
+    },
+    {
+      id: "bedrock",
+      group: "Connect",
+      label: "Bedrock backend",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/providers/bedrock/",
+      blurb: "Amazon Bedrock backend + HTTPRoute.",
+      provider: "bedrock",
+      fields: ["core", "provider", "model", "secret", "path", "gateway", "region"],
+    },
+    {
+      id: "gemini",
+      group: "Connect",
+      label: "Gemini backend",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/providers/google/",
+      blurb: "Google Gemini backend + HTTPRoute.",
+      provider: "gemini",
+      fields: ["core", "provider", "model", "secret", "path", "gateway"],
+    },
+    {
+      id: "secretref",
+      group: "Connect",
+      label: "API key secretRef",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/api-keys/",
+      blurb: "Backend auth via secretRef name only. Create the Secret in-cluster first — never paste a key.",
+      fields: ["core", "provider", "model", "secret", "path", "gateway"],
+    },
+    {
+      id: "agw-model",
+      group: "Connect",
+      label: "AgentgatewayModel",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/models/serve/",
+      blurb: "Model-centric 2026.8 API. Experimental; enable AgentgatewayModel on the control plane first.",
+      fields: ["core", "provider", "secret", "gateway"],
+    },
+    {
+      id: "gateway",
+      group: "Connect",
+      label: "Gateway (HTTP :80)",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/",
+      blurb: "HTTP listener on agentgateway-proxy.",
+      fields: ["core", "gateway"],
+    },
+    {
+      id: "model-failover",
+      group: "Route",
+      label: "Model failover",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/failover/",
+      blurb: "Same provider, priority groups, plus the required health policy.",
+      fields: ["core", "provider", "model", "fallback", "secret", "path", "gateway", "health"],
+    },
+    {
+      id: "provider-failover",
+      group: "Route",
+      label: "Provider failover",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/failover/",
+      blurb: "OpenAI → Claude / Grok on one backend. Health policy evicts 5xx/429.",
+      fields: [
+        "core",
+        "provider",
+        "model",
+        "fallback",
+        "secret",
+        "path",
+        "gateway",
+        "fallbackProvider",
+        "health",
+      ],
+    },
+    {
+      id: "load-balance",
+      group: "Route",
+      label: "Load balancing (P2C)",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/load-balancing/",
+      blurb: "Two providers in one priority group. P2C picks by health and latency.",
+      fields: [
+        "core",
+        "provider",
+        "model",
+        "secret",
+        "path",
+        "gateway",
+        "fallback",
+        "fallbackProvider",
+      ],
+    },
+    {
+      id: "content-routing",
+      group: "Route",
+      label: "Content-based routing",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/content-routing/",
+      blurb: "Extract json(request.body).model into x-model, then match GPT vs Claude.",
+      fields: ["core", "secret", "gateway", "fallbackSecret"],
+    },
+    {
+      id: "httproute",
+      group: "Route",
+      label: "HTTPRoute add-on",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/",
+      blurb: "Path rewrite onto an existing backend.",
+      fields: ["core", "path", "gateway"],
+    },
+    {
+      id: "virtual-model",
+      group: "Route",
+      label: "Virtual model failover",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/models/virtual/",
+      blurb: "Public AgentgatewayModel with virtualModel.failover to Internal targets.",
+      fields: ["core", "provider", "model", "fallback", "secret", "gateway"],
+    },
+    {
+      id: "prompt-guard",
+      group: "Protect",
+      label: "Prompt guard",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/guardrails/regex/",
+      blurb: "Reject requests that match a regex (docs example: credit card).",
+      fields: ["core", "targetRoute", "regex"],
+    },
+    {
+      id: "rbac",
+      group: "Protect",
+      label: "CEL RBAC",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/rbac/",
+      blurb: "Allow only requests whose header matches a CEL expression.",
+      fields: ["core", "targetRoute", "header"],
+    },
+    {
+      id: "prompt-enrichment",
+      group: "Control",
+      label: "Prompt enrichment",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/prompt-enrichment/",
+      blurb: "Prepend a system prompt on an HTTPRoute.",
+      fields: ["core", "targetRoute", "prompt"],
+    },
+    {
+      id: "prompt-template",
+      group: "Control",
+      label: "Prompt template",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/prompt-templates/",
+      blurb: "Static prepend + append system prompts.",
+      fields: ["core", "targetRoute", "prompt", "promptAppend"],
+    },
+    {
+      id: "transformation",
+      group: "Control",
+      label: "Request transformation",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/transformations/",
+      blurb: "CEL field transform, e.g. cap max_completion_tokens.",
+      fields: ["core", "targetRoute", "transform"],
+    },
+    {
+      id: "rate-limit",
+      group: "Control",
+      label: "Rate limiting",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/rate-limit/",
+      blurb: "RateLimitConfig + policy. Request or token counters.",
+      fields: ["core", "targetRoute", "rateLimit"],
+    },
+    {
+      id: "alias",
+      group: "Control",
+      label: "Model aliasing",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/alias/",
+      blurb: "policies.ai.modelAliases on a provider backend.",
+      fields: ["core", "provider", "secret", "path", "gateway", "alias"],
+    },
+    {
+      id: "budget",
+      group: "Control",
+      label: "Cost budget",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/cost-controls/budget-limits/",
+      blurb: "EnterpriseAgentgatewayBudget plus entBudgetEnforcement on a route.",
+      fields: ["core", "targetRoute", "budget"],
+    },
+    {
+      id: "streaming",
+      group: "Control",
+      label: "Streaming",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/streaming/",
+      blurb: "Client sets stream: true. No gateway CRD.",
+      apply: false,
+      fields: [],
+    },
+    {
+      id: "functions",
+      group: "Control",
+      label: "Function calling",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/functions/",
+      blurb: "Tools go in the chat request body. No gateway CRD.",
+      apply: false,
+      fields: [],
+    },
   ];
+
+  const LLM_PRESETS = LLM_CATALOG.filter((item) => item.apply !== false).map((item) => ({
+    id: item.id,
+    label: item.label,
+    provider: item.provider,
+    group: item.group,
+  }));
+
+  function catalogRecipe(id) {
+    const mapped = id === "failover" ? "model-failover" : id;
+    return (
+      LLM_CATALOG.find((item) => item.id === mapped) ||
+      LLM_CATALOG.find((item) => item.id === "openai")
+    );
+  }
 
   const MCP_PRESETS = [
     { id: "remote", label: "Remote MCP URL" },
@@ -361,6 +592,31 @@
     };
   }
 
+  function isFailoverPreset(preset) {
+    return (
+      preset === "failover" ||
+      preset === "model-failover" ||
+      preset === "provider-failover"
+    );
+  }
+
+  function normalizeFailoverPreset(preset, providerFailover) {
+    if (preset === "provider-failover" || providerFailover) {
+      return "provider-failover";
+    }
+    if (preset === "failover" || preset === "model-failover") {
+      return "model-failover";
+    }
+    return preset;
+  }
+
+  function parseModelList(raw) {
+    return String(raw || "")
+      .split(/[,;\n]+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
   function llmHeader(fields) {
     const docs =
       fields.provider === "claude"
@@ -372,66 +628,94 @@
             : fields.provider === "gemini"
               ? "https://docs.solo.io/agentgateway/latest/llm/providers/google/"
               : "https://docs.solo.io/agentgateway/latest/llm/providers/openai/";
-    const extra = fields.failover
-      ? "# Failover groups: https://docs.solo.io/agentgateway/latest/llm/failover/\n"
+    const extra = isFailoverPreset(fields.preset) || fields.failover
+      ? "# Failover groups: https://docs.solo.io/agentgateway/latest/llm/failover/\n# Health policy is required — without it, backends are not evicted and failover does not occur.\n"
       : "";
     return `# Docs: ${docs}\n# secretRef name only — create the Secret in the cluster first.\n${extra}`;
   }
 
+  function llmGroupProvider(fields, { name, model }) {
+    const local = { ...fields, model, failover: true };
+    const block = {
+      name,
+      ...llmProviderBlock(local),
+    };
+    const policies = {};
+    const auth = llmAuth(local.provider, String(local.secretRef || "").trim());
+    if (auth) {
+      policies.auth = auth;
+    }
+    const host = String(local.host || "").trim();
+    if (host) {
+      policies.tls = { sni: host };
+    }
+    if (Object.keys(policies).length) {
+      block.policies = policies;
+    }
+    return block;
+  }
+
+  function fallbackProviderFields(fields) {
+    const provider = String(fields.fallbackProvider || "").trim() || "claude";
+    const defaults = llmDefaults(provider);
+    return {
+      ...defaults,
+      provider,
+      model: String(fields.fallbackModel || "").trim() || defaults.model,
+      secretRef:
+        String(fields.fallbackSecretRef || "").trim() || defaults.secretRef,
+      namespace: fields.namespace,
+      gateway: fields.gateway,
+    };
+  }
+
   function llmBackendDoc(fields) {
-    const name = cleanName(fields.name, "openai");
+    const failover = isFailoverPreset(fields.preset) || fields.failover;
+    const name = cleanName(
+      fields.name,
+      failover
+        ? normalizeFailoverPreset(fields.preset, fields.preset === "provider-failover")
+        : "openai"
+    );
     const namespace = cleanNs(fields.namespace);
     const spec = {};
-    if (fields.failover) {
-      const fallback = String(fields.fallbackModel || "").trim();
-      const primaryFields = { ...fields, failover: false };
-      const fallbackFields = { ...fields, model: fallback, failover: false };
-      const primary = {
-        name: `${name}-primary`,
-        ...llmProviderBlock(primaryFields),
-      };
-      const primaryAuth = llmAuth(
-        fields.provider,
-        String(fields.secretRef || "").trim()
-      );
-      if (primaryAuth) {
-        primary.policies = { auth: primaryAuth };
+    if (failover) {
+      const primaryFields = { ...fields, failover: true };
+      const primary = llmGroupProvider(primaryFields, {
+        name: `${primaryFields.provider || "openai"}-primary`,
+        model: fields.model,
+      });
+      const groups = [{ providers: [primary] }];
+      if (normalizeFailoverPreset(fields.preset) === "provider-failover") {
+        const fallbackFields = fallbackProviderFields(fields);
+        groups.push({
+          providers: [
+            llmGroupProvider(fallbackFields, {
+              name: `${fallbackFields.provider}-fallback`,
+              model: fallbackFields.model,
+            }),
+          ],
+        });
+      } else {
+        const fallbacks = parseModelList(fields.fallbackModel);
+        const models = fallbacks.length
+          ? fallbacks
+          : [String(fields.fallbackModel || "").trim() || "gpt-4o"];
+        models.forEach((model, index) => {
+          groups.push({
+            providers: [
+              llmGroupProvider(primaryFields, {
+                name:
+                  index === 0
+                    ? `${primaryFields.provider || "openai"}-fallback`
+                    : `${primaryFields.provider || "openai"}-fallback-${index + 1}`,
+                model,
+              }),
+            ],
+          });
+        });
       }
-      if (String(fields.host || "").trim()) {
-        primary.policies = primary.policies || {};
-        primary.policies.tls = { sni: String(fields.host).trim() };
-        if (String(fields.host || "").trim()) {
-          primary.host = String(fields.host).trim();
-          const port = Number(fields.port);
-          primary.port = Number.isFinite(port) && port > 0 ? port : 443;
-          if (String(fields.providerPath || "").trim()) {
-            primary.path = String(fields.providerPath).trim();
-          }
-        }
-      }
-      const fallbackProv = {
-        name: `${name}-fallback`,
-        ...llmProviderBlock(fallbackFields),
-      };
-      if (primaryAuth) {
-        fallbackProv.policies = { auth: primaryAuth };
-      }
-      if (String(fields.host || "").trim()) {
-        fallbackProv.policies = fallbackProv.policies || {};
-        fallbackProv.policies.tls = { sni: String(fields.host).trim() };
-        fallbackProv.host = String(fields.host).trim();
-        const port = Number(fields.port);
-        fallbackProv.port = Number.isFinite(port) && port > 0 ? port : 443;
-        if (String(fields.providerPath || "").trim()) {
-          fallbackProv.path = String(fields.providerPath).trim();
-        }
-      }
-      spec.ai = {
-        groups: [
-          { providers: [primary] },
-          { providers: [fallbackProv] },
-        ],
-      };
+      spec.ai = { groups };
     } else {
       spec.ai = { provider: llmProviderBlock(fields) };
       const policies = llmPolicies(fields);
@@ -448,8 +732,21 @@
   }
 
   function healthPolicyDoc(fields) {
-    const name = cleanName(fields.name, "openai");
+    const failover = isFailoverPreset(fields.preset) || fields.failover;
+    const name = cleanName(
+      fields.name,
+      failover
+        ? normalizeFailoverPreset(fields.preset, fields.preset === "provider-failover")
+        : "openai"
+    );
     const namespace = cleanNs(fields.namespace);
+    const condition =
+      String(fields.unhealthyCondition || "").trim() ||
+      HEALTH_DEFAULTS.unhealthyCondition;
+    const duration =
+      String(fields.evictionDuration || "").trim() ||
+      HEALTH_DEFAULTS.evictionDuration;
+    const failures = Number(fields.consecutiveFailures);
     return {
       apiVersion: AGW_API,
       kind: KIND_POLICY,
@@ -464,16 +761,427 @@
         ],
         backend: {
           health: {
-            unhealthyCondition: "response.code >= 500 || response.code == 429",
-            eviction: { duration: "10s", consecutiveFailures: 1 },
+            unhealthyCondition: condition,
+            eviction: {
+              duration,
+              consecutiveFailures:
+                Number.isFinite(failures) && failures > 0
+                  ? Math.floor(failures)
+                  : HEALTH_DEFAULTS.consecutiveFailures,
+            },
           },
         },
       },
     };
   }
 
+  function routeTarget(fields, fallback) {
+    return {
+      group: "gateway.networking.k8s.io",
+      kind: KIND_ROUTE,
+      name: cleanName(fields.targetRoute || fields.name, fallback),
+    };
+  }
+
+  function gatewayTarget(fields) {
+    return {
+      group: "gateway.networking.k8s.io",
+      kind: KIND_GATEWAY,
+      name: cleanName(fields.gateway, DEFAULT_GATEWAY),
+    };
+  }
+
+  function policyDoc(name, namespace, spec) {
+    return {
+      apiVersion: AGW_API,
+      kind: KIND_POLICY,
+      metadata: meta(name, namespace),
+      spec,
+    };
+  }
+
+  function loadBalanceDocs(fields) {
+    const name = cleanName(fields.name, "loadbalanced-backend");
+    const namespace = cleanNs(fields.namespace);
+    const primary = llmGroupProvider(fields, {
+      name: `${fields.provider || "openai"}-primary`,
+      model: fields.model,
+    });
+    const fallbackFields = fallbackProviderFields(fields);
+    const secondary = llmGroupProvider(fallbackFields, {
+      name: `${fallbackFields.provider}-secondary`,
+      model: fallbackFields.model,
+    });
+    const backend = {
+      apiVersion: AGW_API,
+      kind: KIND_BACKEND,
+      metadata: meta(name, namespace),
+      spec: { ai: { groups: [{ providers: [primary, secondary] }] } },
+    };
+    const route = httpRouteDoc({
+      ...fields,
+      name,
+      routePath: String(fields.routePath || "").trim() || "/chat",
+    });
+    return [backend, route];
+  }
+
+  function contentRoutingDocs(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const gateway = cleanName(fields.gateway, DEFAULT_GATEWAY);
+    const openaiSecret = String(fields.secretRef || "").trim() || "openai-secret";
+    const claudeSecret =
+      String(fields.fallbackSecretRef || "").trim() || "anthropic-secret";
+    const openai = {
+      apiVersion: AGW_API,
+      kind: KIND_BACKEND,
+      metadata: meta("openai-backend", namespace),
+      spec: {
+        ai: { provider: { openai: { model: "gpt-4o" } } },
+        policies: { auth: { secretRef: { name: openaiSecret } } },
+      },
+    };
+    const anthropic = {
+      apiVersion: AGW_API,
+      kind: KIND_BACKEND,
+      metadata: meta("anthropic-backend", namespace),
+      spec: {
+        ai: { provider: { anthropic: { model: "claude-3-5-sonnet-latest" } } },
+        policies: { auth: { secretRef: { name: claudeSecret } } },
+      },
+    };
+    const route = {
+      apiVersion: GW_API,
+      kind: KIND_ROUTE,
+      metadata: meta("content-routing", namespace),
+      spec: {
+        parentRefs: [{ name: gateway, namespace }],
+        rules: [
+          {
+            matches: [
+              {
+                path: { type: "PathPrefix", value: "/v1/chat/completions" },
+                headers: [
+                  { type: "RegularExpression", name: "x-model", value: "^gpt-.*" },
+                ],
+              },
+            ],
+            backendRefs: [backendRef("openai-backend", namespace)],
+          },
+          {
+            matches: [
+              {
+                path: { type: "PathPrefix", value: "/v1/chat/completions" },
+                headers: [
+                  {
+                    type: "RegularExpression",
+                    name: "x-model",
+                    value: "^claude-.*",
+                  },
+                ],
+              },
+            ],
+            backendRefs: [backendRef("anthropic-backend", namespace)],
+          },
+        ],
+      },
+    };
+    const extract = policyDoc("extract-model", namespace, {
+      targetRefs: [gatewayTarget(fields)],
+      traffic: {
+        phase: "PreRouting",
+        transformation: {
+          request: { set: [{ name: "x-model", value: "json(request.body).model" }] },
+        },
+      },
+    });
+    return [openai, anthropic, route, extract];
+  }
+
+  function promptGuardDoc(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const name = cleanName(fields.name, "openai-prompt-guard");
+    const match = String(fields.regex || "").trim() || "credit card";
+    return policyDoc(name, namespace, {
+      targetRefs: [routeTarget(fields, "openai")],
+      backend: {
+        ai: {
+          promptGuard: {
+            request: [
+              {
+                response: { message: "Rejected due to inappropriate content" },
+                regex: { action: "Reject", matches: [match] },
+              },
+            ],
+          },
+        },
+      },
+    });
+  }
+
+  function promptEnrichmentDoc(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const name = cleanName(fields.name, "openai-opt");
+    const content =
+      String(fields.prompt || "").trim() ||
+      "Parse the unstructured text into CSV format.";
+    return policyDoc(name, namespace, {
+      targetRefs: [routeTarget(fields, "openai")],
+      backend: {
+        ai: {
+          prompt: { prepend: [{ role: "system", content }] },
+        },
+      },
+    });
+  }
+
+  function promptTemplateDoc(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const name = cleanName(fields.name, "static-prompt-template");
+    const prepend =
+      String(fields.prompt || "").trim() ||
+      "You are a helpful customer service assistant. Always be polite and professional.";
+    const append =
+      String(fields.promptAppend || "").trim() ||
+      "If you cannot answer a question, say so clearly rather than making up information.";
+    return policyDoc(name, namespace, {
+      targetRefs: [routeTarget(fields, "openai")],
+      backend: {
+        ai: {
+          prompt: {
+            prepend: [{ role: "system", content: prepend }],
+            append: [{ role: "system", content: append }],
+          },
+        },
+      },
+    });
+  }
+
+  function transformationDoc(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const name = cleanName(fields.name, "cap-max-tokens");
+    const field = String(fields.transformField || "").trim() || "max_completion_tokens";
+    const expression =
+      String(fields.cel || "").trim() || "min(llmRequest.max_completion_tokens, 10)";
+    return policyDoc(name, namespace, {
+      targetRefs: [routeTarget(fields, "openai")],
+      backend: {
+        ai: { transformations: [{ field, expression }] },
+      },
+    });
+  }
+
+  function rateLimitDocs(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const name = cleanName(fields.name, "openai-rate-limit");
+    const count = Number(fields.rateLimitCount);
+    const unit = String(fields.rateLimitUnit || "").trim() || "MINUTE";
+    const type = String(fields.rateLimitType || "").trim() || "REQUEST";
+    const config = {
+      apiVersion: "ratelimit.solo.io/v1alpha1",
+      kind: "RateLimitConfig",
+      metadata: meta(name, namespace),
+      spec: {
+        raw: {
+          descriptors: [
+            {
+              key: "generic_key",
+              value: "counter",
+              rateLimit: {
+                requestsPerUnit:
+                  Number.isFinite(count) && count > 0 ? Math.floor(count) : 5,
+                unit,
+              },
+            },
+          ],
+          rateLimits: [
+            {
+              actions: [{ genericKey: { descriptorValue: "counter" } }],
+              type,
+            },
+          ],
+        },
+      },
+    };
+    const policy = policyDoc(name, namespace, {
+      targetRefs: [routeTarget(fields, "openai")],
+      traffic: {
+        entRateLimit: {
+          global: { rateLimitConfigRefs: [{ name }] },
+        },
+      },
+    });
+    return [config, policy];
+  }
+
+  function aliasDocs(fields) {
+    const name = cleanName(fields.name, "openai");
+    const namespace = cleanNs(fields.namespace);
+    const alias = String(fields.aliasName || "").trim() || "fast";
+    const target = String(fields.aliasTarget || "").trim() || "gpt-3.5-turbo";
+    const backend = llmBackendDoc({ ...fields, name, failover: false, preset: "openai" });
+    backend.spec.policies = backend.spec.policies || {};
+    backend.spec.policies.ai = backend.spec.policies.ai || {};
+    backend.spec.policies.ai.modelAliases = { [alias]: target };
+    return [backend, httpRouteDoc({ ...fields, name })];
+  }
+
+  function rbacDoc(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const name = cleanName(fields.name, "rbac-policy");
+    const header = String(fields.headerName || "").trim() || "x-llm";
+    const value = String(fields.headerValue || "").trim() || "gemini";
+    return policyDoc(name, namespace, {
+      targetRefs: [routeTarget(fields, "google")],
+      traffic: {
+        authorization: {
+          action: "Allow",
+          policy: {
+            matchExpressions: [`request.headers['${header}'] == '${value}'`],
+          },
+        },
+      },
+    });
+  }
+
+  function agwModelDoc(fields) {
+    const name = cleanName(fields.name, "gpt-4");
+    const namespace = cleanNs(fields.namespace);
+    const providerLabel =
+      fields.provider === "claude"
+        ? "Anthropic"
+        : fields.provider === "gemini"
+          ? "Gemini"
+          : fields.provider === "bedrock"
+            ? "Bedrock"
+            : "OpenAI";
+    const spec = {
+      parentRefs: [
+        {
+          group: "gateway.networking.k8s.io",
+          kind: KIND_GATEWAY,
+          name: cleanName(fields.gateway, DEFAULT_GATEWAY),
+          sectionName: "http",
+        },
+      ],
+      provider: providerLabel,
+    };
+    const secretRef = String(fields.secretRef || "").trim();
+    if (secretRef) {
+      spec.policies = { auth: { secretRef: { name: secretRef } } };
+    }
+    return {
+      apiVersion: "agentgateway.dev/v1alpha1",
+      kind: "AgentgatewayModel",
+      metadata: meta(name, namespace),
+      spec,
+    };
+  }
+
+  function virtualModelDocs(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const gateway = cleanName(fields.gateway, DEFAULT_GATEWAY);
+    const parentRefs = [
+      {
+        group: "gateway.networking.k8s.io",
+        kind: KIND_GATEWAY,
+        name: gateway,
+        sectionName: "http",
+      },
+    ];
+    const secretRef = String(fields.secretRef || "").trim();
+    const providerLabel =
+      fields.provider === "claude"
+        ? "Anthropic"
+        : fields.provider === "gemini"
+          ? "Gemini"
+          : "OpenAI";
+    const primaryName = cleanName(`${fields.name || "resilient"}-primary`, "primary-model");
+    const fallbackName = cleanName(
+      `${fields.name || "resilient"}-fallback`,
+      "fallback-model"
+    );
+    const virtualName = cleanName(fields.name, "resilient");
+    const auth = secretRef ? { auth: { secretRef: { name: secretRef } } } : undefined;
+    const primary = {
+      apiVersion: "agentgateway.dev/v1alpha1",
+      kind: "AgentgatewayModel",
+      metadata: meta(primaryName, namespace),
+      spec: {
+        parentRefs,
+        visibility: "Internal",
+        provider: providerLabel,
+        policies: {
+          ...(auth || {}),
+          health: { eviction: { consecutiveFailures: 1 } },
+        },
+      },
+    };
+    const fallback = {
+      apiVersion: "agentgateway.dev/v1alpha1",
+      kind: "AgentgatewayModel",
+      metadata: meta(fallbackName, namespace),
+      spec: {
+        parentRefs,
+        visibility: "Internal",
+        provider: providerLabel,
+        policies: auth,
+      },
+    };
+    const virtual = {
+      apiVersion: "agentgateway.dev/v1alpha1",
+      kind: "AgentgatewayModel",
+      metadata: meta(virtualName, namespace),
+      spec: {
+        parentRefs,
+        virtualModel: {
+          failover: {
+            targets: [
+              { modelRef: { name: primaryName }, priority: 0 },
+              { modelRef: { name: fallbackName }, priority: 1 },
+            ],
+          },
+        },
+      },
+    };
+    return [primary, fallback, virtual];
+  }
+
+  function budgetDocs(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const name = cleanName(fields.name, "route-budget");
+    const amount = Number(fields.budgetAmount);
+    const budget = {
+      apiVersion: AGW_API,
+      kind: "EnterpriseAgentgatewayBudget",
+      metadata: meta(name, namespace),
+      spec: {
+        budgets: [
+          {
+            name: `${name}-tokens`,
+            limit: {
+              unit: String(fields.budgetUnit || "").trim() || "Tokens",
+              amount: Number.isFinite(amount) && amount > 0 ? Math.floor(amount) : 100000,
+            },
+            window: { unit: String(fields.budgetWindow || "").trim() || "Day" },
+            onBudgetExceeded: "Block",
+          },
+        ],
+      },
+    };
+    const policy = policyDoc(`${name}-enforcement`, namespace, {
+      targetRefs: [routeTarget(fields, "openai")],
+      traffic: { entBudgetEnforcement: {} },
+    });
+    return [budget, policy];
+  }
+
   function generateLlmYaml(fields) {
-    const mode = fields.preset || "backend";
+    const recipe = catalogRecipe(fields.preset || "openai");
+    const mode = recipe.id;
+    if (recipe.apply === false) {
+      return `# ${recipe.label}\n# ${recipe.blurb}\n# Docs: ${recipe.docs}\n`;
+    }
     if (mode === "gateway") {
       return joinDocs(
         [gatewayDoc(fields)],
@@ -494,8 +1202,68 @@
         `# HTTPRoute add-on. Docs: https://docs.solo.io/agentgateway/latest/llm/\n`
       );
     }
+    if (mode === "load-balance") {
+      return joinDocs(
+        loadBalanceDocs(fields),
+        `# Docs: ${recipe.docs}\n# secretRef name only — create the Secrets in the cluster first.\n`
+      );
+    }
+    if (mode === "content-routing") {
+      return joinDocs(
+        contentRoutingDocs(fields),
+        `# Docs: ${recipe.docs}\n# PreRouting is required so x-model is set before route match.\n# secretRef names only.\n`
+      );
+    }
+    if (mode === "prompt-guard") {
+      return joinDocs(
+        [promptGuardDoc(fields)],
+        `# Docs: ${recipe.docs}\n# Safe regex reject example. Not a jailbreak payload.\n`
+      );
+    }
+    if (mode === "prompt-enrichment") {
+      return joinDocs([promptEnrichmentDoc(fields)], `# Docs: ${recipe.docs}\n`);
+    }
+    if (mode === "prompt-template") {
+      return joinDocs([promptTemplateDoc(fields)], `# Docs: ${recipe.docs}\n`);
+    }
+    if (mode === "transformation") {
+      return joinDocs([transformationDoc(fields)], `# Docs: ${recipe.docs}\n`);
+    }
+    if (mode === "rate-limit") {
+      return joinDocs(
+        rateLimitDocs(fields),
+        `# Docs: ${recipe.docs}\n# RateLimitConfig + EnterpriseAgentgatewayPolicy.\n`
+      );
+    }
+    if (mode === "alias") {
+      return joinDocs(
+        aliasDocs(fields),
+        `# Docs: ${recipe.docs}\n# secretRef name only.\n`
+      );
+    }
+    if (mode === "rbac") {
+      return joinDocs([rbacDoc(fields)], `# Docs: ${recipe.docs}\n`);
+    }
+    if (mode === "agw-model") {
+      return joinDocs(
+        [agwModelDoc(fields)],
+        `# Docs: ${recipe.docs}\n# Experimental AgentgatewayModel API. secretRef name only.\n`
+      );
+    }
+    if (mode === "virtual-model") {
+      return joinDocs(
+        virtualModelDocs(fields),
+        `# Docs: ${recipe.docs}\n# Virtual models must be Public and cannot set spec.policies.\n# secretRef name only.\n`
+      );
+    }
+    if (mode === "budget") {
+      return joinDocs(
+        budgetDocs(fields),
+        `# Docs: ${recipe.docs}\n# Omit subject = one budget for all requests on the target route.\n`
+      );
+    }
     const docs = [llmBackendDoc(fields), httpRouteDoc(fields)];
-    if (fields.failover) {
+    if (isFailoverPreset(fields.preset) || fields.failover) {
       docs.push(healthPolicyDoc(fields));
     }
     return joinDocs(docs, llmHeader(fields));
@@ -593,6 +1361,8 @@
 
   function llmDefaults(provider) {
     const spec = LLM_DEFAULTS[provider] || LLM_DEFAULTS.openai;
+    const fallbackProvider = provider === "openai" ? "claude" : "openai";
+    const fallbackSpec = LLM_DEFAULTS[fallbackProvider] || LLM_DEFAULTS.claude;
     return {
       provider: LLM_DEFAULTS[provider] ? provider : "openai",
       gateway: DEFAULT_GATEWAY,
@@ -603,6 +1373,9 @@
       providerPath: "",
       region: "",
       rewriteTo: "",
+      fallbackProvider,
+      fallbackSecretRef: fallbackSpec.secretRef,
+      ...HEALTH_DEFAULTS,
       ...spec,
     };
   }
@@ -628,36 +1401,58 @@
     return cur;
   }
 
+  function detectProviderFromBlock(block) {
+    if (!block || typeof block !== "object") {
+      return "openai";
+    }
+    if (block.bedrock) {
+      return "bedrock";
+    }
+    if (block.anthropic) {
+      return "claude";
+    }
+    if (block.gemini) {
+      return "gemini";
+    }
+    if (block.host) {
+      return "grok";
+    }
+    if (block.openai) {
+      return "openai";
+    }
+    return "openai";
+  }
+
   function detectLlmProvider(spec) {
     const provider = pick(spec, ["ai", "provider"]) || {};
     const firstGroup = pick(spec, ["ai", "groups", 0, "providers", 0]) || {};
     const src = provider.openai || provider.anthropic || provider.bedrock || provider.gemini
       ? provider
       : firstGroup;
-    if (src.bedrock) {
-      return "bedrock";
-    }
-    if (src.anthropic) {
-      return "claude";
-    }
-    if (src.gemini) {
-      return "gemini";
-    }
-    if (src.host || firstGroup.host) {
-      return "grok";
-    }
-    if (src.openai || provider.openai) {
-      return "openai";
-    }
-    return "openai";
+    return detectProviderFromBlock(src);
+  }
+
+  function groupsAreProviderFailover(spec) {
+    const groups = pick(spec, ["ai", "groups"]) || [];
+    const providers = groups
+      .map((group) => detectProviderFromBlock((group && group.providers && group.providers[0]) || {}))
+      .filter(Boolean);
+    return providers.length > 1 && providers.some((item) => item !== providers[0]);
+  }
+
+  function secretFromProvider(block) {
+    return (
+      pick(block, ["policies", "auth", "secretRef", "name"]) ||
+      pick(block, ["policies", "auth", "aws", "secretRef", "name"]) ||
+      ""
+    );
   }
 
   function secretNameFromSpec(spec) {
     return (
       pick(spec, ["policies", "auth", "secretRef", "name"]) ||
       pick(spec, ["policies", "auth", "aws", "secretRef", "name"]) ||
-      pick(spec, ["ai", "groups", 0, "providers", 0, "policies", "auth", "secretRef", "name"]) ||
-      pick(spec, ["ai", "groups", 0, "providers", 0, "policies", "auth", "aws", "secretRef", "name"]) ||
+      secretFromProvider(pick(spec, ["ai", "groups", 0, "providers", 0]) || {}) ||
       ""
     );
   }
@@ -681,11 +1476,32 @@
     return "";
   }
 
-  function fieldsFromLlmResource(item, route) {
+  function fieldsFromHealthPolicy(item) {
+    const health = pick(item, ["spec", "backend", "health"]) || {};
+    const eviction = health.eviction || {};
+    return {
+      unhealthyCondition:
+        health.unhealthyCondition || HEALTH_DEFAULTS.unhealthyCondition,
+      evictionDuration: eviction.duration || HEALTH_DEFAULTS.evictionDuration,
+      consecutiveFailures:
+        eviction.consecutiveFailures != null
+          ? eviction.consecutiveFailures
+          : HEALTH_DEFAULTS.consecutiveFailures,
+      policyName: pick(item, ["metadata", "name"]) || "",
+      targetBackend: pick(item, ["spec", "targetRefs", 0, "name"]) || "",
+    };
+  }
+
+  function isHealthPolicy(item) {
+    return Boolean(pick(item, ["spec", "backend", "health"]));
+  }
+
+  function fieldsFromLlmResource(item, route, policy) {
     const spec = (item && item.spec) || {};
     const provider = detectLlmProvider(spec);
     const defaults = llmDefaults(provider);
     const providerBlock = pick(spec, ["ai", "provider"]) || {};
+    const groups = pick(spec, ["ai", "groups"]) || [];
     const primary = pick(spec, ["ai", "groups", 0, "providers", 0]) || {};
     const fallback = pick(spec, ["ai", "groups", 1, "providers", 0]) || {};
     const src = providerBlock.openai || providerBlock.anthropic || providerBlock.bedrock || providerBlock.gemini
@@ -702,13 +1518,26 @@
       "path",
       "replacePrefixMatch",
     ]);
+    const providerFailover = groupsAreProviderFailover(spec);
+    const failover = Boolean(groups.length);
+    const fallbackModels = groups
+      .slice(1)
+      .map((group) => modelFromProvider((group && group.providers && group.providers[0]) || {}))
+      .filter(Boolean);
+    const health = policy ? fieldsFromHealthPolicy(policy) : {};
     return {
       ...defaults,
       name: pick(item, ["metadata", "name"]) || defaults.name,
       namespace: pick(item, ["metadata", "namespace"]) || defaults.namespace,
       provider,
       model: modelFromProvider(src) || defaults.model,
-      fallbackModel: modelFromProvider(fallback) || defaults.fallbackModel,
+      fallbackModel: fallbackModels.join(", ") || modelFromProvider(fallback) || defaults.fallbackModel,
+      fallbackProvider: providerFailover
+        ? detectProviderFromBlock(fallback)
+        : defaults.fallbackProvider,
+      fallbackSecretRef: providerFailover
+        ? secretFromProvider(fallback) || defaults.fallbackSecretRef
+        : defaults.fallbackSecretRef,
       secretRef: secretNameFromSpec(spec) || defaults.secretRef,
       routePath: match || defaults.routePath,
       rewriteTo: rewrite || "",
@@ -718,8 +1547,19 @@
       port: src.port != null ? String(src.port) : defaults.port || "",
       providerPath: src.path || primary.path || defaults.providerPath || "",
       region: pick(src, ["bedrock", "region"]) || defaults.region || "",
-      failover: Boolean(pick(spec, ["ai", "groups"])),
-      preset: pick(spec, ["ai", "groups"]) ? "failover" : provider,
+      failover,
+      preset: failover
+        ? providerFailover
+          ? "provider-failover"
+          : "model-failover"
+        : provider,
+      unhealthyCondition:
+        health.unhealthyCondition || defaults.unhealthyCondition,
+      evictionDuration: health.evictionDuration || defaults.evictionDuration,
+      consecutiveFailures:
+        health.consecutiveFailures != null
+          ? health.consecutiveFailures
+          : defaults.consecutiveFailures,
     };
   }
 
@@ -826,11 +1666,19 @@
     KIND_GATEWAY,
     KIND_POLICY,
     LLM_PRESETS,
+    LLM_CATALOG,
+    catalogRecipe,
     MCP_PRESETS,
+    HEALTH_DEFAULTS,
     llmDefaults,
     mcpDefaults,
     generateLlmYaml,
     generateMcpYaml,
+    isFailoverPreset,
+    normalizeFailoverPreset,
+    parseModelList,
+    fieldsFromHealthPolicy,
+    isHealthPolicy,
     generateGatewayYaml(fields) {
       return generateLlmYaml({ ...fields, preset: "gateway" });
     },

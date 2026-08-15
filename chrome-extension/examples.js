@@ -65,8 +65,78 @@ spec:
           kind: EnterpriseAgentgatewayBackend
 `,
     },
+    providerFailover: {
+      label: "Provider failover (OpenAI → Claude)",
+      yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/failover/
+# Official provider-failover shape: priority groups on one backend.
+# Primary: OpenAI gpt-4o-mini. Fallback: Anthropic claude-sonnet-4-5.
+# Health policy evicts 5xx/429 so traffic moves to the next group.
+# secretRef names only — create the Secrets in the cluster first.
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: provider-failover
+  namespace: agentgateway-system
+spec:
+  ai:
+    groups:
+      - providers:
+          - name: openai-primary
+            openai:
+              model: gpt-4o-mini
+            policies:
+              auth:
+                secretRef:
+                  name: openai-secret
+      - providers:
+          - name: claude-fallback
+            anthropic:
+              model: claude-sonnet-4-5
+            policies:
+              auth:
+                secretRef:
+                  name: anthropic-secret
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: provider-failover
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /model
+      backendRefs:
+        - name: provider-failover
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: provider-failover-health
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
+      name: provider-failover
+  backend:
+    health:
+      unhealthyCondition: "response.code >= 500 || response.code == 429"
+      eviction:
+        duration: 10s
+        consecutiveFailures: 1
+`,
+    },
     failover: {
-      label: "Failover backend (primary + fallback)",
+      label: "Model failover (same provider)",
       yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/failover/
 # Primary model: gpt-4o-mini (first priority group)
 # Fallback model: gpt-4o (second priority group)

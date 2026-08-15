@@ -209,7 +209,10 @@
           <div class="test-head">
             <div class="test-copy">
               <div class="test-name">Model failover</div>
-              <p class="hint">Primary, then fallback if it fails.</p>
+              <p class="hint">
+                Primary, then fallback if it fails. Tiles follow the Build
+                &amp; apply failover providers after you apply a policy.
+              </p>
             </div>
             <button id="run-failover" type="button" class="btn btn-run">
               Run
@@ -372,8 +375,46 @@
               </button>
             </div>
             <div id="llm-inventory" class="inventory" hidden></div>
-            <label class="field-label" for="llm-preset">Preset</label>
-            <select id="llm-preset"></select>
+            <label class="field-label" for="llm-catalog-search">
+              LLM config catalog
+            </label>
+            <input
+              id="llm-catalog-search"
+              type="search"
+              spellcheck="false"
+              autocomplete="off"
+              placeholder="Search Connect, Route, Protect, Control…"
+            />
+            <div id="llm-catalog" class="catalog-list"></div>
+            <div class="catalog-selected">
+              <div class="catalog-title-row">
+                <span id="llm-catalog-title">OpenAI backend</span>
+                <a
+                  id="llm-docs-link"
+                  href="https://docs.solo.io/agentgateway/latest/llm/providers/openai/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Docs</a
+                >
+              </div>
+              <p class="hint" id="llm-catalog-blurb"></p>
+            </div>
+            <select id="llm-preset" hidden></select>
+            <div id="llm-docs-only" class="docs-only" hidden></div>
+            <p class="hint" id="llm-policy-hint" hidden>
+              Policies add priority groups on one
+              <code>EnterpriseAgentgatewayBackend</code> plus a required
+              <code>EnterpriseAgentgatewayPolicy</code> health policy. Without
+              the health policy, backends are not evicted and failover does not
+              occur.
+              <a
+                href="https://docs.solo.io/agentgateway/latest/llm/failover/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Failover docs</a
+              >.
+            </p>
+            <div id="llm-form-wrap">
             <span class="field-label" id="llm-builder-provider-label">
               Provider
             </span>
@@ -407,7 +448,9 @@
                 />
               </div>
               <div>
-                <label class="field-label" for="llm-model">Model</label>
+                <label class="field-label" for="llm-model" id="llm-model-label">
+                  Model
+                </label>
                 <input
                   id="llm-model"
                   class="builder-field"
@@ -419,7 +462,7 @@
               </div>
               <div id="llm-fallback-wrap" hidden>
                 <label class="field-label" for="llm-fallback">
-                  Fallback model
+                  Fallback model(s)
                 </label>
                 <input
                   id="llm-fallback"
@@ -427,7 +470,7 @@
                   type="text"
                   spellcheck="false"
                   autocomplete="off"
-                  placeholder="gpt-4o"
+                  placeholder="gpt-4o, gpt-3.5-turbo"
                 />
               </div>
               <div>
@@ -514,6 +557,271 @@
                 />
               </div>
             </div>
+            <div id="llm-fallback-provider-wrap" hidden>
+              <span class="builder-subhead">Fallback provider</span>
+              <span class="field-label" id="llm-fallback-provider-label">
+                Fallback provider
+              </span>
+              <div
+                class="provider-switch"
+                id="llm-fallback-provider"
+                data-scope="fallback"
+                role="radiogroup"
+                aria-labelledby="llm-fallback-provider-label"
+              ></div>
+              <div class="field-grid">
+                <div>
+                  <label class="field-label" for="llm-fallback-secret">
+                    Fallback secretRef
+                  </label>
+                  <input
+                    id="llm-fallback-secret"
+                    class="builder-field"
+                    type="text"
+                    spellcheck="false"
+                    autocomplete="off"
+                    placeholder="anthropic-secret"
+                  />
+                </div>
+              </div>
+            </div>
+            <div id="llm-health-wrap" hidden>
+              <span class="builder-subhead">Health policy</span>
+              <p class="hint">
+                Evicts the current priority group on matching responses so
+                traffic moves to the next group.
+              </p>
+              <div class="field-grid">
+                <div class="field-span">
+                  <label class="field-label" for="llm-unhealthy">
+                    unhealthyCondition
+                  </label>
+                  <input
+                    id="llm-unhealthy"
+                    class="builder-field"
+                    type="text"
+                    spellcheck="false"
+                    autocomplete="off"
+                    placeholder="response.code >= 500 || response.code == 429"
+                  />
+                </div>
+                <div>
+                  <label class="field-label" for="llm-eviction">
+                    Eviction duration
+                  </label>
+                  <input
+                    id="llm-eviction"
+                    class="builder-field"
+                    type="text"
+                    spellcheck="false"
+                    autocomplete="off"
+                    placeholder="10s"
+                  />
+                </div>
+                <div>
+                  <label class="field-label" for="llm-failures">
+                    consecutiveFailures
+                  </label>
+                  <input
+                    id="llm-failures"
+                    class="builder-field"
+                    type="number"
+                    min="1"
+                    step="1"
+                    spellcheck="false"
+                    autocomplete="off"
+                    placeholder="1"
+                  />
+                </div>
+              </div>
+            </div>
+            <div id="llm-target-wrap" hidden>
+              <label class="field-label" for="llm-target-route">
+                Target HTTPRoute
+              </label>
+              <input
+                id="llm-target-route"
+                class="builder-field"
+                type="text"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="openai"
+              />
+            </div>
+            <div id="llm-prompt-wrap" hidden>
+              <label class="field-label" for="llm-prompt">System prompt</label>
+              <textarea
+                id="llm-prompt"
+                class="builder-field"
+                rows="3"
+                spellcheck="false"
+                placeholder="Parse the unstructured text into CSV format."
+              ></textarea>
+            </div>
+            <div id="llm-prompt-append-wrap" hidden>
+              <label class="field-label" for="llm-prompt-append">
+                Append prompt
+              </label>
+              <textarea
+                id="llm-prompt-append"
+                class="builder-field"
+                rows="2"
+                spellcheck="false"
+                placeholder="If you cannot answer a question, say so clearly."
+              ></textarea>
+            </div>
+            <div id="llm-regex-wrap" hidden>
+              <label class="field-label" for="llm-regex">Regex match</label>
+              <input
+                id="llm-regex"
+                class="builder-field"
+                type="text"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="credit card"
+              />
+            </div>
+            <div class="field-grid" id="llm-header-wrap" hidden>
+              <div>
+                <label class="field-label" for="llm-header-name">Header</label>
+                <input
+                  id="llm-header-name"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="x-llm"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="llm-header-value">Value</label>
+                <input
+                  id="llm-header-value"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="gemini"
+                />
+              </div>
+            </div>
+            <div class="field-grid" id="llm-transform-wrap" hidden>
+              <div>
+                <label class="field-label" for="llm-transform-field">
+                  Field
+                </label>
+                <input
+                  id="llm-transform-field"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="max_completion_tokens"
+                />
+              </div>
+              <div class="field-span">
+                <label class="field-label" for="llm-cel">CEL expression</label>
+                <input
+                  id="llm-cel"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="min(llmRequest.max_completion_tokens, 10)"
+                />
+              </div>
+            </div>
+            <div class="field-grid" id="llm-alias-wrap" hidden>
+              <div>
+                <label class="field-label" for="llm-alias-name">Alias</label>
+                <input
+                  id="llm-alias-name"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="fast"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="llm-alias-target">
+                  Target model
+                </label>
+                <input
+                  id="llm-alias-target"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="gpt-3.5-turbo"
+                />
+              </div>
+            </div>
+            <div class="field-grid" id="llm-ratelimit-wrap" hidden>
+              <div>
+                <label class="field-label" for="llm-rl-count">
+                  requestsPerUnit
+                </label>
+                <input
+                  id="llm-rl-count"
+                  class="builder-field"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="5"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="llm-rl-unit">Unit</label>
+                <input
+                  id="llm-rl-unit"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="MINUTE"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="llm-rl-type">Type</label>
+                <input
+                  id="llm-rl-type"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="REQUEST"
+                />
+              </div>
+            </div>
+            <div class="field-grid" id="llm-budget-wrap" hidden>
+              <div>
+                <label class="field-label" for="llm-budget-amount">
+                  Token amount
+                </label>
+                <input
+                  id="llm-budget-amount"
+                  class="builder-field"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="100000"
+                />
+              </div>
+              <div>
+                <label class="field-label" for="llm-budget-window">Window</label>
+                <input
+                  id="llm-budget-window"
+                  class="builder-field"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="Day"
+                />
+              </div>
+            </div>
+            </div>
+            <div id="llm-apply-wrap">
             <label class="field-label" for="llm-yaml">YAML preview</label>
             <textarea
               id="llm-yaml"
@@ -528,6 +836,7 @@
               <button id="apply-llm" type="button" class="btn">Apply</button>
             </div>
             <div id="llm-apply-result" class="result-box" hidden></div>
+            </div>
           </div>
         </details>
       </div>
@@ -1125,7 +1434,8 @@
 
         <h2 class="cluster-heading">Resources</h2>
         <p class="hint">
-          Gateway, Backend, HTTPRoute, and Policy in the namespace above. Load
+          Gateway, Backend, HTTPRoute, Policy, Model, RateLimit, and Budget
+          in the namespace above. Load
           one into the YAML box or delete it. Apply still accepts freeform YAML
           (or JSON) with multiple documents.
         </p>
@@ -1149,6 +1459,11 @@
           </option>
           <option value="EnterpriseAgentgatewayPolicy">
             EnterpriseAgentgatewayPolicy
+          </option>
+          <option value="AgentgatewayModel">AgentgatewayModel</option>
+          <option value="RateLimitConfig">RateLimitConfig</option>
+          <option value="EnterpriseAgentgatewayBudget">
+            EnterpriseAgentgatewayBudget
           </option>
         </select>
 

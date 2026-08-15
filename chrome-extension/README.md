@@ -146,23 +146,49 @@ latency, model, and reply or error.
 - **Model failover** — two provider tiles (primary + fallback). On Run,
   primary lights, then dims if it fails and fallback lights. Hop labels
   say **Primary failed** / **Failover → {provider}**. Default models
-  stay `gpt-4o-mini` / `gpt-4o` for the OpenAI pill; tiles follow the
-  model names so Claude → Grok (or any pair) is visible
+  stay `gpt-4o-mini` / `gpt-4o` for the OpenAI pill. After you apply a
+  failover policy, tiles follow that form’s primary/fallback providers
+  (not hardcoded OpenAI), so OpenAI → Claude is visible
 - **List / call model** — `GET /v1/models`, then chat with the chosen
   model
 
-The LLM builder (from `manifests/` and
-[Solo LLM docs](https://docs.solo.io/agentgateway/latest/llm/))
-creates or updates an `EnterpriseAgentgatewayBackend` plus `HTTPRoute`:
+The LLM builder is a searchable **config catalog** from the
+[Solo LLM index](https://docs.solo.io/agentgateway/latest/llm/), grouped
+**Connect / Route / Protect / Control**. Picking a recipe fills a short
+form, a live YAML preview, and **Apply**. Each recipe links **Docs** to
+the exact Solo page. YAML is documented fields only — no invented CRDs.
+If a topic has no apply-able gateway YAML, the catalog shows a one-line
+“see docs” card instead of fake YAML.
 
-- Fields: name, namespace (default from Settings), provider pill, model,
-  `secretRef` name, route path (`/v1/chat/completions` or `/openai`),
-  parent Gateway (default `agentgateway-proxy`)
-- Presets: OpenAI, Claude, Grok (OpenAI-compat), Bedrock, Gemini,
-  failover groups + health policy, HTTPRoute add-on, Gateway HTTP :80
-- Inventory: list Gateways, HTTPRoutes, and AI backends from the
-  cluster; **Load** fills the form or **Delete** (confirm)
-- Live YAML preview — edit before Apply. No secret values.
+**Connect**
+- Provider backends: OpenAI, Claude, Grok, Bedrock, Gemini
+- API key `secretRef` (name only — never the key)
+- `AgentgatewayModel` (2026.8 model API)
+- Gateway (HTTP :80)
+
+**Route**
+- Model failover + required health policy
+- Provider failover (OpenAI → Claude / Grok)
+- Load balancing (P2C, two providers in one group)
+- Content-based routing (`json(request.body).model` → `x-model`)
+- HTTPRoute add-on
+- Virtual model failover (`virtualModel.failover`)
+
+**Protect**
+- Prompt guard (regex reject, docs example `credit card`)
+- CEL RBAC (allow header match)
+
+**Control**
+- Prompt enrichment / static prompt templates
+- Request transformations (CEL, e.g. cap `max_completion_tokens`)
+- Rate limiting (`RateLimitConfig` + policy)
+- Model aliasing (`policies.ai.modelAliases`)
+- Cost budget (`EnterpriseAgentgatewayBudget` + `entBudgetEnforcement`)
+- Streaming and function calling — see-docs cards (client request only)
+
+Inventory lists Gateway, HTTPRoute, AI backends, Policy,
+`AgentgatewayModel`, `RateLimitConfig`, and Budget. **Load** / **Delete**
+work like the existing builder. No secret values.
 
 ### MCP
 
@@ -218,8 +244,8 @@ The gear in the header opens **Settings**.
   loop. Honors `prefers-reduced-motion`.
 - **Cluster** — API server, token, namespace, kubeconfig parse, Test
   connection, a short **Resources** list (Gateway / Backend / HTTPRoute /
-  Policy), and freeform Apply YAML. LLM and MCP builders use these
-  fields.
+  Policy / Model / RateLimit / Budget), and freeform Apply YAML. LLM and
+  MCP builders use these fields.
 
 ## Cluster
 
@@ -274,9 +300,10 @@ Always visible. **Refresh** and **Apply** need an API server URL and
 token, and a successful **Test connection**.
 
 - **In cluster** — `GET` Gateway, `EnterpriseAgentgatewayBackend`,
-  `HTTPRoute`, and `EnterpriseAgentgatewayPolicy` in the configured
-  namespace. **Load** copies a resource into the YAML box; **Delete**
-  asks for confirm.
+  `HTTPRoute`, `EnterpriseAgentgatewayPolicy`, `AgentgatewayModel`,
+  `RateLimitConfig`, and `EnterpriseAgentgatewayBudget` in the
+  configured namespace. **Load** copies a resource into the YAML box;
+  **Delete** asks for confirm.
 - **YAML** — paste one or more documents (YAML preferred; JSON is accepted).
   **Load example** fills a small Gateway + OpenAI
   `EnterpriseAgentgatewayBackend` + `HTTPRoute`. The example uses
