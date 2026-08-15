@@ -12,6 +12,7 @@ A fresh `terraform apply` with the license and OpenAI key produces that stack. D
 | `helm/management-values.yaml` | Shared ClickHouse persistence values (Terraform + fallback script) |
 | `manifests/` | Gateway + OpenAI backend/HTTPRoute (no secrets); applied by Terraform |
 | `scripts/install-agentgateway.sh` | Optional non-Terraform fallback for the in-cluster stack |
+| `chrome-extension/` | Manifest V3 popup chat against the Agentgateway `/v1/chat/completions` proxy |
 
 ## Prerequisites
 
@@ -113,6 +114,10 @@ terraform destroy -target=google_container_cluster.autopilot
 ```
 
 The project uses `deletion_policy = PREVENT` by default so `terraform destroy` will not delete `maniak-showcase`. Set `-var=project_deletion_policy=DELETE` if you intend to remove the project.
+
+## Chrome extension
+
+`chrome-extension/` is a Manifest V3 popup that chats through a configurable Agentgateway endpoint (saved in `chrome.storage.local`; no API keys). Load it unpacked from that folder — see [chrome-extension/README.md](chrome-extension/README.md).
 
 ## CI
 

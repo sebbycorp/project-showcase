@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agentgateway Chat</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <h1>Agentgateway Chat</h1>
+      <label class="endpoint-label" for="endpoint">Endpoint URL</label>
+      <input
+        id="endpoint"
+        type="url"
+        spellcheck="false"
+        autocomplete="off"
+        placeholder="http://host/v1/chat/completions"
+      />
+    </header>
+
+    <main id="log" class="log" aria-live="polite"></main>
+
+    <form id="chat-form" class="composer">
+      <textarea
+        id="message"
+        rows="2"
+        placeholder="Message…"
+        autocomplete="off"
+      ></textarea>
+      <button id="send" type="submit">Send</button>
+    </form>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
