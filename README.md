@@ -70,6 +70,8 @@ Each of **LLM**, **MCP**, **A2A**, and **API/HTTP** has **Apply** + **Run** card
 
 ![API/HTTP workshop demos](docs/images/api-waf.png)
 
+![Entra and Keycloak JWT workshop cards](docs/images/api-identity.png)
+
 ## Install
 
 Load the unpacked extension in Chrome (desktop). This is not on the Chrome Web Store.
@@ -179,7 +181,11 @@ az account get-access-token
 az account get-access-token --resource api://<client-id>
 ```
 
+![Settings → Identity, Entra ID](docs/images/identity-entra.png)
+
 **Keycloak** — Issuer URL with no trailing slash (for example `http://10.0.0.5:8080/realms/mcp-enterprise`), optional realm (parsed from `/realms/<name>` if empty), optional audience, optional access token. **Apply Keycloak JWT** targets `/openai-keycloak`.
+
+![Settings → Identity, Keycloak](docs/images/identity-keycloak.png)
 
 **Run** posts chat completions with no token (expect 401/403), then with the pasted bearer if present (expect 200). The result shows `iss` / `aud` (and Entra `tid`) from the JWT payload — never the raw token.
 
