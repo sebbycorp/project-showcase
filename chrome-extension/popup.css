@@ -52,10 +52,17 @@ body {
 
 .area-tabs button,
 #scenario-type,
+#cluster-type,
+#crd-kind,
 #run-failover,
 #probe-mcp,
 #probe-a2a,
 #run-security,
+#parse-kubeconfig,
+#test-cluster,
+#list-crds,
+#load-example,
+#apply-crds,
 #test,
 #send {
   font: inherit;
@@ -65,11 +72,12 @@ body {
 
 .area-tabs button {
   flex: 1 1 0;
-  padding: 6px 8px;
+  padding: 6px 4px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg);
   color: var(--text);
+  font-size: 12px;
 }
 
 .area-tabs button.is-active {
@@ -114,6 +122,13 @@ body {
 #mcp-endpoint,
 #a2a-endpoint,
 #scenario-type,
+#cluster-type,
+#cluster-api-server,
+#cluster-token,
+#cluster-namespace,
+#cluster-kubeconfig,
+#crd-kind,
+#crd-yaml,
 #message {
   width: 100%;
   padding: 6px 8px;
@@ -160,6 +175,10 @@ body {
 #probe-mcp,
 #probe-a2a,
 #run-security,
+#parse-kubeconfig,
+#test-cluster,
+#list-crds,
+#apply-crds,
 #send {
   border: 0;
   border-radius: 6px;
@@ -175,7 +194,12 @@ body {
 #run-failover,
 #probe-mcp,
 #probe-a2a,
-#run-security {
+#run-security,
+#parse-kubeconfig,
+#test-cluster,
+#list-crds,
+#apply-crds,
+#load-example {
   display: block;
   width: 100%;
   margin-top: 10px;
@@ -187,6 +211,10 @@ body {
 #probe-mcp:hover:not(:disabled),
 #probe-a2a:hover:not(:disabled),
 #run-security:hover:not(:disabled),
+#parse-kubeconfig:hover:not(:disabled),
+#test-cluster:hover:not(:disabled),
+#list-crds:hover:not(:disabled),
+#apply-crds:hover:not(:disabled),
 #send:hover:not(:disabled) {
   background: var(--accent-hover);
 }
@@ -196,6 +224,11 @@ body {
 #probe-mcp:disabled,
 #probe-a2a:disabled,
 #run-security:disabled,
+#parse-kubeconfig:disabled,
+#test-cluster:disabled,
+#list-crds:disabled,
+#apply-crds:disabled,
+#load-example:disabled,
 #send:disabled {
   opacity: 0.55;
   cursor: default;
@@ -263,9 +296,70 @@ body {
 #mcp-endpoint:focus,
 #a2a-endpoint:focus,
 #scenario-type:focus,
+#cluster-type:focus,
+#cluster-api-server:focus,
+#cluster-token:focus,
+#cluster-namespace:focus,
+#cluster-kubeconfig:focus,
+#crd-kind:focus,
+#crd-yaml:focus,
 #message:focus {
   outline: 1px solid var(--accent);
   border-color: var(--accent);
+}
+
+#area-cluster {
+  overflow-y: auto;
+}
+
+#area-cluster .cluster-panel {
+  border-bottom: 0;
+}
+
+#cluster-kubeconfig,
+#crd-yaml {
+  resize: vertical;
+  min-height: 64px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.cluster-heading {
+  margin: 16px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+}
+
+.button-row button {
+  flex: 1 1 0;
+}
+
+#load-example {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#load-example:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent-hover);
+}
+
+.crd-names {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.crd-names li {
+  margin: 2px 0;
 }
 
 .log,

@@ -1,8 +1,10 @@
 # Agentgateway (Chrome extension)
 
-Manifest V3 popup with two areas: **Chat** and **Scenarios**. Both talk to a
-user-configured Agentgateway. The gateway injects backend auth, so this
-extension does **not** store or send an API key or license key.
+Manifest V3 popup with three areas: **Chat**, **Scenarios**, and **Cluster**.
+Chat and Scenarios talk to a user-configured Agentgateway. The gateway injects
+backend auth, so those areas do **not** store or send an API key or license
+key. Cluster talks to a Kubernetes API server so you can list and apply
+Agentgateway CRDs from the popup.
 
 ## Load unpacked
 
@@ -83,3 +85,68 @@ attack recipes.
    whether the gateway accepted or rejected it
 
 Each check shows HTTP status, latency, and the reply or error.
+
+## Cluster
+
+Switch to the **Cluster** tab to connect to a Kubernetes API and apply
+Agentgateway CRDs. Manifest V3 `host_permissions` let the extension `fetch`
+the API server directly (browser CORS does not apply). Settings are stored
+only in `chrome.storage.local` — never `sync`. Tokens are not logged.
+
+### Tokens and exec plugins
+
+Chrome **cannot** run kubeconfig exec plugins. That includes
+`gke-gcloud-auth-plugin`, `kubelogin` / Azure exec, and
+`aws eks get-token`. Pasting an exec-only kubeconfig is not enough. You must
+paste a bearer token from the matching command (or a service-account token).
+
+Client-certificate kubeconfigs are also unsupported. Chrome will reject
+untrusted or self-signed API server CAs (common with kind / minikube /
+k3d) unless the CA is trusted by the OS/browser.
+
+### Cluster type
+
+The help text under **Cluster type** changes with the selection:
+
+- **GKE** — API server from `kubectl cluster-info` or
+  `gcloud container clusters describe`. Token from
+  `gcloud auth print-access-token`.
+- **AKS** — API server from `az aks show`. Token from a service account or
+  `az` / `kubelogin` output, not the exec kubeconfig alone.
+- **EKS** — API server from `aws eks describe-cluster`. Token from
+  `aws eks get-token --cluster-name ...`.
+- **Local** — API server + token (for example `kubectl create token`).
+  Chrome rejects self-signed CAs.
+
+### Connection fields
+
+- **API server URL**
+- **Bearer token** (password field)
+- **Namespace** (default `agentgateway-system`)
+- **Kubeconfig YAML** (optional) — **Parse kubeconfig** reads
+  `current-context`, then fills `cluster.server` and `user.token` when
+  present. If the user block is exec-only, the popup tells you to paste a
+  token.
+
+**Test connection** GETs `/version`, and falls back to
+`GET /apis/gateway.networking.k8s.io/v1`. Status, latency, and the
+Kubernetes version (or error) are shown.
+
+### CRDs
+
+Always visible. **List** and **Apply** need an API server URL and token.
+
+- **Kind** — `Gateway`, `HTTPRoute`, `EnterpriseAgentgatewayBackend`, or
+  `EnterpriseAgentgatewayPolicy` (`gateway.networking.k8s.io` /
+  `enterpriseagentgateway.solo.io` as appropriate)
+- **List** — `GET` the collection in the configured namespace and show names
+- **YAML** — paste one or more documents (YAML preferred; JSON is accepted).
+  **Load example** fills a small Gateway + OpenAI
+  `EnterpriseAgentgatewayBackend` + `HTTPRoute`. The example uses
+  `secretRef.name: openai-secret` only — no secret values.
+- **Apply** — converts YAML to JSON and `POST`s (create) or `PUT`s (update)
+  each document. Namespace on the manifest wins; otherwise the Namespace
+  field is used.
+
+Requests send `Authorization: Bearer <token>` and
+`Content-Type: application/json`.

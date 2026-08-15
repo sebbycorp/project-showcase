@@ -16,6 +16,9 @@
         <button type="button" id="tab-scenarios" data-area="scenarios">
           Scenarios
         </button>
+        <button type="button" id="tab-cluster" data-area="cluster">
+          Cluster
+        </button>
       </nav>
     </header>
 
@@ -126,6 +129,98 @@
       <div id="scenario-result" class="scenario-result" aria-live="polite"></div>
     </section>
 
+    <section id="area-cluster" class="area" hidden>
+      <div class="panel cluster-panel">
+        <label class="field-label" for="cluster-type">Cluster type</label>
+        <select id="cluster-type">
+          <option value="gke">GKE</option>
+          <option value="aks">AKS</option>
+          <option value="eks">EKS</option>
+          <option value="local">Local</option>
+        </select>
+        <p id="cluster-help" class="hint"></p>
+
+        <label class="field-label" for="cluster-api-server">API server URL</label>
+        <input
+          id="cluster-api-server"
+          type="url"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="https://kubernetes.example:443"
+        />
+
+        <label class="field-label" for="cluster-token">Bearer token</label>
+        <input
+          id="cluster-token"
+          type="password"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="Paste a token, not an exec kubeconfig"
+        />
+
+        <label class="field-label" for="cluster-namespace">Namespace</label>
+        <input
+          id="cluster-namespace"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="agentgateway-system"
+        />
+
+        <label class="field-label" for="cluster-kubeconfig">
+          Kubeconfig YAML (optional)
+        </label>
+        <textarea
+          id="cluster-kubeconfig"
+          rows="4"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="Paste kubeconfig to fill server and token"
+        ></textarea>
+        <button id="parse-kubeconfig" type="button">Parse kubeconfig</button>
+        <div id="kubeconfig-result" class="result-box" hidden></div>
+
+        <button id="test-cluster" type="button">Test connection</button>
+        <div id="cluster-test-result" class="result-box" hidden></div>
+
+        <h2 class="cluster-heading">CRDs</h2>
+        <p class="hint">
+          List or apply Gateway API and Agentgateway resources in the namespace
+          above. Apply accepts YAML (or JSON) and may contain multiple documents.
+        </p>
+
+        <label class="field-label" for="crd-kind">Kind</label>
+        <select id="crd-kind">
+          <option value="Gateway">Gateway</option>
+          <option value="HTTPRoute">HTTPRoute</option>
+          <option value="EnterpriseAgentgatewayBackend">
+            EnterpriseAgentgatewayBackend
+          </option>
+          <option value="EnterpriseAgentgatewayPolicy">
+            EnterpriseAgentgatewayPolicy
+          </option>
+        </select>
+        <button id="list-crds" type="button">List</button>
+        <div id="crd-list-result" class="result-box" hidden></div>
+
+        <label class="field-label" for="crd-yaml">YAML</label>
+        <textarea
+          id="crd-yaml"
+          rows="10"
+          spellcheck="false"
+          autocomplete="off"
+        ></textarea>
+        <div class="button-row">
+          <button id="load-example" type="button" class="btn-secondary">
+            Load example
+          </button>
+          <button id="apply-crds" type="button">Apply</button>
+        </div>
+        <div id="crd-apply-result" class="result-box" hidden></div>
+      </div>
+    </section>
+
+    <script src="yaml.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>
