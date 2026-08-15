@@ -1,10 +1,10 @@
 /* Form → YAML for Agentgateway CRDs. Documented kinds only; secretRef name only. */
 (function (root, factory) {
   const api = factory();
+  // Always set the browser global. Chrome popups can have `module`.
+  root.AgwBuilder = api;
   if (typeof module === "object" && module.exports) {
     module.exports = api;
-  } else {
-    root.AgwBuilder = api;
   }
 })(typeof self !== "undefined" ? self : this, function () {
   const AGW_API = "enterpriseagentgateway.solo.io/v1alpha1";

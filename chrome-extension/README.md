@@ -11,7 +11,7 @@ Install, cluster setup, and how to use the popup are in the [root README](../REA
 3. Click **Load unpacked**.
 4. Select **this folder** (`chrome-extension/`) — the one that contains `manifest.json`, not the repo root.
 
-Current version: **0.10.0** (`manifest.json`). Pin the toolbar icon, then open the gear for **Settings → Cluster**.
+Current version: **0.10.1** (`manifest.json`). Pin the toolbar icon, then open the gear for **Settings → Cluster**.
 
 ## Workshop demos
 

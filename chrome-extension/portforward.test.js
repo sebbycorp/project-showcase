@@ -87,4 +87,21 @@ assert.strictEqual(
   false
 );
 
+// Chrome popups can have a CommonJS `module` object. The UMD must still
+// assign the browser global so popup.js can read PortForward.DEFAULTS.
+const fs = require("fs");
+const path = require("path");
+const vm = require("vm");
+const sandbox = { self: {}, module: { exports: {} } };
+vm.runInNewContext(
+  fs.readFileSync(path.join(__dirname, "portforward.js"), "utf8"),
+  sandbox
+);
+assert.ok(sandbox.self.PortForward, "UMD must set self.PortForward when module exists");
+assert.strictEqual(sandbox.self.PortForward.DEFAULTS.localPort, 8080);
+assert.strictEqual(
+  sandbox.module.exports.buildCommand({}),
+  "kubectl -n agentgateway-system port-forward svc/agentgateway-proxy 8080:80"
+);
+
 console.log("portforward.test.js: ok");

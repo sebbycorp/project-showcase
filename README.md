@@ -2,7 +2,7 @@
 
 A Chrome extension for chatting, testing, and teaching [Solo Agentgateway](https://docs.solo.io/agentgateway/latest/) (LLM, MCP, A2A, and API/HTTP) against **your** Kubernetes cluster. Point it at a reachable API server, apply Gateway / Agentgateway CRDs from the popup, and run the same hops you would show in a live demo.
 
-The extension is in [`chrome-extension/`](chrome-extension/). Current version: **0.10.0** (`manifest.json`).
+The extension is in [`chrome-extension/`](chrome-extension/). Current version: **0.10.1** (`manifest.json`).
 
 ![Chat tab](docs/images/chat.png)
 
@@ -37,7 +37,7 @@ Load the unpacked extension in Chrome (desktop). This is not on the Chrome Web S
 5. Select the **`chrome-extension`** folder — the folder that contains `manifest.json`, not the repo root.
 6. Pin **Agentgateway** from the extensions menu so the toolbar icon stays visible.
 
-Click the toolbar icon to open the popup. Version **0.10.0** is the `version` field in `chrome-extension/manifest.json`.
+Click the toolbar icon to open the popup. Version **0.10.1** is the `version` field in `chrome-extension/manifest.json`.
 
 ## Configure it to your cluster
 

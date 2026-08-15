@@ -2,14 +2,16 @@
 // Chrome cannot run exec plugins or client-certificate auth.
 (function (root, factory) {
   const parseYamlDocuments =
-    typeof module === "object" && module.exports
-      ? require("./yaml.js").parseYamlDocuments
-      : root.parseYamlDocuments;
+    typeof root.parseYamlDocuments === "function"
+      ? root.parseYamlDocuments
+      : typeof module === "object" && module.exports
+        ? require("./yaml.js").parseYamlDocuments
+        : undefined;
   const api = factory(parseYamlDocuments);
+  // Always set the browser global. Chrome popups can have `module`.
+  root.Kubeconfig = api;
   if (typeof module === "object" && module.exports) {
     module.exports = api;
-  } else {
-    root.Kubeconfig = api;
   }
 })(typeof self !== "undefined" ? self : this, function (parseYamlDocuments) {
   const OMNI_TOKEN_REQUIRED =

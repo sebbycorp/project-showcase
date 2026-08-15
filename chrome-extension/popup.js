@@ -2973,7 +2973,7 @@ function mcpSessionId(result) {
 }
 
 function mcpClientInfo() {
-  return { name: "agentgateway-extension", version: "0.10.0" };
+  return { name: "agentgateway-extension", version: "0.10.1" };
 }
 
 function mcpHeaders(sessionId, extra) {
@@ -4045,7 +4045,34 @@ function storedKubeContext() {
   ).trim();
 }
 
+const PortForward =
+  (typeof globalThis !== "undefined" && globalThis.PortForward) ||
+  (typeof window !== "undefined" && window.PortForward);
+
+function missingPortForward(action) {
+  console.error(
+    `PortForward is not defined; ${action}. Check that portforward.js loaded and assigned the browser global.`
+  );
+}
+
 function currentPortForwardSettings() {
+  if (!PortForward) {
+    missingPortForward("cannot read port-forward settings");
+    return {
+      resource:
+        els.pfResource && els.pfResource.value === "deployment"
+          ? "deployment"
+          : "service",
+      name: ((els.pfName && els.pfName.value) || "").trim() || "agentgateway-proxy",
+      namespace:
+        ((els.pfNamespace && els.pfNamespace.value) || "").trim() ||
+        clusterNamespaceOrDefault(),
+      context: ((els.pfContext && els.pfContext.value) || "").trim(),
+      localPort: 8080,
+      remotePort: 80,
+      mcpPath: Boolean(els.pfMcpPath && els.pfMcpPath.checked),
+    };
+  }
   const resource =
     els.pfResource && els.pfResource.value === "deployment"
       ? "deployment"
@@ -4096,6 +4123,10 @@ function applyPortForwardFields(settings) {
 
 function updatePortForwardCommand() {
   if (!els.pfCommand) {
+    return "";
+  }
+  if (!PortForward) {
+    missingPortForward("cannot build kubectl command");
     return "";
   }
   const command = PortForward.buildCommand(currentPortForwardSettings());
@@ -4153,6 +4184,10 @@ function persistPortForwardSettings(extra = {}) {
 }
 
 function loadPortForwardSettings(stored) {
+  if (!PortForward) {
+    missingPortForward("skipping port-forward settings");
+    return;
+  }
   const settings = {
     resource: stored.pfResource === "deployment" ? "deployment" : "service",
     name: stored.pfName || PortForward.DEFAULTS.name,
@@ -4193,6 +4228,9 @@ function showPortForwardNote(body, isError) {
 }
 
 function usingLocalhostEndpoints() {
+  if (!PortForward) {
+    return false;
+  }
   return (
     PortForward.isLocalhostUrl(els.endpoint && els.endpoint.value) ||
     PortForward.isLocalhostUrl(els.mcpEndpoint && els.mcpEndpoint.value) ||
@@ -4217,6 +4255,14 @@ function updateLocalhostChip() {
 }
 
 async function useLocalhostEndpoints() {
+  if (!PortForward) {
+    missingPortForward("cannot switch endpoints to localhost");
+    showPortForwardNote(
+      "Port-forward helper failed to load. Reload the extension.",
+      true
+    );
+    return;
+  }
   const settings = persistPortForwardSettings({ pfUsingLocalhost: true });
   const chat = PortForward.chatEndpoint(settings.localPort);
   const api = PortForward.apiEndpoint(settings.localPort);
@@ -4243,6 +4289,14 @@ async function useLocalhostEndpoints() {
 }
 
 async function checkLocalhost() {
+  if (!PortForward) {
+    missingPortForward("cannot check localhost");
+    showPortForwardNote(
+      "Port-forward helper failed to load. Reload the extension.",
+      true
+    );
+    return;
+  }
   const settings = persistPortForwardSettings();
   const url = PortForward.checkUrl(settings.localPort, settings.mcpPath);
   if (els.pfResult) {
