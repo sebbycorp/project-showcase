@@ -115,6 +115,8 @@ body {
 .btn,
 #cluster-type,
 #crd-kind,
+#provider,
+#llm-provider,
 #llm-example,
 #mcp-example,
 #security-example {
@@ -183,12 +185,15 @@ body {
 }
 
 #endpoint,
+#provider,
+#llm-provider,
 #model,
 #primary-model,
 #fallback-model,
 #chosen-model,
 #mcp-endpoint,
 #a2a-endpoint,
+#solo-ui,
 #llm-example,
 #mcp-example,
 #security-example,
@@ -299,6 +304,10 @@ body {
 
 .service-intro .hint {
   margin-bottom: 0;
+}
+
+.service-intro .field-label {
+  margin-top: 10px;
 }
 
 .test-card {
@@ -432,7 +441,6 @@ body {
 }
 
 .drawer-collapse {
-  margin-left: auto;
   padding: 0;
   border: 0;
   background: transparent;
@@ -445,6 +453,48 @@ body {
 
 .drawer-collapse:hover {
   color: var(--text);
+}
+
+.drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.solo-ui-link {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.solo-ui-link:hover {
+  text-decoration: underline;
+}
+
+.result-box .solo-ui-link {
+  display: inline-block;
+  margin-top: 8px;
+}
+
+.cost-line {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.result-box.is-error .cost-line,
+.attempt.is-error .cost-line,
+.check.is-error .cost-line,
+.test-drawer.is-error .cost-line {
+  color: var(--error-fg);
+}
+
+.attempt.is-ok .cost-line,
+.check.is-ok .cost-line,
+.test-drawer.is-ok .cost-line {
+  color: var(--ok-fg);
 }
 
 .seq {
@@ -920,6 +970,9 @@ body {
 }
 
 #endpoint:focus,
+#provider:focus,
+#llm-provider:focus,
+#solo-ui:focus,
 #model:focus,
 #primary-model:focus,
 #fallback-model:focus,

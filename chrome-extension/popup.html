@@ -58,6 +58,13 @@
           autocomplete="off"
           placeholder="http://host/v1/chat/completions"
         />
+        <label class="field-label" for="provider">Provider</label>
+        <select id="provider">
+          <option value="openai">OpenAI</option>
+          <option value="claude">Claude</option>
+          <option value="grok">Grok</option>
+          <option value="bedrock">Bedrock</option>
+        </select>
         <div class="model-row">
           <div class="model-field">
             <label class="field-label" for="model">Model</label>
@@ -133,6 +140,13 @@
           <div class="service-intro">
             <h2 class="service-title">LLM</h2>
             <p class="hint" id="llm-endpoint-hint"></p>
+            <label class="field-label" for="llm-provider">Provider</label>
+            <select id="llm-provider">
+              <option value="openai">OpenAI</option>
+              <option value="claude">Claude</option>
+              <option value="grok">Grok</option>
+              <option value="bedrock">Bedrock</option>
+            </select>
           </div>
 
           <article class="test-card" id="test-chat-ping">
@@ -673,6 +687,19 @@
     <section id="area-settings" class="area" hidden>
       <div class="panel">
         <h2 class="cluster-heading">Settings</h2>
+        <label class="field-label" for="solo-ui">Solo UI URL</label>
+        <input
+          id="solo-ui"
+          type="url"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="http://35.225.111.45/age/"
+        />
+        <p class="hint">
+          Base URL for the Solo UI app (path <code>/age/</code>). After a Run or
+          Test, Open in Solo UI opens the traces page. Saved in
+          <code>chrome.storage.local</code> like the chat endpoint.
+        </p>
         <label class="toggle" for="hooray">
           <input id="hooray" type="checkbox" checked />
           <span class="toggle-ui" aria-hidden="true"></span>
