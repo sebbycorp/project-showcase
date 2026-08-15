@@ -185,4 +185,131 @@ const single = AgwBuilder.generateLlmYaml(AgwBuilder.llmDefaults("openai"));
 assert.doesNotMatch(single, /kind: EnterpriseAgentgatewayPolicy/);
 assert.match(single, /kind: EnterpriseAgentgatewayBackend/);
 
+assert.ok(AgwBuilder.LLM_CATALOG.some((item) => item.id === "load-balance"));
+assert.strictEqual(AgwBuilder.catalogRecipe("streaming").apply, false);
+
+const lb = AgwBuilder.generateLlmYaml({
+  ...AgwBuilder.llmDefaults("openai"),
+  preset: "load-balance",
+  name: "loadbalanced-backend",
+  fallbackProvider: "claude",
+  fallbackModel: "claude-3-5-sonnet-latest",
+  fallbackSecretRef: "anthropic-secret",
+  routePath: "/chat",
+});
+assert.match(lb, /name: loadbalanced-backend/);
+assert.match(lb, /anthropic:/);
+assert.doesNotMatch(lb, /kind: EnterpriseAgentgatewayPolicy/);
+
+const routing = AgwBuilder.generateLlmYaml({
+  ...AgwBuilder.llmDefaults("openai"),
+  preset: "content-routing",
+  gateway: "agentgateway-proxy",
+});
+assert.match(routing, /phase: PreRouting/);
+assert.match(routing, /json\(request.body\)\.model/);
+assert.match(routing, /name: x-model/);
+
+const guard = AgwBuilder.generateLlmYaml({
+  preset: "prompt-guard",
+  name: "openai-prompt-guard",
+  targetRoute: "openai",
+  regex: "credit card",
+  namespace: "agentgateway-system",
+});
+assert.match(guard, /promptGuard:/);
+assert.match(guard, /action: Reject/);
+assert.match(guard, /credit card/);
+
+const enrich = AgwBuilder.generateLlmYaml({
+  preset: "prompt-enrichment",
+  name: "openai-opt",
+  targetRoute: "openai",
+  prompt: "Parse the unstructured text into CSV format.",
+  namespace: "agentgateway-system",
+});
+assert.match(enrich, /prepend:/);
+assert.match(enrich, /role: system/);
+
+const tmpl = AgwBuilder.generateLlmYaml({
+  preset: "prompt-template",
+  name: "static-prompt-template",
+  targetRoute: "openai",
+  namespace: "agentgateway-system",
+});
+assert.match(tmpl, /append:/);
+
+const xform = AgwBuilder.generateLlmYaml({
+  preset: "transformation",
+  name: "cap-max-tokens",
+  targetRoute: "openai",
+  namespace: "agentgateway-system",
+});
+assert.match(xform, /field: max_completion_tokens/);
+assert.match(xform, /min\(llmRequest.max_completion_tokens, 10\)/);
+
+const rl = AgwBuilder.generateLlmYaml({
+  preset: "rate-limit",
+  name: "openai-rate-limit",
+  targetRoute: "openai",
+  namespace: "agentgateway-system",
+  rateLimitCount: 5,
+  rateLimitUnit: "MINUTE",
+  rateLimitType: "REQUEST",
+});
+assert.match(rl, /kind: RateLimitConfig/);
+assert.match(rl, /entRateLimit:/);
+
+const alias = AgwBuilder.generateLlmYaml({
+  ...AgwBuilder.llmDefaults("openai"),
+  preset: "alias",
+  aliasName: "fast",
+  aliasTarget: "gpt-3.5-turbo",
+});
+assert.match(alias, /modelAliases:/);
+assert.match(alias, /fast: gpt-3.5-turbo/);
+
+const rbac = AgwBuilder.generateLlmYaml({
+  preset: "rbac",
+  name: "rbac-policy",
+  targetRoute: "google",
+  headerName: "x-llm",
+  headerValue: "gemini",
+  namespace: "agentgateway-system",
+});
+assert.match(rbac, /authorization:/);
+assert.match(rbac, /request.headers\['x-llm'\] == 'gemini'/);
+
+const modelApi = AgwBuilder.generateLlmYaml({
+  ...AgwBuilder.llmDefaults("openai"),
+  preset: "agw-model",
+  name: "gpt-4",
+});
+assert.match(modelApi, /kind: AgentgatewayModel/);
+assert.match(modelApi, /provider: OpenAI/);
+
+const virtual = AgwBuilder.generateLlmYaml({
+  ...AgwBuilder.llmDefaults("openai"),
+  preset: "virtual-model",
+  name: "resilient",
+});
+assert.match(virtual, /virtualModel:/);
+assert.match(virtual, /failover:/);
+assert.match(virtual, /visibility: Internal/);
+
+const budget = AgwBuilder.generateLlmYaml({
+  preset: "budget",
+  name: "route-budget",
+  targetRoute: "openai",
+  namespace: "agentgateway-system",
+  budgetAmount: 100000,
+  budgetWindow: "Day",
+});
+assert.match(budget, /kind: EnterpriseAgentgatewayBudget/);
+assert.match(budget, /entBudgetEnforcement: \{\}/);
+
+const streaming = AgwBuilder.generateLlmYaml({ preset: "streaming" });
+assert.match(streaming, /No gateway CRD/);
+assert.doesNotMatch(streaming, /kind: EnterpriseAgentgateway/);
+
 console.log("builder.test.js: ok");

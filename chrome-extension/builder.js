@@ -70,21 +70,241 @@
     consecutiveFailures: 1,
   };
 
-  const LLM_PRESETS = [
-    { id: "openai", label: "OpenAI backend + HTTPRoute", provider: "openai" },
-    { id: "claude", label: "Claude backend + HTTPRoute", provider: "claude" },
-    { id: "grok", label: "Grok (OpenAI-compat) + HTTPRoute", provider: "grok" },
-    { id: "bedrock", label: "Bedrock backend + HTTPRoute", provider: "bedrock" },
-    { id: "gemini", label: "Gemini backend + HTTPRoute", provider: "gemini" },
-    { id: "model-failover", label: "Model failover (same provider)", group: "Policies" },
+  const LLM_CATALOG = [
+    {
+      id: "openai",
+      group: "Connect",
+      label: "OpenAI backend",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/providers/openai/",
+      blurb: "EnterpriseAgentgatewayBackend + HTTPRoute for OpenAI.",
+      provider: "openai",
+      fields: ["core", "provider", "model", "secret", "path", "gateway"],
+    },
+    {
+      id: "claude",
+      group: "Connect",
+      label: "Claude backend",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/providers/anthropic/",
+      blurb: "Anthropic Claude backend + HTTPRoute.",
+      provider: "claude",
+      fields: ["core", "provider", "model", "secret", "path", "gateway"],
+    },
+    {
+      id: "grok",
+      group: "Connect",
+      label: "Grok backend",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/providers/openai-compatible/",
+      blurb: "OpenAI-compatible Grok backend (host api.x.ai).",
+      provider: "grok",
+      fields: ["core", "provider", "model", "secret", "path", "gateway", "compat"],
+    },
+    {
+      id: "bedrock",
+      group: "Connect",
+      label: "Bedrock backend",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/providers/bedrock/",
+      blurb: "Amazon Bedrock backend + HTTPRoute.",
+      provider: "bedrock",
+      fields: ["core", "provider", "model", "secret", "path", "gateway", "region"],
+    },
+    {
+      id: "gemini",
+      group: "Connect",
+      label: "Gemini backend",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/providers/google/",
+      blurb: "Google Gemini backend + HTTPRoute.",
+      provider: "gemini",
+      fields: ["core", "provider", "model", "secret", "path", "gateway"],
+    },
+    {
+      id: "secretref",
+      group: "Connect",
+      label: "API key secretRef",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/api-keys/",
+      blurb: "Backend auth via secretRef name only. Create the Secret in-cluster first — never paste a key.",
+      fields: ["core", "provider", "model", "secret", "path", "gateway"],
+    },
+    {
+      id: "agw-model",
+      group: "Connect",
+      label: "AgentgatewayModel",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/models/serve/",
+      blurb: "Model-centric 2026.8 API. Experimental; enable AgentgatewayModel on the control plane first.",
+      fields: ["core", "provider", "secret", "gateway"],
+    },
+    {
+      id: "gateway",
+      group: "Connect",
+      label: "Gateway (HTTP :80)",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/",
+      blurb: "HTTP listener on agentgateway-proxy.",
+      fields: ["core", "gateway"],
+    },
+    {
+      id: "model-failover",
+      group: "Route",
+      label: "Model failover",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/failover/",
+      blurb: "Same provider, priority groups, plus the required health policy.",
+      fields: ["core", "provider", "model", "fallback", "secret", "path", "gateway", "health"],
+    },
     {
       id: "provider-failover",
-      label: "Provider failover (OpenAI → Claude / Grok)",
-      group: "Policies",
+      group: "Route",
+      label: "Provider failover",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/failover/",
+      blurb: "OpenAI → Claude / Grok on one backend. Health policy evicts 5xx/429.",
+      fields: [
+        "core",
+        "provider",
+        "model",
+        "fallback",
+        "secret",
+        "path",
+        "gateway",
+        "fallbackProvider",
+        "health",
+      ],
     },
-    { id: "httproute", label: "HTTPRoute add-on only" },
-    { id: "gateway", label: "Gateway (HTTP :80)" },
+    {
+      id: "load-balance",
+      group: "Route",
+      label: "Load balancing (P2C)",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/load-balancing/",
+      blurb: "Two providers in one priority group. P2C picks by health and latency.",
+      fields: [
+        "core",
+        "provider",
+        "model",
+        "secret",
+        "path",
+        "gateway",
+        "fallback",
+        "fallbackProvider",
+      ],
+    },
+    {
+      id: "content-routing",
+      group: "Route",
+      label: "Content-based routing",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/content-routing/",
+      blurb: "Extract json(request.body).model into x-model, then match GPT vs Claude.",
+      fields: ["core", "secret", "gateway", "fallbackSecret"],
+    },
+    {
+      id: "httproute",
+      group: "Route",
+      label: "HTTPRoute add-on",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/",
+      blurb: "Path rewrite onto an existing backend.",
+      fields: ["core", "path", "gateway"],
+    },
+    {
+      id: "virtual-model",
+      group: "Route",
+      label: "Virtual model failover",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/models/virtual/",
+      blurb: "Public AgentgatewayModel with virtualModel.failover to Internal targets.",
+      fields: ["core", "provider", "model", "fallback", "secret", "gateway"],
+    },
+    {
+      id: "prompt-guard",
+      group: "Protect",
+      label: "Prompt guard",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/guardrails/regex/",
+      blurb: "Reject requests that match a regex (docs example: credit card).",
+      fields: ["core", "targetRoute", "regex"],
+    },
+    {
+      id: "rbac",
+      group: "Protect",
+      label: "CEL RBAC",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/rbac/",
+      blurb: "Allow only requests whose header matches a CEL expression.",
+      fields: ["core", "targetRoute", "header"],
+    },
+    {
+      id: "prompt-enrichment",
+      group: "Control",
+      label: "Prompt enrichment",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/prompt-enrichment/",
+      blurb: "Prepend a system prompt on an HTTPRoute.",
+      fields: ["core", "targetRoute", "prompt"],
+    },
+    {
+      id: "prompt-template",
+      group: "Control",
+      label: "Prompt template",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/prompt-templates/",
+      blurb: "Static prepend + append system prompts.",
+      fields: ["core", "targetRoute", "prompt", "promptAppend"],
+    },
+    {
+      id: "transformation",
+      group: "Control",
+      label: "Request transformation",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/transformations/",
+      blurb: "CEL field transform, e.g. cap max_completion_tokens.",
+      fields: ["core", "targetRoute", "transform"],
+    },
+    {
+      id: "rate-limit",
+      group: "Control",
+      label: "Rate limiting",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/rate-limit/",
+      blurb: "RateLimitConfig + policy. Request or token counters.",
+      fields: ["core", "targetRoute", "rateLimit"],
+    },
+    {
+      id: "alias",
+      group: "Control",
+      label: "Model aliasing",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/alias/",
+      blurb: "policies.ai.modelAliases on a provider backend.",
+      fields: ["core", "provider", "secret", "path", "gateway", "alias"],
+    },
+    {
+      id: "budget",
+      group: "Control",
+      label: "Cost budget",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/cost-controls/budget-limits/",
+      blurb: "EnterpriseAgentgatewayBudget plus entBudgetEnforcement on a route.",
+      fields: ["core", "targetRoute", "budget"],
+    },
+    {
+      id: "streaming",
+      group: "Control",
+      label: "Streaming",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/streaming/",
+      blurb: "Client sets stream: true. No gateway CRD.",
+      apply: false,
+      fields: [],
+    },
+    {
+      id: "functions",
+      group: "Control",
+      label: "Function calling",
+      docs: "https://docs.solo.io/agentgateway/latest/llm/functions/",
+      blurb: "Tools go in the chat request body. No gateway CRD.",
+      apply: false,
+      fields: [],
+    },
   ];
+
+  const LLM_PRESETS = LLM_CATALOG.filter((item) => item.apply !== false).map((item) => ({
+    id: item.id,
+    label: item.label,
+    provider: item.provider,
+    group: item.group,
+  }));
+
+  function catalogRecipe(id) {
+    const mapped = id === "failover" ? "model-failover" : id;
+    return (
+      LLM_CATALOG.find((item) => item.id === mapped) ||
+      LLM_CATALOG.find((item) => item.id === "openai")
+    );
+  }
 
   const MCP_PRESETS = [
     { id: "remote", label: "Remote MCP URL" },
@@ -555,8 +775,413 @@
     };
   }
 
+  function routeTarget(fields, fallback) {
+    return {
+      group: "gateway.networking.k8s.io",
+      kind: KIND_ROUTE,
+      name: cleanName(fields.targetRoute || fields.name, fallback),
+    };
+  }
+
+  function gatewayTarget(fields) {
+    return {
+      group: "gateway.networking.k8s.io",
+      kind: KIND_GATEWAY,
+      name: cleanName(fields.gateway, DEFAULT_GATEWAY),
+    };
+  }
+
+  function policyDoc(name, namespace, spec) {
+    return {
+      apiVersion: AGW_API,
+      kind: KIND_POLICY,
+      metadata: meta(name, namespace),
+      spec,
+    };
+  }
+
+  function loadBalanceDocs(fields) {
+    const name = cleanName(fields.name, "loadbalanced-backend");
+    const namespace = cleanNs(fields.namespace);
+    const primary = llmGroupProvider(fields, {
+      name: `${fields.provider || "openai"}-primary`,
+      model: fields.model,
+    });
+    const fallbackFields = fallbackProviderFields(fields);
+    const secondary = llmGroupProvider(fallbackFields, {
+      name: `${fallbackFields.provider}-secondary`,
+      model: fallbackFields.model,
+    });
+    const backend = {
+      apiVersion: AGW_API,
+      kind: KIND_BACKEND,
+      metadata: meta(name, namespace),
+      spec: { ai: { groups: [{ providers: [primary, secondary] }] } },
+    };
+    const route = httpRouteDoc({
+      ...fields,
+      name,
+      routePath: String(fields.routePath || "").trim() || "/chat",
+    });
+    return [backend, route];
+  }
+
+  function contentRoutingDocs(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const gateway = cleanName(fields.gateway, DEFAULT_GATEWAY);
+    const openaiSecret = String(fields.secretRef || "").trim() || "openai-secret";
+    const claudeSecret =
+      String(fields.fallbackSecretRef || "").trim() || "anthropic-secret";
+    const openai = {
+      apiVersion: AGW_API,
+      kind: KIND_BACKEND,
+      metadata: meta("openai-backend", namespace),
+      spec: {
+        ai: { provider: { openai: { model: "gpt-4o" } } },
+        policies: { auth: { secretRef: { name: openaiSecret } } },
+      },
+    };
+    const anthropic = {
+      apiVersion: AGW_API,
+      kind: KIND_BACKEND,
+      metadata: meta("anthropic-backend", namespace),
+      spec: {
+        ai: { provider: { anthropic: { model: "claude-3-5-sonnet-latest" } } },
+        policies: { auth: { secretRef: { name: claudeSecret } } },
+      },
+    };
+    const route = {
+      apiVersion: GW_API,
+      kind: KIND_ROUTE,
+      metadata: meta("content-routing", namespace),
+      spec: {
+        parentRefs: [{ name: gateway, namespace }],
+        rules: [
+          {
+            matches: [
+              {
+                path: { type: "PathPrefix", value: "/v1/chat/completions" },
+                headers: [
+                  { type: "RegularExpression", name: "x-model", value: "^gpt-.*" },
+                ],
+              },
+            ],
+            backendRefs: [backendRef("openai-backend", namespace)],
+          },
+          {
+            matches: [
+              {
+                path: { type: "PathPrefix", value: "/v1/chat/completions" },
+                headers: [
+                  {
+                    type: "RegularExpression",
+                    name: "x-model",
+                    value: "^claude-.*",
+                  },
+                ],
+              },
+            ],
+            backendRefs: [backendRef("anthropic-backend", namespace)],
+          },
+        ],
+      },
+    };
+    const extract = policyDoc("extract-model", namespace, {
+      targetRefs: [gatewayTarget(fields)],
+      traffic: {
+        phase: "PreRouting",
+        transformation: {
+          request: { set: [{ name: "x-model", value: "json(request.body).model" }] },
+        },
+      },
+    });
+    return [openai, anthropic, route, extract];
+  }
+
+  function promptGuardDoc(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const name = cleanName(fields.name, "openai-prompt-guard");
+    const match = String(fields.regex || "").trim() || "credit card";
+    return policyDoc(name, namespace, {
+      targetRefs: [routeTarget(fields, "openai")],
+      backend: {
+        ai: {
+          promptGuard: {
+            request: [
+              {
+                response: { message: "Rejected due to inappropriate content" },
+                regex: { action: "Reject", matches: [match] },
+              },
+            ],
+          },
+        },
+      },
+    });
+  }
+
+  function promptEnrichmentDoc(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const name = cleanName(fields.name, "openai-opt");
+    const content =
+      String(fields.prompt || "").trim() ||
+      "Parse the unstructured text into CSV format.";
+    return policyDoc(name, namespace, {
+      targetRefs: [routeTarget(fields, "openai")],
+      backend: {
+        ai: {
+          prompt: { prepend: [{ role: "system", content }] },
+        },
+      },
+    });
+  }
+
+  function promptTemplateDoc(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const name = cleanName(fields.name, "static-prompt-template");
+    const prepend =
+      String(fields.prompt || "").trim() ||
+      "You are a helpful customer service assistant. Always be polite and professional.";
+    const append =
+      String(fields.promptAppend || "").trim() ||
+      "If you cannot answer a question, say so clearly rather than making up information.";
+    return policyDoc(name, namespace, {
+      targetRefs: [routeTarget(fields, "openai")],
+      backend: {
+        ai: {
+          prompt: {
+            prepend: [{ role: "system", content: prepend }],
+            append: [{ role: "system", content: append }],
+          },
+        },
+      },
+    });
+  }
+
+  function transformationDoc(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const name = cleanName(fields.name, "cap-max-tokens");
+    const field = String(fields.transformField || "").trim() || "max_completion_tokens";
+    const expression =
+      String(fields.cel || "").trim() || "min(llmRequest.max_completion_tokens, 10)";
+    return policyDoc(name, namespace, {
+      targetRefs: [routeTarget(fields, "openai")],
+      backend: {
+        ai: { transformations: [{ field, expression }] },
+      },
+    });
+  }
+
+  function rateLimitDocs(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const name = cleanName(fields.name, "openai-rate-limit");
+    const count = Number(fields.rateLimitCount);
+    const unit = String(fields.rateLimitUnit || "").trim() || "MINUTE";
+    const type = String(fields.rateLimitType || "").trim() || "REQUEST";
+    const config = {
+      apiVersion: "ratelimit.solo.io/v1alpha1",
+      kind: "RateLimitConfig",
+      metadata: meta(name, namespace),
+      spec: {
+        raw: {
+          descriptors: [
+            {
+              key: "generic_key",
+              value: "counter",
+              rateLimit: {
+                requestsPerUnit:
+                  Number.isFinite(count) && count > 0 ? Math.floor(count) : 5,
+                unit,
+              },
+            },
+          ],
+          rateLimits: [
+            {
+              actions: [{ genericKey: { descriptorValue: "counter" } }],
+              type,
+            },
+          ],
+        },
+      },
+    };
+    const policy = policyDoc(name, namespace, {
+      targetRefs: [routeTarget(fields, "openai")],
+      traffic: {
+        entRateLimit: {
+          global: { rateLimitConfigRefs: [{ name }] },
+        },
+      },
+    });
+    return [config, policy];
+  }
+
+  function aliasDocs(fields) {
+    const name = cleanName(fields.name, "openai");
+    const namespace = cleanNs(fields.namespace);
+    const alias = String(fields.aliasName || "").trim() || "fast";
+    const target = String(fields.aliasTarget || "").trim() || "gpt-3.5-turbo";
+    const backend = llmBackendDoc({ ...fields, name, failover: false, preset: "openai" });
+    backend.spec.policies = backend.spec.policies || {};
+    backend.spec.policies.ai = backend.spec.policies.ai || {};
+    backend.spec.policies.ai.modelAliases = { [alias]: target };
+    return [backend, httpRouteDoc({ ...fields, name })];
+  }
+
+  function rbacDoc(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const name = cleanName(fields.name, "rbac-policy");
+    const header = String(fields.headerName || "").trim() || "x-llm";
+    const value = String(fields.headerValue || "").trim() || "gemini";
+    return policyDoc(name, namespace, {
+      targetRefs: [routeTarget(fields, "google")],
+      traffic: {
+        authorization: {
+          action: "Allow",
+          policy: {
+            matchExpressions: [`request.headers['${header}'] == '${value}'`],
+          },
+        },
+      },
+    });
+  }
+
+  function agwModelDoc(fields) {
+    const name = cleanName(fields.name, "gpt-4");
+    const namespace = cleanNs(fields.namespace);
+    const providerLabel =
+      fields.provider === "claude"
+        ? "Anthropic"
+        : fields.provider === "gemini"
+          ? "Gemini"
+          : fields.provider === "bedrock"
+            ? "Bedrock"
+            : "OpenAI";
+    const spec = {
+      parentRefs: [
+        {
+          group: "gateway.networking.k8s.io",
+          kind: KIND_GATEWAY,
+          name: cleanName(fields.gateway, DEFAULT_GATEWAY),
+          sectionName: "http",
+        },
+      ],
+      provider: providerLabel,
+    };
+    const secretRef = String(fields.secretRef || "").trim();
+    if (secretRef) {
+      spec.policies = { auth: { secretRef: { name: secretRef } } };
+    }
+    return {
+      apiVersion: "agentgateway.dev/v1alpha1",
+      kind: "AgentgatewayModel",
+      metadata: meta(name, namespace),
+      spec,
+    };
+  }
+
+  function virtualModelDocs(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const gateway = cleanName(fields.gateway, DEFAULT_GATEWAY);
+    const parentRefs = [
+      {
+        group: "gateway.networking.k8s.io",
+        kind: KIND_GATEWAY,
+        name: gateway,
+        sectionName: "http",
+      },
+    ];
+    const secretRef = String(fields.secretRef || "").trim();
+    const providerLabel =
+      fields.provider === "claude"
+        ? "Anthropic"
+        : fields.provider === "gemini"
+          ? "Gemini"
+          : "OpenAI";
+    const primaryName = cleanName(`${fields.name || "resilient"}-primary`, "primary-model");
+    const fallbackName = cleanName(
+      `${fields.name || "resilient"}-fallback`,
+      "fallback-model"
+    );
+    const virtualName = cleanName(fields.name, "resilient");
+    const auth = secretRef ? { auth: { secretRef: { name: secretRef } } } : undefined;
+    const primary = {
+      apiVersion: "agentgateway.dev/v1alpha1",
+      kind: "AgentgatewayModel",
+      metadata: meta(primaryName, namespace),
+      spec: {
+        parentRefs,
+        visibility: "Internal",
+        provider: providerLabel,
+        policies: {
+          ...(auth || {}),
+          health: { eviction: { consecutiveFailures: 1 } },
+        },
+      },
+    };
+    const fallback = {
+      apiVersion: "agentgateway.dev/v1alpha1",
+      kind: "AgentgatewayModel",
+      metadata: meta(fallbackName, namespace),
+      spec: {
+        parentRefs,
+        visibility: "Internal",
+        provider: providerLabel,
+        policies: auth,
+      },
+    };
+    const virtual = {
+      apiVersion: "agentgateway.dev/v1alpha1",
+      kind: "AgentgatewayModel",
+      metadata: meta(virtualName, namespace),
+      spec: {
+        parentRefs,
+        virtualModel: {
+          failover: {
+            targets: [
+              { modelRef: { name: primaryName }, priority: 0 },
+              { modelRef: { name: fallbackName }, priority: 1 },
+            ],
+          },
+        },
+      },
+    };
+    return [primary, fallback, virtual];
+  }
+
+  function budgetDocs(fields) {
+    const namespace = cleanNs(fields.namespace);
+    const name = cleanName(fields.name, "route-budget");
+    const amount = Number(fields.budgetAmount);
+    const budget = {
+      apiVersion: AGW_API,
+      kind: "EnterpriseAgentgatewayBudget",
+      metadata: meta(name, namespace),
+      spec: {
+        budgets: [
+          {
+            name: `${name}-tokens`,
+            limit: {
+              unit: String(fields.budgetUnit || "").trim() || "Tokens",
+              amount: Number.isFinite(amount) && amount > 0 ? Math.floor(amount) : 100000,
+            },
+            window: { unit: String(fields.budgetWindow || "").trim() || "Day" },
+            onBudgetExceeded: "Block",
+          },
+        ],
+      },
+    };
+    const policy = policyDoc(`${name}-enforcement`, namespace, {
+      targetRefs: [routeTarget(fields, "openai")],
+      traffic: { entBudgetEnforcement: {} },
+    });
+    return [budget, policy];
+  }
+
   function generateLlmYaml(fields) {
-    const mode = fields.preset || "backend";
+    const recipe = catalogRecipe(fields.preset || "openai");
+    const mode = recipe.id;
+    if (recipe.apply === false) {
+      return `# ${recipe.label}\n# ${recipe.blurb}\n# Docs: ${recipe.docs}\n`;
+    }
     if (mode === "gateway") {
       return joinDocs(
         [gatewayDoc(fields)],
@@ -575,6 +1200,66 @@
       return joinDocs(
         [httpRouteDoc(routeFields)],
         `# HTTPRoute add-on. Docs: https://docs.solo.io/agentgateway/latest/llm/\n`
+      );
+    }
+    if (mode === "load-balance") {
+      return joinDocs(
+        loadBalanceDocs(fields),
+        `# Docs: ${recipe.docs}\n# secretRef name only — create the Secrets in the cluster first.\n`
+      );
+    }
+    if (mode === "content-routing") {
+      return joinDocs(
+        contentRoutingDocs(fields),
+        `# Docs: ${recipe.docs}\n# PreRouting is required so x-model is set before route match.\n# secretRef names only.\n`
+      );
+    }
+    if (mode === "prompt-guard") {
+      return joinDocs(
+        [promptGuardDoc(fields)],
+        `# Docs: ${recipe.docs}\n# Safe regex reject example. Not a jailbreak payload.\n`
+      );
+    }
+    if (mode === "prompt-enrichment") {
+      return joinDocs([promptEnrichmentDoc(fields)], `# Docs: ${recipe.docs}\n`);
+    }
+    if (mode === "prompt-template") {
+      return joinDocs([promptTemplateDoc(fields)], `# Docs: ${recipe.docs}\n`);
+    }
+    if (mode === "transformation") {
+      return joinDocs([transformationDoc(fields)], `# Docs: ${recipe.docs}\n`);
+    }
+    if (mode === "rate-limit") {
+      return joinDocs(
+        rateLimitDocs(fields),
+        `# Docs: ${recipe.docs}\n# RateLimitConfig + EnterpriseAgentgatewayPolicy.\n`
+      );
+    }
+    if (mode === "alias") {
+      return joinDocs(
+        aliasDocs(fields),
+        `# Docs: ${recipe.docs}\n# secretRef name only.\n`
+      );
+    }
+    if (mode === "rbac") {
+      return joinDocs([rbacDoc(fields)], `# Docs: ${recipe.docs}\n`);
+    }
+    if (mode === "agw-model") {
+      return joinDocs(
+        [agwModelDoc(fields)],
+        `# Docs: ${recipe.docs}\n# Experimental AgentgatewayModel API. secretRef name only.\n`
+      );
+    }
+    if (mode === "virtual-model") {
+      return joinDocs(
+        virtualModelDocs(fields),
+        `# Docs: ${recipe.docs}\n# Virtual models must be Public and cannot set spec.policies.\n# secretRef name only.\n`
+      );
+    }
+    if (mode === "budget") {
+      return joinDocs(
+        budgetDocs(fields),
+        `# Docs: ${recipe.docs}\n# Omit subject = one budget for all requests on the target route.\n`
       );
     }
     const docs = [llmBackendDoc(fields), httpRouteDoc(fields)];
@@ -981,6 +1666,8 @@
     KIND_GATEWAY,
     KIND_POLICY,
     LLM_PRESETS,
+    LLM_CATALOG,
+    catalogRecipe,
     MCP_PRESETS,
     HEALTH_DEFAULTS,
     llmDefaults,

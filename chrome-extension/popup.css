@@ -1402,6 +1402,87 @@ html.demo-stage .seq-wire {
   margin-top: 4px;
 }
 
+.catalog-list {
+  margin-top: 6px;
+  max-height: 148px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.catalog-group {
+  padding: 6px 8px 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.catalog-item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.catalog-item:hover {
+  background: var(--accent-soft);
+}
+
+.catalog-item.is-active {
+  background: var(--accent-soft);
+  color: var(--ok-fg);
+}
+
+.catalog-item.is-docs {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.catalog-selected {
+  margin-top: 8px;
+}
+
+.catalog-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.catalog-title-row span {
+  font-weight: 650;
+}
+
+.catalog-title-row a {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.docs-only {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--muted);
+}
+
+#llm-catalog-search {
+  margin-top: 4px;
+}
+
 .deploy {
   margin-top: 4px;
   border: 1px solid var(--border);
