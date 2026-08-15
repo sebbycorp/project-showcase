@@ -394,7 +394,12 @@ function providerDeployOptions(id) {
     ["gateway", "Gateway (HTTP :80)"],
     [spec.example, `${spec.label} backend + HTTPRoute`],
     [spec.failoverExample, "Failover backend (primary + fallback)"],
-    [spec.httprouteExample, DEPLOY_EXAMPLES.llm[spec.httprouteExample].label],
+    [
+      spec.httprouteExample,
+      (DEPLOY_EXAMPLES.llm[spec.httprouteExample] &&
+        DEPLOY_EXAMPLES.llm[spec.httprouteExample].label) ||
+        "HTTPRoute add-on",
+    ],
   ];
 }
 
@@ -986,9 +991,9 @@ async function animateSeqReturn(seq, viaGateway, target, token) {
   return waitSeq(SEQ_RETURN_MS, seq.id, token);
 }
 
-async function runWithSeq(seq, requestFn, { viaGateway, target, ok }) {
+async function runWithSeq(seq, requestFn, { viaGateway, target, targetKind, ok }) {
   const token = ++seqTokens[seq.id];
-  configureSeq(seq, { viaGateway, target });
+  configureSeq(seq, { viaGateway, target, targetKind });
   resetSeq(seq);
   seq.classList.add("is-run");
 
@@ -1431,7 +1436,7 @@ els.primaryModel.addEventListener("input", () => {
 els.fallbackModel.addEventListener("change", () => {
   const fallbackModel = normalizeModel(
     els.fallbackModel.value,
-    DEFAULT_FALLBACK_MODEL
+    providerSpec(currentProvider()).fallback
   );
   els.fallbackModel.value = fallbackModel;
   persist({ fallbackModel });
@@ -1587,7 +1592,7 @@ els.runFailover.addEventListener("click", async () => {
   const primaryModel = normalizeModel(els.primaryModel.value);
   const fallbackModel = normalizeModel(
     els.fallbackModel.value,
-    DEFAULT_FALLBACK_MODEL
+    providerSpec(currentProvider()).fallback
   );
   els.primaryModel.value = primaryModel;
   els.fallbackModel.value = fallbackModel;
