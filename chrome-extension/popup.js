@@ -2766,7 +2766,7 @@ function mcpSessionId(result) {
 }
 
 function mcpClientInfo() {
-  return { name: "agentgateway-extension", version: "0.9.7" };
+  return { name: "agentgateway-extension", version: "0.9.8" };
 }
 
 function mcpHeaders(sessionId, extra) {
