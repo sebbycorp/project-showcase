@@ -1271,7 +1271,7 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.8.2" },
+      clientInfo: { name: "agentgateway-extension", version: "0.8.3" },
     },
   };
 

@@ -13,7 +13,7 @@ and professional system type. The header keeps the official color mark
 beside the title. The dark wordmark and color mark are vendored in
 `icons/` from the live homepage (`/agw-dark.svg`, `/agw-mark-color.svg`) —
 they are not hotlinked at runtime. Flow hops use compact vendored SVGs
-in the same folder (AI Agent spark/node, OpenAI blossom, Claude asterisk,
+in the same folder (AI Agent robot, OpenAI blossom, Claude asterisk,
 xAI/Grok mark, AWS cube, MCP, A2A, Policy). Toolbar PNGs (`icon16.png`,
 `icon32.png`, `icon48.png`) are rasterized from that mark and set as
 `action.default_icon`.
