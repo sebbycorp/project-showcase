@@ -37,6 +37,7 @@ const STORAGE_KEYS = [
   "clusterManifest",
   "hooray",
   "soloUi",
+  "demoStage",
 ];
 const PROVIDERS = {
   openai: {
@@ -75,6 +76,15 @@ const PROVIDERS = {
     failoverExample: "failoverBedrock",
     httprouteExample: "httprouteBedrock",
   },
+  gemini: {
+    id: "gemini",
+    label: "Gemini",
+    model: "gemini-2.0-flash",
+    fallback: "gemini-1.5-flash",
+    example: "gemini",
+    failoverExample: "failoverGemini",
+    httprouteExample: "httprouteGemini",
+  },
 };
 // USD per 1M tokens. In-extension estimate only — not a bill.
 const MODEL_RATES = [
@@ -89,6 +99,8 @@ const MODEL_RATES = [
   { match: /nova-micro/i, prompt: 0.035, completion: 0.14 },
   { match: /nova-lite/i, prompt: 0.06, completion: 0.24 },
   { match: /anthropic\.claude|us\.anthropic/i, prompt: 3, completion: 15 },
+  { match: /gemini-2\.0-flash|gemini-2\.5-flash|gemini-1\.5-flash/i, prompt: 0.1, completion: 0.4 },
+  { match: /gemini/i, prompt: 0.15, completion: 0.6 },
   { match: /amazon\.|bedrock/i, prompt: 0.15, completion: 0.6 },
 ];
 const CLUSTER_HELP = {
@@ -257,11 +269,38 @@ const els = {
   areaSettings: document.getElementById("area-settings"),
   soloUi: document.getElementById("solo-ui"),
   hooray: document.getElementById("hooray"),
+  demoStage: document.getElementById("demo-stage"),
+  demoToggle: document.getElementById("demo-toggle"),
   confetti: document.getElementById("confetti"),
 };
 
 let hoorayOn = true;
+let demoStageOn = false;
 let clusterConnected = false;
+
+function seqStepMs() {
+  return demoStageOn ? 840 : 560;
+}
+
+function seqReturnMs() {
+  return demoStageOn ? 720 : 480;
+}
+
+function setDemoStage(on, persistIt = false) {
+  demoStageOn = Boolean(on);
+  document.documentElement.classList.toggle("demo-stage", demoStageOn);
+  document.body.classList.toggle("demo-stage", demoStageOn);
+  if (els.demoStage) {
+    els.demoStage.checked = demoStageOn;
+  }
+  if (els.demoToggle) {
+    els.demoToggle.classList.toggle("is-active", demoStageOn);
+    els.demoToggle.setAttribute("aria-pressed", demoStageOn ? "true" : "false");
+  }
+  if (persistIt) {
+    persist({ demoStage: demoStageOn });
+  }
+}
 
 function celebrate() {
   if (!hoorayOn) {
@@ -374,18 +413,49 @@ function providerSpec(id) {
 }
 
 function currentProvider() {
-  const raw = (els.provider && els.provider.value) || "";
+  const active =
+    els.provider && els.provider.querySelector(".provider-pill.is-active");
+  const raw = (active && active.dataset.provider) || "";
   return PROVIDERS[raw] ? raw : providerFromModel(els.model.value);
 }
 
 function setProviderSelects(id) {
   const spec = providerSpec(id);
-  if (els.provider) {
-    els.provider.value = spec.id;
-  }
-  if (els.llmProvider) {
-    els.llmProvider.value = spec.id;
-  }
+  document.querySelectorAll(".provider-switch").forEach((root) => {
+    root.querySelectorAll(".provider-pill").forEach((btn) => {
+      const on = btn.dataset.provider === spec.id;
+      btn.classList.toggle("is-active", on);
+      btn.setAttribute("aria-checked", on ? "true" : "false");
+    });
+  });
+}
+
+function buildProviderSwitches(selected) {
+  const spec = providerSpec(selected);
+  document.querySelectorAll(".provider-switch").forEach((root) => {
+    root.replaceChildren();
+    for (const item of Object.values(PROVIDERS)) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "provider-pill";
+      btn.dataset.provider = item.id;
+      btn.setAttribute("role", "radio");
+      btn.setAttribute("aria-checked", item.id === spec.id ? "true" : "false");
+      if (item.id === spec.id) {
+        btn.classList.add("is-active");
+      }
+      const img = document.createElement("img");
+      img.src = SEQ_ICONS[item.id] || SEQ_ICONS.openai;
+      img.alt = "";
+      const name = document.createElement("span");
+      name.textContent = item.label;
+      btn.append(img, name);
+      btn.addEventListener("click", () => {
+        onProviderChange(item.id);
+      });
+      root.append(btn);
+    }
+  });
 }
 
 function providerDeployOptions(id) {
@@ -598,6 +668,64 @@ function costNode(usage, model) {
   return node;
 }
 
+function traceStrip(result) {
+  if (!result) {
+    return null;
+  }
+  const headersMs =
+    result.headersMs != null && Number.isFinite(result.headersMs)
+      ? result.headersMs
+      : null;
+  const latencyMs =
+    result.latencyMs != null && Number.isFinite(result.latencyMs)
+      ? result.latencyMs
+      : null;
+  const agentMs =
+    result.agentMs != null && Number.isFinite(result.agentMs) && result.agentMs > 0
+      ? result.agentMs
+      : null;
+  const modelMs =
+    latencyMs == null
+      ? null
+      : headersMs != null
+        ? Math.max(0, latencyMs - headersMs)
+        : latencyMs;
+  const rows = [
+    { name: "Agent", ms: agentMs },
+    { name: "Gateway", ms: headersMs },
+    { name: "Model", ms: modelMs },
+  ];
+  if (!rows.some((row) => row.ms != null)) {
+    return null;
+  }
+  const max = Math.max(...rows.map((row) => (row.ms == null ? 0 : row.ms)), 1);
+  const wrap = document.createElement("div");
+  wrap.className = "trace-strip";
+  for (const row of rows) {
+    const line = document.createElement("div");
+    line.className = "trace-row";
+    const name = document.createElement("span");
+    name.className = "trace-name";
+    name.textContent = row.name;
+    const track = document.createElement("span");
+    track.className = "trace-track";
+    const bar = document.createElement("i");
+    if (row.ms != null) {
+      bar.style.width = `${Math.max(6, Math.round((row.ms / max) * 100))}%`;
+    } else {
+      bar.style.width = "0";
+      bar.style.opacity = "0";
+    }
+    track.append(bar);
+    const ms = document.createElement("span");
+    ms.className = "trace-ms";
+    ms.textContent = row.ms != null ? formatHopMs(row.ms) : "";
+    line.append(name, track, ms);
+    wrap.append(line);
+  }
+  return wrap;
+}
+
 function headerMap(response) {
   const out = {};
   if (!response || !response.headers || typeof response.headers.forEach !== "function") {
@@ -637,33 +765,42 @@ function notifySeqProgress(stage, detail) {
   }
 }
 
-function lightHopFromStage(seq, stage, viaGateway, target, token) {
+function lightHopFromStage(seq, stage, viaGateway, target, token, extras = {}) {
   if (seqTokens[seq.id] !== token) {
     return;
   }
+  const targetRole = extras.targetRole || "target";
   if (stage === "start") {
     markSeq(seq, ["client"], [], "is-on");
     setSeqHop(seq, "client", null);
-    setSeqCaption(seq, "AI Agent sends");
+    setHopLabel(seq, "client", "Agent sends");
     return;
   }
   if (stage === "headers") {
     markSeq(seq, viaGateway ? ["client", "gateway"] : ["client"], [1], "is-on");
     if (viaGateway) {
       setSeqHop(seq, "gateway", 1);
-      setSeqCaption(seq, "Agentgateway");
+      setHopLabel(seq, "gateway", "Gateway routes");
     }
+    applySeqTimings(seq, viaGateway, extras);
     return;
   }
   if (stage === "body") {
     markSeq(
       seq,
-      viaGateway ? ["client", "gateway", "target"] : ["client", "target"],
+      viaGateway
+        ? ["client", "gateway", targetRole]
+        : ["client", targetRole],
       viaGateway ? [1, 2] : [1],
       "is-on"
     );
-    setSeqHop(seq, "target", viaGateway ? 2 : 1);
-    setSeqCaption(seq, target);
+    setSeqHop(seq, targetRole, viaGateway ? 2 : 1);
+    setHopLabel(
+      seq,
+      "target",
+      extras.phase === "fallback" ? `Failover → ${target}` : `${target} replies`
+    );
+    applySeqTimings(seq, viaGateway, extras);
   }
 }
 
@@ -720,8 +857,6 @@ function updateEndpointHints() {
   refreshSeqDiagrams();
 }
 
-const SEQ_STEP_MS = 560;
-const SEQ_RETURN_MS = 480;
 const seqTokens = {
   "seq-chat": 0,
   "seq-chat-ping": 0,
@@ -738,6 +873,7 @@ const SEQ_ICONS = {
   claude: "icons/claude.svg",
   grok: "icons/grok.svg",
   bedrock: "icons/bedrock.svg",
+  gemini: "icons/gemini.svg",
   mcp: "icons/mcp.svg",
   a2a: "icons/a2a.svg",
   security: "icons/policy.svg",
@@ -748,6 +884,7 @@ const SEQ_LABELS = {
   claude: "Claude",
   grok: "Grok",
   bedrock: "Bedrock",
+  gemini: "Gemini",
   mcp: "MCP",
   a2a: "A2A",
   security: "Policy",
@@ -768,6 +905,9 @@ function providerFromModel(raw) {
   }
   if (model.includes("grok")) {
     return "grok";
+  }
+  if (model.includes("gemini")) {
+    return "gemini";
   }
   return "openai";
 }
@@ -794,25 +934,127 @@ function mcpUsesGateway(mcpUrl, chatUrl) {
 
 function setSeqCaption(seq, text) {
   seq.setAttribute("aria-label", text);
-  seq.title = text;
 }
 
-function configureSeq(seq, { viaGateway, target, targetKind }) {
+function requestPath(url) {
+  try {
+    return new URL(url).pathname || "";
+  } catch {
+    return "";
+  }
+}
+
+function formatHopMs(ms) {
+  if (ms == null || !Number.isFinite(ms) || ms < 0) {
+    return "";
+  }
+  if (ms >= 1000) {
+    const rounded = (ms / 1000).toFixed(1).replace(/\.0$/, "");
+    return `${rounded}s`;
+  }
+  return `${Math.round(ms)}ms`;
+}
+
+function setHopLabel(seq, role, text) {
+  const hop = role === "primary" || role === "fallback" ? "target" : role;
+  const node = seq.querySelector(`[data-hop="${hop}"]`);
+  if (!node) {
+    return;
+  }
+  if (!text) {
+    node.hidden = true;
+    node.textContent = "";
+    return;
+  }
+  node.hidden = false;
+  node.textContent = text;
+}
+
+function setArrowMs(seq, step, ms) {
+  const arrow = seq.querySelector(`[data-step="${step}"]`);
+  const node = arrow && arrow.querySelector(".seq-ms");
+  if (!node) {
+    return;
+  }
+  const text = formatHopMs(ms);
+  if (!text) {
+    node.hidden = true;
+    node.textContent = "";
+    return;
+  }
+  node.hidden = false;
+  node.textContent = text;
+}
+
+function setSeqWire(seq, path, model) {
+  const text = [path, model].filter(Boolean).join(" · ");
+  seq.querySelectorAll(".seq-wire").forEach((node) => {
+    if (!text) {
+      node.hidden = true;
+      node.textContent = "";
+    } else {
+      node.hidden = false;
+      node.textContent = text;
+    }
+  });
+}
+
+function clearSeqNarration(seq) {
+  seq.querySelectorAll(".seq-hop, .seq-ms, .seq-wire").forEach((node) => {
+    node.hidden = true;
+    node.textContent = "";
+  });
+}
+
+function applySeqTimings(seq, viaGateway, detail) {
+  if (!detail) {
+    return;
+  }
+  if (detail.headersMs != null) {
+    setArrowMs(seq, 1, detail.headersMs);
+  }
+  if (detail.latencyMs != null && detail.headersMs != null) {
+    setArrowMs(seq, viaGateway ? 2 : 1, Math.max(0, detail.latencyMs - detail.headersMs));
+  } else if (detail.latencyMs != null && !viaGateway) {
+    setArrowMs(seq, 1, detail.latencyMs);
+  }
+}
+
+function configureSeq(seq, { viaGateway, target, targetKind, primaryKind, fallbackKind }) {
   seq.dataset.mode = viaGateway ? "via-gw" : "direct";
-  const caption = pathCaption(viaGateway, target);
-  seq.setAttribute("aria-label", caption);
-  seq.title = caption;
-  const targetBox = seq.querySelector('[data-role="target"]');
-  if (targetBox) {
-    targetBox.title = target;
-    const icon = targetBox.querySelector("[data-target-icon]");
-    const src = SEQ_ICONS[targetKind] || SEQ_ICONS.openai;
-    if (icon) {
-      icon.src = src;
+  setSeqCaption(seq, pathCaption(viaGateway, target));
+  if (seq.dataset.failover === "1") {
+    const pKind = primaryKind || targetKind;
+    const fKind = fallbackKind || targetKind;
+    const primaryBox = seq.querySelector('[data-role="primary"]');
+    const fallbackBox = seq.querySelector('[data-role="fallback"]');
+    const primaryIcon = seq.querySelector("[data-primary-icon]");
+    const fallbackIcon = seq.querySelector("[data-fallback-icon]");
+    if (primaryBox) {
+      primaryBox.title = providerLabel(pKind);
+    }
+    if (fallbackBox) {
+      fallbackBox.title = providerLabel(fKind);
+    }
+    if (primaryIcon) {
+      primaryIcon.src = SEQ_ICONS[pKind] || SEQ_ICONS.openai;
+    }
+    if (fallbackIcon) {
+      fallbackIcon.src = SEQ_ICONS[fKind] || SEQ_ICONS.openai;
+    }
+  } else {
+    const targetBox = seq.querySelector('[data-role="target"]');
+    if (targetBox) {
+      targetBox.title = target;
+      const icon = targetBox.querySelector("[data-target-icon]");
+      const src = SEQ_ICONS[targetKind] || SEQ_ICONS.openai;
+      if (icon) {
+        icon.src = src;
+      }
     }
   }
   if (!seq.classList.contains("is-run")) {
-    setSeqCaption(seq, caption);
+    clearSeqNarration(seq);
   }
 }
 
@@ -835,10 +1077,23 @@ function securitySeqConfig() {
   return { viaGateway: true, target: "Policy", targetKind: "security" };
 }
 
+function failoverSeqConfig() {
+  const primaryKind = providerFromModel(els.primaryModel.value);
+  const fallbackKind = providerFromModel(els.fallbackModel.value);
+  return {
+    viaGateway: true,
+    target: providerLabel(primaryKind),
+    targetKind: primaryKind,
+    primaryKind,
+    fallbackKind,
+    fallbackTarget: providerLabel(fallbackKind),
+  };
+}
+
 function refreshSeqDiagrams() {
   configureSeq(els.seqChat, llmSeqConfig(els.model.value));
   configureSeq(els.seqChatPing, llmSeqConfig(els.model.value));
-  configureSeq(els.seqFailover, llmSeqConfig(els.primaryModel.value));
+  configureSeq(els.seqFailover, failoverSeqConfig());
   configureSeq(els.seqListCall, llmSeqConfig(els.chosenModel.value));
   configureSeq(els.seqMcpInit, mcpSeqConfig());
   configureSeq(els.seqA2a, a2aSeqConfig());
@@ -867,6 +1122,10 @@ function setSeqHop(seq, role, step) {
 function resetSeq(seq) {
   seq.classList.remove("is-run", "is-ok", "is-fail");
   clearSeqMarks(seq);
+  seq.querySelectorAll(".seq-box").forEach((box) => {
+    box.classList.remove("is-dim");
+  });
+  clearSeqNarration(seq);
 }
 
 function markSeq(seq, roles, steps, className) {
@@ -903,72 +1162,104 @@ function failHopFromResult(result, viaGateway) {
   return 2;
 }
 
-function failSeq(seq, hop, viaGateway, target) {
+function failSeq(seq, hop, viaGateway, target, extras = {}) {
   seq.classList.remove("is-run");
   seq.classList.add("is-fail");
-  clearSeqMarks(seq);
+  const targetRole = extras.targetRole || "target";
+  seq.querySelectorAll(".seq-wire").forEach((node) => {
+    node.hidden = true;
+  });
 
   if (hop <= 1) {
+    clearSeqMarks(seq);
     markSeq(seq, ["client"], [1], "is-fail");
-    setSeqCaption(seq, "Failed at AI Agent");
+    setHopLabel(seq, "client", "Agent sends");
+    setSeqCaption(seq, "Failed at agent");
     return;
   }
 
   if (!viaGateway) {
+    clearSeqMarks(seq);
     markSeq(seq, ["client"], [1], "is-on");
-    markSeq(seq, ["target"], [1], "is-fail");
+    markSeq(seq, [targetRole], [1], "is-fail");
+    setHopLabel(
+      seq,
+      "target",
+      extras.phase === "primary" ? "Primary failed" : `Failed at ${target}`
+    );
     setSeqCaption(seq, `Failed at ${target}`);
     return;
   }
 
   if (hop === 2) {
+    clearSeqMarks(seq);
     markSeq(seq, ["client"], [1], "is-on");
     markSeq(seq, ["gateway"], [], "is-fail");
-    setSeqCaption(seq, "Failed at Agentgateway");
+    setHopLabel(seq, "gateway", "Gateway routes");
+    setSeqCaption(seq, "Failed at gateway");
     return;
   }
 
+  seq.querySelectorAll(".seq-arrow, .seq-box").forEach((node) => {
+    if (node.dataset.role === "primary" && extras.phase === "fallback") {
+      return;
+    }
+    node.classList.remove("is-on", "is-fail", "is-back", "is-hop", "is-transit");
+  });
   markSeq(seq, ["client", "gateway"], [1, 2], "is-on");
-  markSeq(seq, ["target"], [2], "is-fail");
-  setSeqCaption(seq, `Failed at ${target}`);
+  markSeq(seq, [targetRole], [2], "is-fail");
+  setHopLabel(
+    seq,
+    "target",
+    extras.phase === "primary" ? "Primary failed" : `Failed at ${target}`
+  );
+  setSeqCaption(
+    seq,
+    extras.phase === "primary" ? "Primary failed" : `Failed at ${target}`
+  );
 }
 
-async function animateSeqForward(seq, viaGateway, target, token) {
+async function animateSeqForward(seq, viaGateway, target, token, extras = {}) {
   const id = seq.id;
+  const targetRole = extras.targetRole || "target";
   markSeq(seq, ["client"], [], "is-on");
   setSeqHop(seq, "client", null);
-  setSeqCaption(seq, "AI Agent sends");
-  if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
+  setHopLabel(seq, "client", "Agent sends");
+  if (!(await waitSeq(seqStepMs(), id, token))) {
     return false;
   }
 
   markSeq(seq, [], [1], "is-on");
   setSeqHop(seq, null, 1);
-  if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
+  if (!(await waitSeq(seqStepMs(), id, token))) {
     return false;
   }
 
   if (viaGateway) {
     markSeq(seq, ["gateway"], [], "is-on");
     setSeqHop(seq, "gateway", null);
-    setSeqCaption(seq, "Agentgateway");
-    if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
+    setHopLabel(seq, "gateway", "Gateway routes");
+    if (!(await waitSeq(seqStepMs(), id, token))) {
       return false;
     }
     markSeq(seq, [], [2], "is-on");
     setSeqHop(seq, null, 2);
-    if (!(await waitSeq(SEQ_STEP_MS, id, token))) {
+    if (!(await waitSeq(seqStepMs(), id, token))) {
       return false;
     }
-    markSeq(seq, ["target"], [], "is-on");
-    setSeqHop(seq, "target", 2);
-    setSeqCaption(seq, target);
+    markSeq(seq, [targetRole], [], "is-on");
+    setSeqHop(seq, targetRole, 2);
+    setHopLabel(
+      seq,
+      "target",
+      extras.phase === "fallback" ? `Failover → ${target}` : `${target} replies`
+    );
     return true;
   }
 
-  markSeq(seq, ["target"], [], "is-on");
-  setSeqHop(seq, "target", 1);
-  setSeqCaption(seq, target);
+  markSeq(seq, [targetRole], [], "is-on");
+  setSeqHop(seq, targetRole, 1);
+  setHopLabel(seq, "target", `${target} replies`);
   return true;
 }
 
@@ -976,45 +1267,83 @@ async function animateSeqReturn(seq, viaGateway, target, token) {
   seq.querySelectorAll(".seq-arrow").forEach((arrow) => {
     arrow.classList.add("is-back");
   });
-  setSeqCaption(seq, "Response");
   if (viaGateway) {
     markSeq(seq, [], [1, 2], "is-on");
     setSeqHop(seq, "gateway", 2);
-    if (!(await waitSeq(SEQ_RETURN_MS, seq.id, token))) {
+    if (!(await waitSeq(seqReturnMs(), seq.id, token))) {
       return false;
     }
     setSeqHop(seq, "client", 1);
-    return waitSeq(SEQ_RETURN_MS, seq.id, token);
+    return waitSeq(seqReturnMs(), seq.id, token);
   }
   markSeq(seq, [], [1], "is-on");
   setSeqHop(seq, "client", 1);
-  return waitSeq(SEQ_RETURN_MS, seq.id, token);
+  return waitSeq(seqReturnMs(), seq.id, token);
 }
 
-async function runWithSeq(seq, requestFn, { viaGateway, target, targetKind, ok }) {
+async function runWithSeq(seq, requestFn, opts) {
+  const {
+    viaGateway,
+    target,
+    targetKind,
+    ok,
+    path,
+    model,
+    phase,
+    targetRole = "target",
+    reset = true,
+    primaryKind,
+    fallbackKind,
+  } = opts;
   const token = ++seqTokens[seq.id];
-  configureSeq(seq, { viaGateway, target, targetKind });
-  resetSeq(seq);
+  configureSeq(seq, { viaGateway, target, targetKind, primaryKind, fallbackKind });
+  if (reset) {
+    resetSeq(seq);
+  } else {
+    seq.classList.remove("is-ok", "is-fail");
+    seq.querySelectorAll(".seq-arrow").forEach((arrow) => {
+      arrow.classList.remove("is-back", "is-transit", "is-on", "is-fail");
+    });
+  }
   seq.classList.add("is-run");
+  if (path || model) {
+    setSeqWire(seq, path, model);
+  }
 
   const previousProgress = seqProgress;
   seqProgress = (stage, detail) => {
-    lightHopFromStage(seq, stage, viaGateway, target, token);
+    lightHopFromStage(seq, stage, viaGateway, target, token, {
+      targetRole,
+      phase,
+      headersMs: detail && detail.headersMs,
+      latencyMs: detail && detail.latencyMs,
+    });
     if (detail && detail.response && seqTokens[seq.id] === token) {
       seq.dataset.traceId = traceIdFromHeaders(detail.response.headers) || "";
     }
   };
 
   const request = Promise.resolve().then(requestFn);
-  const forward = animateSeqForward(seq, viaGateway, target, token);
+  const forward = animateSeqForward(seq, viaGateway, target, token, {
+    targetRole,
+    phase,
+  });
   let result;
   try {
     result = await request;
   } finally {
     seqProgress = previousProgress;
   }
-  if (result && hopFromUsage(result)) {
-    lightHopFromStage(seq, "body", viaGateway, target, token);
+  if (result) {
+    applySeqTimings(seq, viaGateway, result);
+    if (hopFromUsage(result)) {
+      lightHopFromStage(seq, "body", viaGateway, target, token, {
+        targetRole,
+        phase,
+        headersMs: result.headersMs,
+        latencyMs: result.latencyMs,
+      });
+    }
   }
   void trySoloTracesApi(els.soloUi ? els.soloUi.value : DEFAULT_SOLO_UI);
   const stillCurrent = await forward;
@@ -1035,17 +1364,30 @@ async function runWithSeq(seq, requestFn, { viaGateway, target, targetKind, ok }
     seq.querySelectorAll(".seq-box").forEach((box) => {
       box.classList.remove("is-hop");
     });
+    seq.querySelectorAll(".seq-wire").forEach((node) => {
+      node.hidden = true;
+    });
     markSeq(
       seq,
-      viaGateway ? ["client", "gateway", "target"] : ["client", "target"],
+      viaGateway
+        ? ["client", "gateway", targetRole]
+        : ["client", targetRole],
       viaGateway ? [1, 2] : [1],
       "is-on"
+    );
+    setHopLabel(
+      seq,
+      "target",
+      phase === "fallback" ? `Failover → ${target}` : `${target} replies`
     );
     setSeqCaption(seq, pathCaption(viaGateway, target));
     return result;
   }
 
-  failSeq(seq, failHopFromResult(result, viaGateway), viaGateway, target);
+  failSeq(seq, failHopFromResult(result, viaGateway), viaGateway, target, {
+    targetRole,
+    phase,
+  });
   return result;
 }
 
@@ -1073,11 +1415,12 @@ async function timedFetch(url, options) {
     notifySeqProgress("headers", { response, status: response.status, headersMs });
     const raw = await response.text();
     const payload = parseJson(raw);
-    notifySeqProgress("body", { response, raw, payload });
+    const latencyMs = Math.round(performance.now() - started);
+    notifySeqProgress("body", { response, raw, payload, headersMs, latencyMs });
     return {
       response,
       status: response.status,
-      latencyMs: Math.round(performance.now() - started),
+      latencyMs,
       headersMs,
       raw,
       payload,
@@ -1171,6 +1514,10 @@ function showBox(target, { status, latencyMs, model, body, isError, usage, resul
     target.append(cost);
   }
   if (result) {
+    const strip = traceStrip(result);
+    if (strip) {
+      target.append(strip);
+    }
     target.append(soloUiLink(result));
   }
 }
@@ -1267,7 +1614,12 @@ function resultDrawer(target, { ok, meta, nodes, result }) {
   }
   actions.append(collapseButton(target));
   row.append(drawerStatus(state), drawerMeta(meta), actions);
-  setTestDrawer(target, [row, ...nodes], state);
+  const extras = [];
+  const strip = traceStrip(result);
+  if (strip) {
+    extras.push(strip);
+  }
+  setTestDrawer(target, [row, ...extras, ...nodes], state);
 }
 
 function setArea(area) {
@@ -1305,6 +1657,7 @@ async function loadSettings() {
   const provider = PROVIDERS[stored.provider]
     ? stored.provider
     : providerFromModel(stored.model || DEFAULT_MODEL);
+  buildProviderSwitches(provider);
   setProviderSelects(provider);
   els.primaryModel.value = stored.primaryModel || DEFAULT_MODEL;
   els.fallbackModel.value = stored.fallbackModel || DEFAULT_FALLBACK_MODEL;
@@ -1339,6 +1692,7 @@ async function loadSettings() {
   }
   hoorayOn = stored.hooray !== false;
   els.hooray.checked = hoorayOn;
+  setDemoStage(stored.demoStage === true);
   setArea(normalizeArea(stored.area));
   setScenario(stored.scenario || "llm");
   updateEndpointHints();
@@ -1372,6 +1726,14 @@ els.hooray.addEventListener("change", () => {
   persist({ hooray: hoorayOn });
 });
 
+els.demoStage.addEventListener("change", () => {
+  setDemoStage(els.demoStage.checked, true);
+});
+
+els.demoToggle.addEventListener("click", () => {
+  setDemoStage(!demoStageOn, true);
+});
+
 els.soloUi.addEventListener("change", () => {
   persist({ soloUi: currentSoloUi() });
 });
@@ -1379,14 +1741,6 @@ els.soloUi.addEventListener("change", () => {
 function onProviderChange(id) {
   applyProvider(id, { setModels: true, loadYaml: true });
 }
-
-els.provider.addEventListener("change", () => {
-  onProviderChange(els.provider.value);
-});
-
-els.llmProvider.addEventListener("change", () => {
-  onProviderChange(els.llmProvider.value);
-});
 
 els.sectionLlm.addEventListener("click", () => {
   setScenario("llm");
@@ -1440,6 +1794,11 @@ els.fallbackModel.addEventListener("change", () => {
   );
   els.fallbackModel.value = fallbackModel;
   persist({ fallbackModel });
+  refreshSeqDiagrams();
+});
+
+els.fallbackModel.addEventListener("input", () => {
+  refreshSeqDiagrams();
 });
 
 els.chosenModel.addEventListener("change", () => {
@@ -1489,7 +1848,7 @@ els.test.addEventListener("click", async () => {
   const result = await runWithSeq(
     els.seqChat,
     () => postCompletions(endpoint, model, [TEST_MESSAGE]),
-    { ...llmSeqConfig(model), ok: llmRequestOk }
+    { ...llmSeqConfig(model), ok: llmRequestOk, path: requestPath(endpoint), model }
   );
   const summary = summarizeCompletion(result, model);
   showBox(els.testResult, {
@@ -1525,7 +1884,7 @@ els.form.addEventListener("submit", async (event) => {
     const result = await runWithSeq(
       els.seqChat,
       () => postCompletions(endpoint, model, messages),
-      { ...llmSeqConfig(model), ok: llmRequestOk }
+      { ...llmSeqConfig(model), ok: llmRequestOk, path: requestPath(endpoint), model }
     );
     if (result.error) {
       throw new Error(result.error);
@@ -1562,7 +1921,7 @@ els.runChatPing.addEventListener("click", async () => {
   const result = await runWithSeq(
     els.seqChatPing,
     () => postCompletions(endpoint, model, [TEST_MESSAGE]),
-    { ...llmSeqConfig(model), ok: llmRequestOk }
+    { ...llmSeqConfig(model), ok: llmRequestOk, path: requestPath(endpoint), model }
   );
   const summary = summarizeCompletion(result, model);
   const statusText =
@@ -1602,24 +1961,49 @@ els.runFailover.addEventListener("click", async () => {
   runningDrawer(els.resultFailover, "Running primary model…");
 
   const attempts = [];
+  const failoverCfg = failoverSeqConfig();
+  const chatPath = requestPath(endpoint);
   const primary = summarizeCompletion(
     await runWithSeq(
       els.seqFailover,
       () => postCompletions(endpoint, primaryModel, [TEST_MESSAGE]),
-      { ...llmSeqConfig(primaryModel), ok: llmRequestOk }
+      {
+        ...failoverCfg,
+        ok: llmRequestOk,
+        path: chatPath,
+        model: primaryModel,
+        phase: "primary",
+        targetRole: "primary",
+      }
     ),
     primaryModel
   );
   attempts.push({ label: "primary", ...primary });
 
   if (!primary.ok) {
+    const primaryBox = els.seqFailover.querySelector('[data-role="primary"]');
+    if (primaryBox) {
+      primaryBox.classList.remove("is-on", "is-hop");
+      primaryBox.classList.add("is-fail", "is-dim");
+    }
+    setHopLabel(els.seqFailover, "target", "Primary failed");
     runningDrawer(els.resultFailover, "Primary failed · trying fallback…");
     await new Promise((resolve) => setTimeout(resolve, 450));
     const fallback = summarizeCompletion(
       await runWithSeq(
         els.seqFailover,
         () => postCompletions(endpoint, fallbackModel, [TEST_MESSAGE]),
-        { ...llmSeqConfig(fallbackModel), ok: llmRequestOk }
+        {
+          ...failoverCfg,
+          target: failoverCfg.fallbackTarget,
+          targetKind: failoverCfg.fallbackKind,
+          ok: llmRequestOk,
+          path: chatPath,
+          model: fallbackModel,
+          phase: "fallback",
+          targetRole: "fallback",
+          reset: false,
+        }
       ),
       fallbackModel
     );
@@ -1699,7 +2083,11 @@ els.runListCall.addEventListener("click", async () => {
   const listed = await runWithSeq(
     els.seqListCall,
     () => timedFetch(listUrl, { method: "GET", headers: { Accept: "application/json" } }),
-    { ...llmSeqConfig(chosenModel), ok: mcpRequestOk }
+    {
+      ...llmSeqConfig(chosenModel),
+      ok: mcpRequestOk,
+      path: requestPath(listUrl) || "/v1/models",
+    }
   );
   const listOk = !listed.error && listed.status != null && listed.status < 400;
   const listStatus =
@@ -1716,7 +2104,12 @@ els.runListCall.addEventListener("click", async () => {
     await runWithSeq(
       els.seqListCall,
       () => postCompletions(endpoint, chosenModel, [TEST_MESSAGE]),
-      { ...llmSeqConfig(chosenModel), ok: llmRequestOk }
+      {
+        ...llmSeqConfig(chosenModel),
+        ok: llmRequestOk,
+        path: requestPath(endpoint),
+        model: chosenModel,
+      }
     ),
     chosenModel
   );
@@ -1772,7 +2165,7 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.9.0" },
+      clientInfo: { name: "agentgateway-extension", version: "0.9.1" },
     },
   };
 
@@ -1795,7 +2188,7 @@ els.probeMcp.addEventListener("click", async () => {
         },
         "POST initialize unavailable; used GET"
       ),
-    { ...mcpSeqConfig(), ok: mcpRequestOk }
+    { ...mcpSeqConfig(), ok: mcpRequestOk, path: requestPath(url) }
   );
 
   const ok = !result.error && result.status != null && result.status < 400;
@@ -1860,7 +2253,7 @@ els.probeA2a.addEventListener("click", async () => {
     },
         "GET unavailable; used POST health"
       ),
-    { ...a2aSeqConfig(), ok: mcpRequestOk }
+    { ...a2aSeqConfig(), ok: mcpRequestOk, path: requestPath(url) }
   );
 
   const ok = !result.error && result.status != null && result.status < 400;
@@ -1900,7 +2293,12 @@ async function runSecurityProbe(button, drawer, seq, label, messages) {
   const result = await runWithSeq(
     seq,
     () => postCompletions(endpoint, model, messages),
-    { ...securitySeqConfig(), ok: llmRequestOk }
+    {
+      ...securitySeqConfig(),
+      ok: llmRequestOk,
+      path: requestPath(endpoint),
+      model,
+    }
   );
   const summary = summarizeCompletion(result, model);
   const statusText =

@@ -19,21 +19,32 @@
           />
           <h1>Agentgateway</h1>
         </div>
-        <button
-          type="button"
-          id="tab-settings"
-          data-area="settings"
-          class="settings-btn"
-          aria-label="Settings"
-          title="Settings"
-        >
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-            <path
-              fill="currentColor"
-              d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.4.32.64.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.24.1.51 0 .64-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"
-            />
-          </svg>
-        </button>
+        <div class="header-actions">
+          <button
+            type="button"
+            id="demo-toggle"
+            class="demo-btn"
+            aria-pressed="false"
+            title="Demo stage — larger tiles for a projector"
+          >
+            Demo
+          </button>
+          <button
+            type="button"
+            id="tab-settings"
+            data-area="settings"
+            class="settings-btn"
+            aria-label="Settings"
+            title="Settings"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.4.32.64.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.24.1.51 0 .64-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
       <nav class="area-tabs" aria-label="Areas">
         <button type="button" id="tab-chat" data-area="chat" class="is-active">
@@ -58,13 +69,13 @@
           autocomplete="off"
           placeholder="http://host/v1/chat/completions"
         />
-        <label class="field-label" for="provider">Provider</label>
-        <select id="provider">
-          <option value="openai">OpenAI</option>
-          <option value="claude">Claude</option>
-          <option value="grok">Grok</option>
-          <option value="bedrock">Bedrock</option>
-        </select>
+        <span class="field-label" id="provider-label">Provider</span>
+        <div
+          class="provider-switch"
+          id="provider"
+          role="radiogroup"
+          aria-labelledby="provider-label"
+        ></div>
         <div class="model-row">
           <div class="model-field">
             <label class="field-label" for="model">Model</label>
@@ -83,26 +94,33 @@
           id="seq-chat"
           aria-live="polite"
           data-mode="via-gw"
-          aria-label="AI Agent → Agentgateway → OpenAI"
-          title="AI Agent → Agentgateway → OpenAI"
+          aria-label="Request path"
         >
           <div class="seq-fwd">
             <div class="seq-col">
               <div class="seq-box" data-role="client" title="AI Agent">
                 <img class="seq-icon" src="icons/ai-agent.svg" alt="" />
               </div>
+              <span class="seq-hop" data-hop="client" hidden></span>
             </div>
-            <div class="seq-arrow" data-step="1" aria-hidden="true"></div>
+            <div class="seq-arrow" data-step="1" aria-hidden="true">
+              <span class="seq-ms" hidden></span>
+            </div>
             <div class="seq-col" data-slot="gateway">
               <div class="seq-box seq-gw" data-role="gateway" title="Agentgateway">
                 <img class="seq-logo" src="icons/agw-mark-color.svg" alt="" />
               </div>
+              <span class="seq-hop" data-hop="gateway" hidden></span>
             </div>
-            <div class="seq-arrow" data-step="2" aria-hidden="true"></div>
+            <div class="seq-arrow" data-step="2" aria-hidden="true">
+              <span class="seq-ms" hidden></span>
+              <span class="seq-wire" hidden></span>
+            </div>
             <div class="seq-col">
-              <div class="seq-box" data-role="target" title="OpenAI">
+              <div class="seq-box" data-role="target" title="Provider">
                 <img class="seq-icon" src="icons/openai.svg" alt="" data-target-icon />
               </div>
+              <span class="seq-hop" data-hop="target" hidden></span>
             </div>
           </div>
         </figure>
@@ -140,13 +158,13 @@
           <div class="service-intro">
             <h2 class="service-title">LLM</h2>
             <p class="hint" id="llm-endpoint-hint"></p>
-            <label class="field-label" for="llm-provider">Provider</label>
-            <select id="llm-provider">
-              <option value="openai">OpenAI</option>
-              <option value="claude">Claude</option>
-              <option value="grok">Grok</option>
-              <option value="bedrock">Bedrock</option>
-            </select>
+            <span class="field-label" id="llm-provider-label">Provider</span>
+            <div
+              class="provider-switch"
+              id="llm-provider"
+              role="radiogroup"
+              aria-labelledby="llm-provider-label"
+            ></div>
           </div>
 
           <article class="test-card" id="test-chat-ping">
@@ -164,26 +182,33 @@
               id="seq-chat-ping"
               aria-live="polite"
               data-mode="via-gw"
-              aria-label="AI Agent → Agentgateway → OpenAI"
-              title="AI Agent → Agentgateway → OpenAI"
+              aria-label="Request path"
             >
               <div class="seq-fwd">
                 <div class="seq-col">
                   <div class="seq-box" data-role="client" title="AI Agent">
                     <img class="seq-icon" src="icons/ai-agent.svg" alt="" />
                   </div>
+                  <span class="seq-hop" data-hop="client" hidden></span>
                 </div>
-                <div class="seq-arrow" data-step="1" aria-hidden="true"></div>
+                <div class="seq-arrow" data-step="1" aria-hidden="true">
+                  <span class="seq-ms" hidden></span>
+                </div>
                 <div class="seq-col" data-slot="gateway">
                   <div class="seq-box seq-gw" data-role="gateway" title="Agentgateway">
                     <img class="seq-logo" src="icons/agw-mark-color.svg" alt="" />
                   </div>
+                  <span class="seq-hop" data-hop="gateway" hidden></span>
                 </div>
-                <div class="seq-arrow" data-step="2" aria-hidden="true"></div>
+                <div class="seq-arrow" data-step="2" aria-hidden="true">
+                  <span class="seq-ms" hidden></span>
+                  <span class="seq-wire" hidden></span>
+                </div>
                 <div class="seq-col">
-                  <div class="seq-box" data-role="target" title="OpenAI">
+                  <div class="seq-box" data-role="target" title="Provider">
                     <img class="seq-icon" src="icons/openai.svg" alt="" data-target-icon />
                   </div>
+                  <span class="seq-hop" data-hop="target" hidden></span>
                 </div>
               </div>
             </figure>
@@ -228,30 +253,53 @@
               </div>
             </div>
             <figure
-              class="seq seq-compact"
+              class="seq seq-compact seq-failover"
               id="seq-failover"
               aria-live="polite"
               data-mode="via-gw"
-              aria-label="AI Agent → Agentgateway → OpenAI"
-              title="AI Agent → Agentgateway → OpenAI"
+              data-failover="1"
+              aria-label="Request path with failover"
             >
               <div class="seq-fwd">
                 <div class="seq-col">
                   <div class="seq-box" data-role="client" title="AI Agent">
                     <img class="seq-icon" src="icons/ai-agent.svg" alt="" />
                   </div>
+                  <span class="seq-hop" data-hop="client" hidden></span>
                 </div>
-                <div class="seq-arrow" data-step="1" aria-hidden="true"></div>
+                <div class="seq-arrow" data-step="1" aria-hidden="true">
+                  <span class="seq-ms" hidden></span>
+                </div>
                 <div class="seq-col" data-slot="gateway">
                   <div class="seq-box seq-gw" data-role="gateway" title="Agentgateway">
                     <img class="seq-logo" src="icons/agw-mark-color.svg" alt="" />
                   </div>
+                  <span class="seq-hop" data-hop="gateway" hidden></span>
                 </div>
-                <div class="seq-arrow" data-step="2" aria-hidden="true"></div>
-                <div class="seq-col">
-                  <div class="seq-box" data-role="target" title="OpenAI">
-                    <img class="seq-icon" src="icons/openai.svg" alt="" data-target-icon />
+                <div class="seq-arrow" data-step="2" aria-hidden="true">
+                  <span class="seq-ms" hidden></span>
+                  <span class="seq-wire" hidden></span>
+                </div>
+                <div class="seq-col seq-col-pair">
+                  <div class="seq-pair">
+                    <div class="seq-box" data-role="primary" title="Primary">
+                      <img
+                        class="seq-icon"
+                        src="icons/openai.svg"
+                        alt=""
+                        data-primary-icon
+                      />
+                    </div>
+                    <div class="seq-box" data-role="fallback" title="Fallback">
+                      <img
+                        class="seq-icon"
+                        src="icons/openai.svg"
+                        alt=""
+                        data-fallback-icon
+                      />
+                    </div>
                   </div>
+                  <span class="seq-hop" data-hop="target" hidden></span>
                 </div>
               </div>
             </figure>
@@ -286,26 +334,33 @@
               id="seq-list-call"
               aria-live="polite"
               data-mode="via-gw"
-              aria-label="AI Agent → Agentgateway → OpenAI"
-              title="AI Agent → Agentgateway → OpenAI"
+              aria-label="Request path"
             >
               <div class="seq-fwd">
                 <div class="seq-col">
                   <div class="seq-box" data-role="client" title="AI Agent">
                     <img class="seq-icon" src="icons/ai-agent.svg" alt="" />
                   </div>
+                  <span class="seq-hop" data-hop="client" hidden></span>
                 </div>
-                <div class="seq-arrow" data-step="1" aria-hidden="true"></div>
+                <div class="seq-arrow" data-step="1" aria-hidden="true">
+                  <span class="seq-ms" hidden></span>
+                </div>
                 <div class="seq-col" data-slot="gateway">
                   <div class="seq-box seq-gw" data-role="gateway" title="Agentgateway">
                     <img class="seq-logo" src="icons/agw-mark-color.svg" alt="" />
                   </div>
+                  <span class="seq-hop" data-hop="gateway" hidden></span>
                 </div>
-                <div class="seq-arrow" data-step="2" aria-hidden="true"></div>
+                <div class="seq-arrow" data-step="2" aria-hidden="true">
+                  <span class="seq-ms" hidden></span>
+                  <span class="seq-wire" hidden></span>
+                </div>
                 <div class="seq-col">
-                  <div class="seq-box" data-role="target" title="OpenAI">
+                  <div class="seq-box" data-role="target" title="Provider">
                     <img class="seq-icon" src="icons/openai.svg" alt="" data-target-icon />
                   </div>
+                  <span class="seq-hop" data-hop="target" hidden></span>
                 </div>
               </div>
             </figure>
@@ -373,26 +428,33 @@
               id="seq-mcp-init"
               aria-live="polite"
               data-mode="via-gw"
-              aria-label="AI Agent → Agentgateway → MCP"
-              title="AI Agent → Agentgateway → MCP"
+              aria-label="Request path"
             >
               <div class="seq-fwd">
                 <div class="seq-col">
                   <div class="seq-box" data-role="client" title="AI Agent">
                     <img class="seq-icon" src="icons/ai-agent.svg" alt="" />
                   </div>
+                  <span class="seq-hop" data-hop="client" hidden></span>
                 </div>
-                <div class="seq-arrow" data-step="1" aria-hidden="true"></div>
+                <div class="seq-arrow" data-step="1" aria-hidden="true">
+                  <span class="seq-ms" hidden></span>
+                </div>
                 <div class="seq-col" data-slot="gateway">
                   <div class="seq-box seq-gw" data-role="gateway" title="Agentgateway">
                     <img class="seq-logo" src="icons/agw-mark-color.svg" alt="" />
                   </div>
+                  <span class="seq-hop" data-hop="gateway" hidden></span>
                 </div>
-                <div class="seq-arrow" data-step="2" aria-hidden="true"></div>
+                <div class="seq-arrow" data-step="2" aria-hidden="true">
+                  <span class="seq-ms" hidden></span>
+                  <span class="seq-wire" hidden></span>
+                </div>
                 <div class="seq-col">
                   <div class="seq-box" data-role="target" title="MCP">
                     <img class="seq-icon" src="icons/mcp.svg" alt="" data-target-icon />
                   </div>
+                  <span class="seq-hop" data-hop="target" hidden></span>
                 </div>
               </div>
             </figure>
@@ -422,26 +484,33 @@
               id="seq-a2a"
               aria-live="polite"
               data-mode="via-gw"
-              aria-label="AI Agent → Agentgateway → A2A"
-              title="AI Agent → Agentgateway → A2A"
+              aria-label="Request path"
             >
               <div class="seq-fwd">
                 <div class="seq-col">
                   <div class="seq-box" data-role="client" title="AI Agent">
                     <img class="seq-icon" src="icons/ai-agent.svg" alt="" />
                   </div>
+                  <span class="seq-hop" data-hop="client" hidden></span>
                 </div>
-                <div class="seq-arrow" data-step="1" aria-hidden="true"></div>
+                <div class="seq-arrow" data-step="1" aria-hidden="true">
+                  <span class="seq-ms" hidden></span>
+                </div>
                 <div class="seq-col" data-slot="gateway">
                   <div class="seq-box seq-gw" data-role="gateway" title="Agentgateway">
                     <img class="seq-logo" src="icons/agw-mark-color.svg" alt="" />
                   </div>
+                  <span class="seq-hop" data-hop="gateway" hidden></span>
                 </div>
-                <div class="seq-arrow" data-step="2" aria-hidden="true"></div>
+                <div class="seq-arrow" data-step="2" aria-hidden="true">
+                  <span class="seq-ms" hidden></span>
+                  <span class="seq-wire" hidden></span>
+                </div>
                 <div class="seq-col">
                   <div class="seq-box" data-role="target" title="A2A">
                     <img class="seq-icon" src="icons/a2a.svg" alt="" data-target-icon />
                   </div>
+                  <span class="seq-hop" data-hop="target" hidden></span>
                 </div>
               </div>
             </figure>
@@ -494,26 +563,33 @@
               id="seq-unauth"
               aria-live="polite"
               data-mode="via-gw"
-              aria-label="AI Agent → Agentgateway → Policy"
-              title="AI Agent → Agentgateway → Policy"
+              aria-label="Request path"
             >
               <div class="seq-fwd">
                 <div class="seq-col">
                   <div class="seq-box" data-role="client" title="AI Agent">
                     <img class="seq-icon" src="icons/ai-agent.svg" alt="" />
                   </div>
+                  <span class="seq-hop" data-hop="client" hidden></span>
                 </div>
-                <div class="seq-arrow" data-step="1" aria-hidden="true"></div>
+                <div class="seq-arrow" data-step="1" aria-hidden="true">
+                  <span class="seq-ms" hidden></span>
+                </div>
                 <div class="seq-col" data-slot="gateway">
                   <div class="seq-box seq-gw" data-role="gateway" title="Agentgateway">
                     <img class="seq-logo" src="icons/agw-mark-color.svg" alt="" />
                   </div>
+                  <span class="seq-hop" data-hop="gateway" hidden></span>
                 </div>
-                <div class="seq-arrow" data-step="2" aria-hidden="true"></div>
+                <div class="seq-arrow" data-step="2" aria-hidden="true">
+                  <span class="seq-ms" hidden></span>
+                  <span class="seq-wire" hidden></span>
+                </div>
                 <div class="seq-col">
                   <div class="seq-box" data-role="target" title="Policy">
                     <img class="seq-icon" src="icons/policy.svg" alt="" data-target-icon />
                   </div>
+                  <span class="seq-hop" data-hop="target" hidden></span>
                 </div>
               </div>
             </figure>
@@ -540,26 +616,33 @@
               id="seq-junk"
               aria-live="polite"
               data-mode="via-gw"
-              aria-label="AI Agent → Agentgateway → Policy"
-              title="AI Agent → Agentgateway → Policy"
+              aria-label="Request path"
             >
               <div class="seq-fwd">
                 <div class="seq-col">
                   <div class="seq-box" data-role="client" title="AI Agent">
                     <img class="seq-icon" src="icons/ai-agent.svg" alt="" />
                   </div>
+                  <span class="seq-hop" data-hop="client" hidden></span>
                 </div>
-                <div class="seq-arrow" data-step="1" aria-hidden="true"></div>
+                <div class="seq-arrow" data-step="1" aria-hidden="true">
+                  <span class="seq-ms" hidden></span>
+                </div>
                 <div class="seq-col" data-slot="gateway">
                   <div class="seq-box seq-gw" data-role="gateway" title="Agentgateway">
                     <img class="seq-logo" src="icons/agw-mark-color.svg" alt="" />
                   </div>
+                  <span class="seq-hop" data-hop="gateway" hidden></span>
                 </div>
-                <div class="seq-arrow" data-step="2" aria-hidden="true"></div>
+                <div class="seq-arrow" data-step="2" aria-hidden="true">
+                  <span class="seq-ms" hidden></span>
+                  <span class="seq-wire" hidden></span>
+                </div>
                 <div class="seq-col">
                   <div class="seq-box" data-role="target" title="Policy">
                     <img class="seq-icon" src="icons/policy.svg" alt="" data-target-icon />
                   </div>
+                  <span class="seq-hop" data-hop="target" hidden></span>
                 </div>
               </div>
             </figure>
@@ -700,6 +783,16 @@
           Test, Open in Solo UI opens the traces page. Saved in
           <code>chrome.storage.local</code> like the chat endpoint.
         </p>
+        <label class="toggle" for="demo-stage">
+          <input id="demo-stage" type="checkbox" />
+          <span class="toggle-ui" aria-hidden="true"></span>
+          <span class="toggle-copy">
+            <span class="toggle-title">Demo stage</span>
+            <span class="hint">
+              Taller popup, bigger tiles, slower arrows. For a projector.
+            </span>
+          </span>
+        </label>
         <label class="toggle" for="hooray">
           <input id="hooray" type="checkbox" checked />
           <span class="toggle-ui" aria-hidden="true"></span>

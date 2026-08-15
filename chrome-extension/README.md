@@ -7,28 +7,51 @@ backend auth, so those areas do **not** store or send an API key or license
 key. Cluster talks to a Kubernetes API server so you can list and apply
 Agentgateway CRDs from the popup.
 
-The popup is a light enterprise console: off-white surfaces (`#F4F6F7`,
-`#FFFFFF`), subtle gray borders, a restrained teal accent (`#0D7A6F`),
-and professional system type. The header keeps the official color mark
+The popup is a light console: off-white surfaces (`#F3F5F6`, `#FFFFFF`),
+soft gray borders, a refined teal accent (`#0C7469`), tighter system type,
+and cards with a light shadow. The header keeps the official color mark
 beside the title. The dark wordmark and color mark are vendored in
 `icons/` from the live homepage (`/agw-dark.svg`, `/agw-mark-color.svg`) —
 they are not hotlinked at runtime. Flow hops use compact vendored SVGs
 in the same folder (AI Agent robot, OpenAI blossom, Claude asterisk,
-xAI/Grok mark, AWS cube, MCP, A2A, Policy). Toolbar PNGs (`icon16.png`,
-`icon32.png`, `icon48.png`) are rasterized from that mark and set as
-`action.default_icon`.
+xAI/Grok mark, AWS cube, an original twin-ring Gemini mark, MCP, A2A,
+Policy). Toolbar PNGs (`icon16.png`, `icon32.png`, `icon48.png`) are
+rasterized from that mark and set as `action.default_icon`.
+
+The story is **Agent → Agentgateway → any LLM**. Provider pills
+(OpenAI, Claude, Grok, Bedrock, Gemini) sit above the model field — not
+a dropdown that defaults the whole UI to OpenAI. Switching updates the
+right-hand flow icon immediately and fills a default model
+(`gpt-4o-mini`, `claude-sonnet-4-5`, `grok-3`, `amazon.nova-micro-v1:0`,
+`gemini-2.0-flash`). The same control appears on Services → LLM.
+Provider, endpoint, and model are saved in `chrome.storage.local`.
 
 Chat and each Services test show a compact one-row flow
-(AI Agent tile → Agentgateway mark → provider or MCP/A2A tile). Hover
-title and `aria-label` name the path; there is no caption bar. **Test**
-and each named **Run** light tiles in order. When the request is in
-flight, tiles follow real fetch hops when they are available: AI Agent
-(request sent) → Agentgateway (HTTP headers / status) → provider (model
-in the body). Sliding chevrons still march as a fallback so demos move
-if timing or traces are empty. A traces GET against the Solo UI origin
-is attempted without extra auth and never blocks Run; a 401 or CORS
-failure stays on the client-side fallback. The path settles teal on
-success, or motion stops on the failing hop.
+(AI Agent tile → Agentgateway mark → provider or MCP/A2A tile). Idle
+tiles are icon-only — no permanent path caption. **Test** and each named
+**Run** light tiles in order and add short hop labels as they light:
+**Agent sends** → **Gateway routes** → **{Provider} replies**. When the
+request is in flight, tiles follow real fetch hops when they are
+available: AI Agent (request sent) → Agentgateway (HTTP headers /
+status) → provider (model in the body). Sliding chevrons still march as
+a fallback so demos move if timing or traces are empty. A traces GET
+against the Solo UI origin is attempted without extra auth and never
+blocks Run; a 401 or CORS failure stays on the client-side fallback.
+The path settles teal on success, or motion stops on the failing hop.
+
+When real timings exist (`headersMs` / body delta, or total latency),
+each hop arrow can show a compact duration (`12ms`, `80ms`, `1.9s`).
+Unknown hops stay blank — numbers are never invented. During Run, the
+active chevron also carries the request path and model
+(`/v1/chat/completions · gpt-4o-mini`). After OK, the result drawer
+adds a compact waterfall (agent / gateway / model) for hops that have
+timings, plus the existing **Open in Solo UI** link and token/cost
+estimate.
+
+The header **Demo** control (also a Settings toggle, persisted in
+`chrome.storage.local`, default **off**) grows the popup to 480×640,
+enlarges Services tiles, slows the arrows, and makes hop labels easier
+to read on a projector. Normal mode stays 448×600.
 
 The header gear opens **Settings**. **Hooray** (default on, stored in
 `chrome.storage.local`) plays a short canvas confetti burst after a
@@ -44,7 +67,7 @@ HTTP 2xx, a Security probe that finishes as designed, or a Cluster
 3. Click **Load unpacked**
 4. Select this `chrome-extension/` folder
 
-The toolbar action opens a 448×600 popup.
+The toolbar action opens a 448×600 popup (480×640 in Demo stage).
 
 ## Chat
 
@@ -55,11 +78,10 @@ The **Endpoint URL** field is pre-filled with:
 
 `http://35.226.209.32/v1/chat/completions`
 
-**Provider** (OpenAI, Claude, Grok, Bedrock) sits above the model field. Switching
-updates the right-hand flow icon immediately and fills a default model
-(`gpt-4o-mini`, `claude-sonnet-4-5`, `grok-3`, `amazon.nova-micro-v1:0`).
-The same control appears on Services → LLM. Provider, endpoint, and model
-are saved in `chrome.storage.local`.
+**Provider** is a pill / segment control with each provider’s icon.
+Switching updates the right-hand flow tile and default model. Captions
+and hop labels use the selected provider name, not a hardcoded
+“OpenAI.”
 
 If you enter a base URL without `/v1/chat/completions` (for example
 `http://35.226.209.32`), the extension appends that path.
@@ -115,8 +137,11 @@ Tests run against the Chat endpoint. Each result shows HTTP status,
 latency, model, and reply or error.
 
 - **Chat ping** — tiny `Reply with the word pong.` prompt
-- **Model failover** — primary model, then fallback if it fails
-  (persisted; defaults follow the selected provider)
+- **Model failover** — two provider tiles (primary + fallback). On Run,
+  primary lights, then dims if it fails and fallback lights. Hop labels
+  say **Primary failed** / **Failover → {provider}**. Default models
+  stay `gpt-4o-mini` / `gpt-4o` for the OpenAI pill; tiles follow the
+  model names so Claude → Grok (or any pair) is visible
 - **List / call model** — `GET /v1/models`, then chat with the chosen
   model
 
@@ -133,6 +158,7 @@ Prebuilt deploys (from `manifests/` and
 - Grok OpenAI-compatible backend (`api.x.ai`) + HTTPRoute (`grok-secret`)
 - Bedrock backend + HTTPRoute (`bedrock-secret`, documented
   `amazon.nova-micro-v1:0`)
+- Gemini backend + HTTPRoute (`gemini-secret`, `gemini-2.0-flash`)
 - Matching failover and HTTPRoute add-on examples per provider
 
 ### MCP / A2A
@@ -166,6 +192,8 @@ The gear in the header opens **Settings**.
   **Open in Solo UI** uses this base and the SPA traces path
   (`/age/tracing`). A trace id from gateway response headers is appended
   as a path segment when present. No invented query params.
+- **Demo stage** — taller popup, bigger tiles, slower arrows. Also
+  toggled from the header **Demo** control. Persisted; default **off**.
 - **Hooray** — “Confetti on a successful test.” Persisted in
   `chrome.storage.local`; default **on**. One ~1s canvas burst, not a
   loop. Honors `prefers-reduced-motion`.

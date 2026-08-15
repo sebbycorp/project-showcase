@@ -586,6 +586,148 @@ spec:
         consecutiveFailures: 1
 `,
     },
+    gemini: {
+      label: "Gemini backend + HTTPRoute",
+      yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/providers/google/
+# Create gemini-secret in the cluster first — do not put a key here.
+#   kubectl -n agentgateway-system create secret generic gemini-secret \\
+#     --from-literal=Authorization="\${GEMINI_API_KEY}"
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: gemini
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      gemini:
+        model: gemini-2.0-flash
+  policies:
+    auth:
+      secretRef:
+        name: gemini-secret
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: gemini
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /gemini
+      backendRefs:
+        - name: gemini
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+`,
+    },
+    failoverGemini: {
+      label: "Failover backend (Gemini)",
+      yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/failover/
+# Primary model: gemini-2.0-flash (first priority group)
+# Fallback model: gemini-1.5-flash (second priority group)
+# secretRef name only — create gemini-secret separately.
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: model-failover
+  namespace: agentgateway-system
+spec:
+  ai:
+    groups:
+      - providers:
+          - name: gemini-primary
+            gemini:
+              model: gemini-2.0-flash
+            policies:
+              auth:
+                secretRef:
+                  name: gemini-secret
+      - providers:
+          - name: gemini-fallback
+            gemini:
+              model: gemini-1.5-flash
+            policies:
+              auth:
+                secretRef:
+                  name: gemini-secret
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: model-failover
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /model
+      backendRefs:
+        - name: model-failover
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: model-failover-health
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
+      name: model-failover
+  backend:
+    health:
+      unhealthyCondition: "response.code >= 500 || response.code == 429"
+      eviction:
+        duration: 10s
+        consecutiveFailures: 1
+`,
+    },
+    httprouteGemini: {
+      label: "HTTPRoute add-on (/gemini)",
+      yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/providers/google/
+# Rewrites /gemini → /v1/chat/completions. Tweak the path or backend name.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: gemini-path
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /gemini
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /v1/chat/completions
+      backendRefs:
+        - name: gemini
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+`,
+    },
     httprouteBedrock: {
       label: "HTTPRoute add-on (/bedrock)",
       yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/providers/bedrock/
