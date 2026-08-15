@@ -917,30 +917,9 @@ spec:
   },
   api: {
     policy: {
-      label: "Prompt-guard policy (PII stub)",
-      yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/guardrails/regex/
-# Safe PII reject example (credit card string). Not a jailbreak payload.
-# Target the openai HTTPRoute from the LLM OpenAI example.
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayPolicy
-metadata:
-  name: openai-prompt-guard
-  namespace: agentgateway-system
-spec:
-  targetRefs:
-    - group: gateway.networking.k8s.io
-      kind: HTTPRoute
-      name: openai
-  backend:
-    ai:
-      promptGuard:
-        request:
-          - response:
-              message: "Rejected due to inappropriate content"
-            regex:
-              action: Reject
-              matches:
-                - "credit card"
+      label: "Prompt Guard (builtin suite)",
+      yaml: `# Replaced by workshop.js WORKSHOP_YAML.guardrails (builtin-guardrails.md).
+# Loaded at runtime — see workshop.js if this stub is still visible.
 `,
     },
   },

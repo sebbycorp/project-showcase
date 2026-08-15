@@ -2,7 +2,7 @@
 
 A Chrome extension for chatting, testing, and teaching [Solo Agentgateway](https://docs.solo.io/agentgateway/latest/) (LLM, MCP, A2A, and API/HTTP) against **your** Kubernetes cluster. Point it at a reachable API server, apply Gateway / Agentgateway CRDs from the popup, and run the same hops you would show in a live demo.
 
-The extension is in [`chrome-extension/`](chrome-extension/). Current version: **0.9.8** (`manifest.json`).
+The extension is in [`chrome-extension/`](chrome-extension/). Current version: **0.10.0** (`manifest.json`).
 
 ![Chat tab](docs/images/chat.png)
 
@@ -21,6 +21,7 @@ These match the tabs and header controls in the popup.
 ![MCP tab](docs/images/mcp.png)
 
 - **A2A and API/HTTP.** **A2A** probes **A2A agent-card / health**. **API/HTTP** runs **HTTP request**, **Unauthenticated request**, and **Junk / policy-probe**. Each tab can **Apply** a prebuilt example when a cluster is connected.
+- **Workshop demos.** Each of **LLM**, **MCP**, **A2A**, and **API/HTTP** has Apply + Run cards from the Solo Enterprise Agentgateway workshop (plus five original flows). Hop labels include promptGuard, prompt.prepend, rateLimit, OpenAPI→REST, WAF, and A2A task. Highlights: builtin guardrails, token budget → 429, streaming SSE, embeddings, OpenAPI→MCP (Open-Meteo), real A2A task, and WAF first-pass. Dedicated paths (`/openai-jwt`, `/mcp-weather`, `/mcp-jwt`) keep default Chat / MCP usable.
 - **Connect to any cluster and apply CRDs.** In **Settings → Cluster**, choose **Source** **Manual** (GKE, AKS, EKS, or Local) or **Omni** (Sidero Omni). **Test connection**, then apply from the builders or **Resources**.
 - **Clusters without a public proxy.** **Settings → Port forward** copies a `kubectl port-forward` command. Run it locally, click **Use localhost**, and point Chat / MCP / API tests at `127.0.0.1`. **Check localhost** reports Reachable or Not reachable.
 - **Persistence.** The last top-level tab and the header **Demo** toggle are remembered. A **Connected** / **Not connected** chip (or **Checking** on open) sits in the header; click it to jump to Cluster.
@@ -36,7 +37,7 @@ Load the unpacked extension in Chrome (desktop). This is not on the Chrome Web S
 5. Select the **`chrome-extension`** folder — the folder that contains `manifest.json`, not the repo root.
 6. Pin **Agentgateway** from the extensions menu so the toolbar icon stays visible.
 
-Click the toolbar icon to open the popup. Version **0.9.8** is the `version` field in `chrome-extension/manifest.json`.
+Click the toolbar icon to open the popup. Version **0.10.0** is the `version` field in `chrome-extension/manifest.json`.
 
 ## Configure it to your cluster
 
