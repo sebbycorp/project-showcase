@@ -126,8 +126,11 @@ JSON-RPC probes, plus initialize / list / call / JWT cards), A2A,
 API/HTTP, plus LLM/MCP cluster config catalog (Connect / Route /
 Protect / Control, including failover Policies) and Cluster CRD apply
 in Settings through a configurable Agentgateway endpoint (saved in
-`chrome.storage.local`; no API keys). Load it unpacked from that
-folder — see [chrome-extension/README.md](chrome-extension/README.md).
+`chrome.storage.local`; no API keys). Settings → Cluster includes a
+Port forward section that copies a `kubectl port-forward` command and
+can point Chat / MCP / API tests at `127.0.0.1` — the extension cannot
+start the tunnel itself. Load it unpacked from that folder — see
+[chrome-extension/README.md](chrome-extension/README.md).
 
 ## CI
 

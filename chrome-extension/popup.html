@@ -22,6 +22,15 @@
         <div class="header-actions">
           <button
             type="button"
+            id="localhost-chip"
+            class="localhost-chip"
+            hidden
+            title="Chat / MCP / API tests use localhost — open Port forward"
+          >
+            <span id="localhost-chip-label">localhost</span>
+          </button>
+          <button
+            type="button"
             id="cluster-chip"
             class="cluster-chip is-disconnected"
             aria-live="polite"
@@ -1694,7 +1703,8 @@
         <p class="hint">
           API server, token, and Apply for Gateway / Agentgateway CRDs. Used by
           the LLM and MCP builders, MCP one-click deploys, and each tab’s
-          Deploy accordion.
+          Deploy accordion. Port forward copies a local kubectl command for
+          clusters without a public proxy — Chrome cannot start the tunnel.
         </p>
         <label class="field-label" for="cluster-source">Source</label>
         <select id="cluster-source">
@@ -1790,6 +1800,124 @@
         </button>
         <div id="cluster-test-result" class="result-box" hidden></div>
 
+        <div id="port-forward-section">
+          <h2 class="cluster-heading">Port forward</h2>
+          <p class="hint">
+            Chrome cannot start <code>kubectl port-forward</code>. Copy the
+            command and run it on this machine — the same laptop where Chrome
+            is open. Then <strong>Use localhost</strong> so Chat / MCP / API
+            tests hit <code>127.0.0.1</code>.
+          </p>
+          <p id="port-forward-omni-note" class="hint" hidden>
+            Omni still needs a working kubeconfig on this machine
+            (<code>omnictl kubeconfig</code> or the OIDC plugin). Port-forward
+            is local kubectl, not the extension token.
+          </p>
+
+          <div class="field-grid">
+            <div>
+              <label class="field-label" for="pf-resource">Resource</label>
+              <select id="pf-resource">
+                <option value="service">Service</option>
+                <option value="deployment">Deployment</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label" for="pf-name">Name</label>
+              <input
+                id="pf-name"
+                type="text"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="agentgateway-proxy"
+                value="agentgateway-proxy"
+              />
+            </div>
+            <div>
+              <label class="field-label" for="pf-namespace">Namespace</label>
+              <input
+                id="pf-namespace"
+                type="text"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="agentgateway-system"
+                value="agentgateway-system"
+              />
+            </div>
+            <div id="pf-context-wrap" hidden>
+              <label class="field-label" for="pf-context">Context</label>
+              <input
+                id="pf-context"
+                type="text"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="Optional --context"
+              />
+            </div>
+            <div>
+              <label class="field-label" for="pf-local-port">Local port</label>
+              <input
+                id="pf-local-port"
+                type="number"
+                min="1"
+                max="65535"
+                step="1"
+                placeholder="8080"
+                value="8080"
+              />
+            </div>
+            <div>
+              <label class="field-label" for="pf-remote-port">Remote port</label>
+              <input
+                id="pf-remote-port"
+                type="number"
+                min="1"
+                max="65535"
+                step="1"
+                placeholder="80"
+                value="80"
+              />
+            </div>
+          </div>
+
+          <label class="toggle" for="pf-mcp-path">
+            <input id="pf-mcp-path" type="checkbox" />
+            <span class="toggle-ui" aria-hidden="true"></span>
+            <span class="toggle-copy">
+              <span class="toggle-title">MCP path</span>
+              <span class="hint">
+                Use localhost also sets MCP to
+                <code>http://127.0.0.1:&lt;port&gt;/mcp</code>. Check localhost
+                GETs <code>/mcp</code>.
+              </span>
+            </span>
+          </label>
+
+          <label class="field-label" for="pf-command">Command</label>
+          <textarea
+            id="pf-command"
+            rows="2"
+            readonly
+            spellcheck="false"
+          ></textarea>
+          <p class="hint">
+            Run this in a terminal on this machine. The extension does not
+            start a tunnel.
+          </p>
+          <div class="button-row">
+            <button id="pf-copy" type="button" class="btn btn-secondary">
+              Copy command
+            </button>
+            <button id="pf-use-localhost" type="button" class="btn">
+              Use localhost
+            </button>
+            <button id="pf-check" type="button" class="btn btn-secondary">
+              Check localhost
+            </button>
+          </div>
+          <div id="pf-result" class="result-box" hidden></div>
+        </div>
+
         <h2 class="cluster-heading">Resources</h2>
         <p class="hint">
           Gateway, Backend, HTTPRoute, Policy, Model, RateLimit, and Budget
@@ -1845,6 +1973,7 @@
     <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
     <script src="yaml.js"></script>
     <script src="kubeconfig.js"></script>
+    <script src="portforward.js"></script>
     <script src="examples.js"></script>
     <script src="builder.js"></script>
     <script src="confetti.js"></script>

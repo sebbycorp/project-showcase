@@ -91,6 +91,14 @@ const STORAGE_KEYS = [
   "clusterConnected",
   "clusterKind",
   "clusterManifest",
+  "pfResource",
+  "pfName",
+  "pfNamespace",
+  "pfContext",
+  "pfLocalPort",
+  "pfRemotePort",
+  "pfMcpPath",
+  "pfUsingLocalhost",
   "hooray",
   "soloUi",
   "demoStage",
@@ -488,6 +496,23 @@ const els = {
   clusterChipLabel: document.getElementById("cluster-chip-label"),
   clusterChipHint: document.getElementById("cluster-chip-hint"),
   clusterPanel: document.getElementById("cluster-panel"),
+  localhostChip: document.getElementById("localhost-chip"),
+  localhostChipLabel: document.getElementById("localhost-chip-label"),
+  portForwardSection: document.getElementById("port-forward-section"),
+  portForwardOmniNote: document.getElementById("port-forward-omni-note"),
+  pfResource: document.getElementById("pf-resource"),
+  pfName: document.getElementById("pf-name"),
+  pfNamespace: document.getElementById("pf-namespace"),
+  pfContext: document.getElementById("pf-context"),
+  pfContextWrap: document.getElementById("pf-context-wrap"),
+  pfLocalPort: document.getElementById("pf-local-port"),
+  pfRemotePort: document.getElementById("pf-remote-port"),
+  pfMcpPath: document.getElementById("pf-mcp-path"),
+  pfCommand: document.getElementById("pf-command"),
+  pfCopy: document.getElementById("pf-copy"),
+  pfUseLocalhost: document.getElementById("pf-use-localhost"),
+  pfCheck: document.getElementById("pf-check"),
+  pfResult: document.getElementById("pf-result"),
   confetti: document.getElementById("confetti"),
 };
 
@@ -585,6 +610,23 @@ function openClusterSettings() {
   switchArea("settings");
   persist({ settingsFocus: "cluster" });
   scrollToCluster();
+}
+
+function scrollToPortForward() {
+  const section = els.portForwardSection;
+  if (!section) {
+    return;
+  }
+  requestAnimationFrame(() => {
+    section.scrollIntoView({ block: "start" });
+  });
+}
+
+function openPortForwardSettings() {
+  settingsFocus = "portforward";
+  switchArea("settings");
+  persist({ settingsFocus: "portforward" });
+  scrollToPortForward();
 }
 
 function restoreDeployViews(stored) {
@@ -1196,6 +1238,7 @@ function updateEndpointHints() {
     els.httpUrl.value = endpoint;
   }
   refreshSeqDiagrams();
+  updateLocalhostChip();
 }
 
 const seqTokens = {
@@ -2107,6 +2150,7 @@ async function loadSettings() {
   els.omniSaKey.value = stored.omniServiceAccountKey || "";
   els.clusterNamespace.value =
     stored.clusterNamespace || DEFAULT_CLUSTER_NAMESPACE;
+  els.clusterNamespace.dataset.previous = els.clusterNamespace.value;
   els.clusterKubeconfig.value = stored.clusterKubeconfig || "";
   els.clusterContext.dataset.preferred = stored.omniContext || "";
   els.crdKind.value = K8S_KINDS[stored.clusterKind]
@@ -2139,17 +2183,23 @@ async function loadSettings() {
   hoorayOn = stored.hooray !== false;
   els.hooray.checked = hoorayOn;
   setDemoStage(stored.demoStage === true);
-  settingsFocus = stored.settingsFocus === "cluster" ? "cluster" : "";
+  settingsFocus =
+    stored.settingsFocus === "cluster" || stored.settingsFocus === "portforward"
+      ? stored.settingsFocus
+      : "";
   restoreDeployViews(stored);
   const area = normalizeArea(stored.area, stored.scenario);
   setArea(area);
   if (area !== stored.area) {
     persist({ area });
   }
+  loadPortForwardSettings(stored);
   updateEndpointHints();
   updateDeployHints();
   setClusterChip(clusterConnected ? "connected" : "disconnected");
-  if (area === "settings" && settingsFocus === "cluster") {
+  if (area === "settings" && settingsFocus === "portforward") {
+    scrollToPortForward();
+  } else if (area === "settings" && settingsFocus === "cluster") {
     scrollToCluster();
   }
   if (
@@ -2214,6 +2264,12 @@ els.tabSettings.addEventListener("click", () => {
 if (els.clusterChip) {
   els.clusterChip.addEventListener("click", () => {
     openClusterSettings();
+  });
+}
+
+if (els.localhostChip) {
+  els.localhostChip.addEventListener("click", () => {
+    openPortForwardSettings();
   });
 }
 
@@ -2710,7 +2766,7 @@ function mcpSessionId(result) {
 }
 
 function mcpClientInfo() {
-  return { name: "agentgateway-extension", version: "0.9.7" };
+  return { name: "agentgateway-extension", version: "0.9.8" };
 }
 
 function mcpHeaders(sessionId, extra) {
@@ -3591,6 +3647,8 @@ function updateClusterSourceUi() {
     ? "Paste omnictl kubeconfig --service-account output"
     : "Paste kubeconfig to fill server and token";
   updateContextVisibility();
+  updatePortForwardOmniNote();
+  updatePortForwardContextVisibility();
 }
 
 function updateContextVisibility() {
@@ -3616,6 +3674,7 @@ function fillContextOptions(parsed, selected) {
     els.clusterContext.value = selected;
   }
   updateContextVisibility();
+  syncPortForwardContextFromCluster();
 }
 
 function applyContextEntry(entry) {
@@ -3767,6 +3826,259 @@ function exampleYaml(section, key) {
 
 function clusterNamespaceOrDefault() {
   return (els.clusterNamespace.value || "").trim() || DEFAULT_CLUSTER_NAMESPACE;
+}
+
+function storedKubeContext() {
+  return (
+    (els.clusterContext &&
+      (els.clusterContext.value || els.clusterContext.dataset.preferred)) ||
+    ""
+  ).trim();
+}
+
+function currentPortForwardSettings() {
+  const resource =
+    els.pfResource && els.pfResource.value === "deployment"
+      ? "deployment"
+      : "service";
+  const name =
+    ((els.pfName && els.pfName.value) || "").trim() ||
+    PortForward.DEFAULTS.name;
+  const namespace =
+    ((els.pfNamespace && els.pfNamespace.value) || "").trim() ||
+    clusterNamespaceOrDefault();
+  const context = ((els.pfContext && els.pfContext.value) || "").trim();
+  const localPort = PortForward.normalizePort(
+    els.pfLocalPort && els.pfLocalPort.value,
+    PortForward.DEFAULTS.localPort
+  );
+  const remotePort = PortForward.normalizePort(
+    els.pfRemotePort && els.pfRemotePort.value,
+    PortForward.DEFAULTS.remotePort
+  );
+  const mcpPath = Boolean(els.pfMcpPath && els.pfMcpPath.checked);
+  return { resource, name, namespace, context, localPort, remotePort, mcpPath };
+}
+
+function applyPortForwardFields(settings) {
+  if (els.pfResource) {
+    els.pfResource.value = settings.resource;
+  }
+  if (els.pfName) {
+    els.pfName.value = settings.name;
+  }
+  if (els.pfNamespace) {
+    els.pfNamespace.value = settings.namespace;
+    els.pfNamespace.placeholder = clusterNamespaceOrDefault();
+  }
+  if (els.pfContext) {
+    els.pfContext.value = settings.context;
+  }
+  if (els.pfLocalPort) {
+    els.pfLocalPort.value = String(settings.localPort);
+  }
+  if (els.pfRemotePort) {
+    els.pfRemotePort.value = String(settings.remotePort);
+  }
+  if (els.pfMcpPath) {
+    els.pfMcpPath.checked = settings.mcpPath;
+  }
+}
+
+function updatePortForwardCommand() {
+  if (!els.pfCommand) {
+    return "";
+  }
+  const command = PortForward.buildCommand(currentPortForwardSettings());
+  els.pfCommand.value = command;
+  return command;
+}
+
+function updatePortForwardOmniNote() {
+  if (els.portForwardOmniNote) {
+    els.portForwardOmniNote.hidden = currentClusterSource() !== "omni";
+  }
+}
+
+function updatePortForwardContextVisibility() {
+  if (!els.pfContextWrap) {
+    return;
+  }
+  const stored = storedKubeContext();
+  const typed = ((els.pfContext && els.pfContext.value) || "").trim();
+  els.pfContextWrap.hidden = !stored && !typed;
+  if (els.pfContext && !typed && stored) {
+    els.pfContext.value = stored;
+    els.pfContext.dataset.fromCluster = stored;
+  }
+}
+
+function syncPortForwardContextFromCluster() {
+  const stored = storedKubeContext();
+  if (els.pfContext && stored) {
+    const current = (els.pfContext.value || "").trim();
+    if (!current || current === els.pfContext.dataset.fromCluster) {
+      els.pfContext.value = stored;
+    }
+    els.pfContext.dataset.fromCluster = stored;
+  }
+  updatePortForwardContextVisibility();
+  updatePortForwardCommand();
+}
+
+function persistPortForwardSettings(extra = {}) {
+  const settings = currentPortForwardSettings();
+  applyPortForwardFields(settings);
+  updatePortForwardCommand();
+  persist({
+    pfResource: settings.resource,
+    pfName: settings.name,
+    pfNamespace: settings.namespace,
+    pfContext: settings.context,
+    pfLocalPort: settings.localPort,
+    pfRemotePort: settings.remotePort,
+    pfMcpPath: settings.mcpPath,
+    ...extra,
+  });
+  return settings;
+}
+
+function loadPortForwardSettings(stored) {
+  const settings = {
+    resource: stored.pfResource === "deployment" ? "deployment" : "service",
+    name: stored.pfName || PortForward.DEFAULTS.name,
+    namespace: stored.pfNamespace || clusterNamespaceOrDefault(),
+    context: stored.pfContext || stored.omniContext || storedKubeContext(),
+    localPort: PortForward.normalizePort(
+      stored.pfLocalPort,
+      PortForward.DEFAULTS.localPort
+    ),
+    remotePort: PortForward.normalizePort(
+      stored.pfRemotePort,
+      PortForward.DEFAULTS.remotePort
+    ),
+    mcpPath: stored.pfMcpPath === true,
+  };
+  applyPortForwardFields(settings);
+  if (els.pfContext && settings.context) {
+    els.pfContext.dataset.fromCluster = storedKubeContext();
+  }
+  updatePortForwardOmniNote();
+  updatePortForwardContextVisibility();
+  updatePortForwardCommand();
+  updateLocalhostChip();
+}
+
+function showPortForwardNote(body, isError) {
+  const target = els.pfResult;
+  if (!target) {
+    return;
+  }
+  target.hidden = false;
+  target.classList.toggle("is-error", Boolean(isError));
+  target.replaceChildren();
+  const detail = document.createElement("div");
+  detail.className = "result-body";
+  detail.textContent = body;
+  target.append(detail);
+}
+
+function usingLocalhostEndpoints() {
+  return (
+    PortForward.isLocalhostUrl(els.endpoint && els.endpoint.value) ||
+    PortForward.isLocalhostUrl(els.mcpEndpoint && els.mcpEndpoint.value) ||
+    PortForward.isLocalhostUrl(els.httpUrl && els.httpUrl.value)
+  );
+}
+
+function updateLocalhostChip() {
+  const chip = els.localhostChip;
+  if (!chip) {
+    return;
+  }
+  const settings = currentPortForwardSettings();
+  const on = usingLocalhostEndpoints();
+  chip.hidden = !on;
+  if (els.localhostChipLabel) {
+    els.localhostChipLabel.textContent = `127.0.0.1:${settings.localPort}`;
+  }
+  chip.title = on
+    ? `Tests use http://127.0.0.1:${settings.localPort}. Open Settings → Port forward.`
+    : "Chat / MCP / API tests use localhost — open Port forward";
+}
+
+async function useLocalhostEndpoints() {
+  const settings = persistPortForwardSettings({ pfUsingLocalhost: true });
+  const chat = PortForward.chatEndpoint(settings.localPort);
+  const api = PortForward.apiEndpoint(settings.localPort);
+  const mcp = PortForward.mcpEndpoint(settings.localPort, settings.mcpPath);
+  els.endpoint.value = normalizeEndpoint(chat);
+  els.httpUrl.value = api;
+  els.mcpEndpoint.value = mcp;
+  els.mcpEndpoint.dataset.fromChat = els.endpoint.value;
+  await persist({
+    endpoint: els.endpoint.value,
+    httpUrl: api,
+    mcpEndpoint: mcp,
+    pfUsingLocalhost: true,
+  });
+  updateEndpointHints();
+  updateLocalhostChip();
+  const mcpNote = settings.mcpPath
+    ? ` MCP ${mcp}.`
+    : " MCP is the same host without /mcp (turn on MCP path to add it).";
+  showPortForwardNote(
+    `Chat and API tests now use ${els.endpoint.value}.${mcpNote} Run the copied kubectl command on this machine, then Check localhost.`,
+    false
+  );
+}
+
+async function checkLocalhost() {
+  const settings = persistPortForwardSettings();
+  const url = PortForward.checkUrl(settings.localPort, settings.mcpPath);
+  if (els.pfResult) {
+    showPending(els.pfResult, `Checking ${url}…`);
+  }
+  const result = await timedFetch(url, { method: "GET" });
+  const reachable = !result.error && result.status != null;
+  if (!els.pfResult) {
+    return;
+  }
+  showBox(els.pfResult, {
+    status: result.status,
+    latencyMs: result.latencyMs,
+    body: reachable
+      ? `Reachable. HTTP ${result.status} at ${url}.`
+      : `Not reachable. ${result.error || "No response"} — run the kubectl command on this machine (CORS or connection).`,
+    isError: !reachable,
+  });
+}
+
+async function copyPortForwardCommand() {
+  const command = updatePortForwardCommand();
+  persistPortForwardSettings();
+  try {
+    await navigator.clipboard.writeText(command);
+    if (els.pfCopy) {
+      const previous = els.pfCopy.textContent;
+      els.pfCopy.textContent = "Copied";
+      window.setTimeout(() => {
+        if (els.pfCopy) {
+          els.pfCopy.textContent = previous;
+        }
+      }, 1200);
+    }
+    showPortForwardNote(
+      `Copied. Run this on the machine where Chrome is open:\n${command}`,
+      false
+    );
+  } catch (error) {
+    showPortForwardNote(
+      error.message ||
+        "Could not copy. Select the command and copy it yourself.",
+      true
+    );
+  }
 }
 
 function fillPresetSelect(select, presets, selected) {
@@ -5715,15 +6027,31 @@ els.clusterContext.addEventListener("change", () => {
   const text = els.clusterKubeconfig.value.trim();
   if (!text) {
     saveClusterSettings({ omniContext: els.clusterContext.value });
+    syncPortForwardContextFromCluster();
+    persistPortForwardSettings();
     return;
   }
   applyKubeconfigText(text, els.clusterContext.value);
+  syncPortForwardContextFromCluster();
+  persistPortForwardSettings();
   updateDeployHints();
 });
 
 els.clusterNamespace.addEventListener("change", () => {
+  const previousClusterNs =
+    (els.clusterNamespace.dataset.previous || "").trim() ||
+    DEFAULT_CLUSTER_NAMESPACE;
   saveClusterSettings();
   const ns = clusterNamespaceOrDefault();
+  els.clusterNamespace.dataset.previous = ns;
+  if (els.pfNamespace) {
+    const current = (els.pfNamespace.value || "").trim();
+    if (!current || current === previousClusterNs) {
+      els.pfNamespace.value = ns;
+    }
+    els.pfNamespace.placeholder = ns;
+    persistPortForwardSettings();
+  }
   if (els.llmNamespace && !els.llmNamespace.value.trim()) {
     els.llmNamespace.value = ns;
     regenLlmYaml();
@@ -5766,8 +6094,63 @@ els.parseKubeconfig.addEventListener("click", async () => {
     return;
   }
   applyKubeconfigText(text, els.clusterContext.value);
+  syncPortForwardContextFromCluster();
+  persistPortForwardSettings();
   updateDeployHints();
 });
+
+function onPortForwardFieldChange() {
+  persistPortForwardSettings();
+  updateLocalhostChip();
+}
+
+if (els.pfResource) {
+  els.pfResource.addEventListener("change", onPortForwardFieldChange);
+}
+if (els.pfName) {
+  els.pfName.addEventListener("change", onPortForwardFieldChange);
+  els.pfName.addEventListener("input", updatePortForwardCommand);
+}
+if (els.pfNamespace) {
+  els.pfNamespace.addEventListener("change", onPortForwardFieldChange);
+  els.pfNamespace.addEventListener("input", updatePortForwardCommand);
+}
+if (els.pfContext) {
+  els.pfContext.addEventListener("change", onPortForwardFieldChange);
+  els.pfContext.addEventListener("input", () => {
+    updatePortForwardContextVisibility();
+    updatePortForwardCommand();
+  });
+}
+if (els.pfLocalPort) {
+  els.pfLocalPort.addEventListener("change", onPortForwardFieldChange);
+  els.pfLocalPort.addEventListener("input", () => {
+    updatePortForwardCommand();
+    updateLocalhostChip();
+  });
+}
+if (els.pfRemotePort) {
+  els.pfRemotePort.addEventListener("change", onPortForwardFieldChange);
+  els.pfRemotePort.addEventListener("input", updatePortForwardCommand);
+}
+if (els.pfMcpPath) {
+  els.pfMcpPath.addEventListener("change", onPortForwardFieldChange);
+}
+if (els.pfCopy) {
+  els.pfCopy.addEventListener("click", () => {
+    copyPortForwardCommand();
+  });
+}
+if (els.pfUseLocalhost) {
+  els.pfUseLocalhost.addEventListener("click", () => {
+    useLocalhostEndpoints();
+  });
+}
+if (els.pfCheck) {
+  els.pfCheck.addEventListener("click", () => {
+    checkLocalhost();
+  });
+}
 
 async function probeClusterConnection({ interactive = false } = {}) {
   const token = ++clusterProbeToken;
@@ -6124,4 +6507,5 @@ els.applyCrds.addEventListener("click", async () => {
 });
 
 bindDeployViews();
+updatePortForwardCommand();
 loadSettings();
