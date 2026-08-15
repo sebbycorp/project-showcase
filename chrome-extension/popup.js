@@ -4,6 +4,7 @@ const DEFAULT_FALLBACK_MODEL = "gpt-4o";
 const DEFAULT_MCP_ENDPOINT = "http://35.226.209.32/mcp";
 const DEFAULT_A2A_ENDPOINT = "http://35.226.209.32/.well-known/agent-card.json";
 const DEFAULT_CLUSTER_NAMESPACE = "agentgateway-system";
+const DEFAULT_SOLO_UI = "http://35.225.111.45/age/";
 const CHAT_PATH = "/v1/chat/completions";
 const TEST_MESSAGE = { role: "user", content: "Reply with the word pong." };
 const JUNK_PROMPT = `policy-probe ${"x".repeat(1024)}`;
@@ -12,6 +13,7 @@ const AREAS = ["chat", "services", "cluster", "settings"];
 const STORAGE_KEYS = [
   "endpoint",
   "model",
+  "provider",
   "primaryModel",
   "fallbackModel",
   "mcpEndpoint",
@@ -34,6 +36,60 @@ const STORAGE_KEYS = [
   "clusterKind",
   "clusterManifest",
   "hooray",
+  "soloUi",
+];
+const PROVIDERS = {
+  openai: {
+    id: "openai",
+    label: "OpenAI",
+    model: "gpt-4o-mini",
+    fallback: "gpt-4o",
+    example: "openai",
+    failoverExample: "failover",
+    httprouteExample: "httproute",
+  },
+  claude: {
+    id: "claude",
+    label: "Claude",
+    model: "claude-sonnet-4-5",
+    fallback: "claude-3-5-sonnet",
+    example: "claude",
+    failoverExample: "failoverClaude",
+    httprouteExample: "httprouteClaude",
+  },
+  grok: {
+    id: "grok",
+    label: "Grok",
+    model: "grok-3",
+    fallback: "grok-2-latest",
+    example: "grok",
+    failoverExample: "failoverGrok",
+    httprouteExample: "httprouteGrok",
+  },
+  bedrock: {
+    id: "bedrock",
+    label: "Bedrock",
+    model: "amazon.nova-micro-v1:0",
+    fallback: "amazon.titan-text-lite-v1",
+    example: "bedrock",
+    failoverExample: "failoverBedrock",
+    httprouteExample: "httprouteBedrock",
+  },
+};
+// USD per 1M tokens. In-extension estimate only — not a bill.
+const MODEL_RATES = [
+  { match: /^gpt-4o-mini/i, prompt: 0.15, completion: 0.6 },
+  { match: /^gpt-4o/i, prompt: 2.5, completion: 10 },
+  { match: /claude-3-5-haiku|claude-haiku/i, prompt: 0.8, completion: 4 },
+  { match: /claude-opus/i, prompt: 15, completion: 75 },
+  { match: /claude-sonnet-4|claude-3-5-sonnet|claude-3\.5-sonnet|claude/i, prompt: 3, completion: 15 },
+  { match: /grok-3/i, prompt: 3, completion: 15 },
+  { match: /grok/i, prompt: 2, completion: 10 },
+  { match: /titan-text-lite/i, prompt: 0.15, completion: 0.2 },
+  { match: /nova-micro/i, prompt: 0.035, completion: 0.14 },
+  { match: /nova-lite/i, prompt: 0.06, completion: 0.24 },
+  { match: /anthropic\.claude|us\.anthropic/i, prompt: 3, completion: 15 },
+  { match: /amazon\.|bedrock/i, prompt: 0.15, completion: 0.6 },
 ];
 const CLUSTER_HELP = {
   gke: "API server from kubectl cluster-info or gcloud container clusters describe. Token from gcloud auth print-access-token. Chrome cannot run gke-gcloud-auth-plugin.",
@@ -122,6 +178,8 @@ const els = {
   areaChat: document.getElementById("area-chat"),
   areaServices: document.getElementById("area-services"),
   endpoint: document.getElementById("endpoint"),
+  provider: document.getElementById("provider"),
+  llmProvider: document.getElementById("llm-provider"),
   model: document.getElementById("model"),
   test: document.getElementById("test"),
   testResult: document.getElementById("test-result"),
@@ -197,6 +255,7 @@ const els = {
   crdApplyResult: document.getElementById("crd-apply-result"),
   tabSettings: document.getElementById("tab-settings"),
   areaSettings: document.getElementById("area-settings"),
+  soloUi: document.getElementById("solo-ui"),
   hooray: document.getElementById("hooray"),
   confetti: document.getElementById("confetti"),
 };
@@ -308,6 +367,336 @@ function parseJson(raw) {
 
 async function persist(partial) {
   await chrome.storage.local.set(partial);
+}
+
+function providerSpec(id) {
+  return PROVIDERS[id] || PROVIDERS.openai;
+}
+
+function currentProvider() {
+  const raw = (els.provider && els.provider.value) || "";
+  return PROVIDERS[raw] ? raw : providerFromModel(els.model.value);
+}
+
+function setProviderSelects(id) {
+  const spec = providerSpec(id);
+  if (els.provider) {
+    els.provider.value = spec.id;
+  }
+  if (els.llmProvider) {
+    els.llmProvider.value = spec.id;
+  }
+}
+
+function providerDeployOptions(id) {
+  const spec = providerSpec(id);
+  return [
+    ["gateway", "Gateway (HTTP :80)"],
+    [spec.example, `${spec.label} backend + HTTPRoute`],
+    [spec.failoverExample, "Failover backend (primary + fallback)"],
+    [spec.httprouteExample, DEPLOY_EXAMPLES.llm[spec.httprouteExample].label],
+  ];
+}
+
+function refreshLlmExampleOptions(id, selectedKey) {
+  if (!els.llmExample) {
+    return selectedKey;
+  }
+  const options = providerDeployOptions(id);
+  const valid = new Set(options.map(([value]) => value));
+  els.llmExample.replaceChildren();
+  for (const [value, label] of options) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    els.llmExample.append(option);
+  }
+  const next = valid.has(selectedKey) ? selectedKey : options[1][0];
+  els.llmExample.value = next;
+  return next;
+}
+
+function applyProvider(id, { setModels = true, loadYaml = true } = {}) {
+  const spec = providerSpec(id);
+  setProviderSelects(spec.id);
+  if (setModels) {
+    els.model.value = spec.model;
+    els.primaryModel.value = spec.model;
+    els.fallbackModel.value = spec.fallback;
+    els.chosenModel.value = spec.model;
+  }
+  const exampleKey = refreshLlmExampleOptions(
+    spec.id,
+    loadYaml ? spec.example : els.llmExample.value
+  );
+  if (loadYaml) {
+    els.llmExample.value = spec.example;
+    els.llmYaml.value = exampleYaml("llm", spec.example);
+  }
+  refreshSeqDiagrams();
+  persist({
+    provider: spec.id,
+    model: els.model.value,
+    primaryModel: els.primaryModel.value,
+    fallbackModel: els.fallbackModel.value,
+    chosenModel: els.chosenModel.value,
+    llmExample: exampleKey,
+    llmYaml: els.llmYaml.value,
+  });
+}
+
+function normalizeSoloUi(raw) {
+  const trimmed = (raw || "").trim() || DEFAULT_SOLO_UI;
+  try {
+    const url = new URL(trimmed);
+    if (!url.pathname || url.pathname === "/") {
+      url.pathname = "/age/";
+    } else if (!url.pathname.endsWith("/")) {
+      url.pathname = `${url.pathname}/`;
+    }
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
+  }
+}
+
+function currentSoloUi() {
+  const soloUi = normalizeSoloUi(els.soloUi.value);
+  els.soloUi.value = soloUi;
+  return soloUi;
+}
+
+function headerValue(headers, name) {
+  if (!headers) {
+    return "";
+  }
+  if (typeof headers.get === "function") {
+    return headers.get(name) || "";
+  }
+  return headers[name.toLowerCase()] || "";
+}
+
+function traceIdFromHeaders(headers) {
+  const parent = headerValue(headers, "traceparent");
+  if (parent) {
+    const parts = parent.split("-");
+    if (parts[1] && /^[0-9a-f]{16,32}$/i.test(parts[1])) {
+      return parts[1];
+    }
+  }
+  for (const name of [
+    "x-b3-traceid",
+    "x-trace-id",
+    "trace-id",
+    "x-datadog-trace-id",
+  ]) {
+    const value = (headerValue(headers, name) || "").trim();
+    if (value) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function traceIdFromResult(result) {
+  if (!result) {
+    return "";
+  }
+  return (
+    result.traceId ||
+    traceIdFromHeaders(result.headers) ||
+    traceIdFromHeaders(result.response && result.response.headers)
+  );
+}
+
+function soloTracesUrl(base, traceId) {
+  const root = normalizeSoloUi(base);
+  const id = (traceId || "").trim();
+  if (id && /^[0-9a-fA-F-]{8,64}$/.test(id)) {
+    return new URL(`tracing/${encodeURIComponent(id)}`, root).toString();
+  }
+  return new URL("tracing", root).toString();
+}
+
+function soloUiLink(result) {
+  const link = document.createElement("a");
+  link.className = "solo-ui-link";
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = "Open in Solo UI";
+  link.href = soloTracesUrl(currentSoloUi(), traceIdFromResult(result));
+  return link;
+}
+
+function usageFromPayload(payload) {
+  const usage = payload && payload.usage;
+  if (!usage || typeof usage !== "object") {
+    return null;
+  }
+  if (usage.prompt_tokens == null && usage.completion_tokens == null) {
+    return null;
+  }
+  const prompt = Number(usage.prompt_tokens);
+  const completion = Number(usage.completion_tokens);
+  return {
+    promptTokens: Number.isFinite(prompt) ? prompt : 0,
+    completionTokens: Number.isFinite(completion) ? completion : 0,
+  };
+}
+
+function rateForModel(model) {
+  const name = String(model || "");
+  return MODEL_RATES.find((row) => row.match.test(name)) || null;
+}
+
+function formatUsd(amount) {
+  if (amount >= 0.01) {
+    return `$${amount.toFixed(4)}`;
+  }
+  if (amount >= 0.0001) {
+    return `$${amount.toFixed(6)}`;
+  }
+  return `$${amount.toFixed(8)}`;
+}
+
+function formatCost(usage, model) {
+  if (!usage) {
+    return "";
+  }
+  const prompt = usage.promptTokens;
+  const completion = usage.completionTokens;
+  const parts = [
+    `${prompt.toLocaleString()} prompt`,
+    `${completion.toLocaleString()} completion`,
+  ];
+  const rate = rateForModel(model);
+  if (rate) {
+    const usd =
+      (prompt * rate.prompt + completion * rate.completion) / 1_000_000;
+    parts.push(`${formatUsd(usd)} estimated (not a bill)`);
+  } else {
+    parts.push("no rate for this model (not a bill)");
+  }
+  return `Tokens ${parts.join(" · ")}`;
+}
+
+function costNode(usage, model) {
+  const text = formatCost(usage, model);
+  if (!text) {
+    return null;
+  }
+  const node = document.createElement("div");
+  node.className = "cost-line";
+  node.textContent = text;
+  return node;
+}
+
+function headerMap(response) {
+  const out = {};
+  if (!response || !response.headers || typeof response.headers.forEach !== "function") {
+    return out;
+  }
+  response.headers.forEach((value, key) => {
+    out[String(key).toLowerCase()] = value;
+  });
+  return out;
+}
+
+function hopFromUsage(result) {
+  const usage = usageFromPayload(result && result.payload);
+  const model =
+    (result && result.payload && result.payload.model) ||
+    (result && result.requestedModel) ||
+    "";
+  if (!usage && !(result && result.status)) {
+    return null;
+  }
+  return {
+    agent: "request sent",
+    gateway:
+      result && result.status != null
+        ? `HTTP ${result.status}`
+        : "headers",
+    provider: model || "provider",
+    usage,
+  };
+}
+
+let seqProgress = null;
+
+function notifySeqProgress(stage, detail) {
+  if (typeof seqProgress === "function") {
+    seqProgress(stage, detail);
+  }
+}
+
+function lightHopFromStage(seq, stage, viaGateway, target, token) {
+  if (seqTokens[seq.id] !== token) {
+    return;
+  }
+  if (stage === "start") {
+    markSeq(seq, ["client"], [], "is-on");
+    setSeqHop(seq, "client", null);
+    setSeqCaption(seq, "AI Agent sends");
+    return;
+  }
+  if (stage === "headers") {
+    markSeq(seq, viaGateway ? ["client", "gateway"] : ["client"], [1], "is-on");
+    if (viaGateway) {
+      setSeqHop(seq, "gateway", 1);
+      setSeqCaption(seq, "Agentgateway");
+    }
+    return;
+  }
+  if (stage === "body") {
+    markSeq(
+      seq,
+      viaGateway ? ["client", "gateway", "target"] : ["client", "target"],
+      viaGateway ? [1, 2] : [1],
+      "is-on"
+    );
+    setSeqHop(seq, "target", viaGateway ? 2 : 1);
+    setSeqCaption(seq, target);
+  }
+}
+
+async function trySoloTracesApi(uiBase) {
+  try {
+    const root = new URL(normalizeSoloUi(uiBase));
+    const candidates = [
+      `${root.origin}/api/rpc.agentgateway.solo.io.AgentgatewayTracingAPI/ListChatSpans`,
+      `${root.origin}/api/rpc.kagent.solo.io.TracingAPI/ListChatTraces`,
+    ];
+    for (const url of candidates) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 1500);
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (response.status === 401 || response.status === 403) {
+          return null;
+        }
+        if (!response.ok) {
+          continue;
+        }
+        const payload = await response.json();
+        if (payload && (payload.spans || payload.traces)) {
+          return payload;
+        }
+      } catch {
+        clearTimeout(timer);
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 function currentChatSettings() {
@@ -423,7 +812,7 @@ function configureSeq(seq, { viaGateway, target, targetKind }) {
 }
 
 function llmSeqConfig(model) {
-  const kind = providerFromModel(model || els.model.value);
+  const kind = currentProvider() || providerFromModel(model || els.model.value);
   return {
     viaGateway: true,
     target: providerLabel(kind),
@@ -603,9 +992,26 @@ async function runWithSeq(seq, requestFn, { viaGateway, target, ok }) {
   resetSeq(seq);
   seq.classList.add("is-run");
 
+  const previousProgress = seqProgress;
+  seqProgress = (stage, detail) => {
+    lightHopFromStage(seq, stage, viaGateway, target, token);
+    if (detail && detail.response && seqTokens[seq.id] === token) {
+      seq.dataset.traceId = traceIdFromHeaders(detail.response.headers) || "";
+    }
+  };
+
   const request = Promise.resolve().then(requestFn);
   const forward = animateSeqForward(seq, viaGateway, target, token);
-  const result = await request;
+  let result;
+  try {
+    result = await request;
+  } finally {
+    seqProgress = previousProgress;
+  }
+  if (result && hopFromUsage(result)) {
+    lightHopFromStage(seq, "body", viaGateway, target, token);
+  }
+  void trySoloTracesApi(els.soloUi ? els.soloUi.value : DEFAULT_SOLO_UI);
   const stillCurrent = await forward;
   if (!stillCurrent || seqTokens[seq.id] !== token) {
     return result;
@@ -655,15 +1061,23 @@ async function saveChatSettings() {
 
 async function timedFetch(url, options) {
   const started = performance.now();
+  notifySeqProgress("start", { started });
   try {
     const response = await fetch(url, options);
+    const headersMs = Math.round(performance.now() - started);
+    notifySeqProgress("headers", { response, status: response.status, headersMs });
     const raw = await response.text();
+    const payload = parseJson(raw);
+    notifySeqProgress("body", { response, raw, payload });
     return {
       response,
       status: response.status,
       latencyMs: Math.round(performance.now() - started),
+      headersMs,
       raw,
-      payload: parseJson(raw),
+      payload,
+      headers: headerMap(response),
+      traceId: traceIdFromHeaders(response.headers),
       error: null,
     };
   } catch (error) {
@@ -671,8 +1085,11 @@ async function timedFetch(url, options) {
       response: null,
       status: null,
       latencyMs: Math.round(performance.now() - started),
+      headersMs: null,
       raw: "",
       payload: null,
+      headers: {},
+      traceId: "",
       error: error.message || String(error),
     };
   }
@@ -721,10 +1138,12 @@ function summarizeCompletion(result, requestedModel) {
     latencyMs: result.latencyMs,
     model: (result.payload && result.payload.model) || requestedModel,
     body,
+    usage: usageFromPayload(result.payload),
+    result,
   };
 }
 
-function showBox(target, { status, latencyMs, model, body, isError }) {
+function showBox(target, { status, latencyMs, model, body, isError, usage, result }) {
   target.hidden = false;
   target.classList.toggle("is-error", Boolean(isError));
   target.replaceChildren();
@@ -742,9 +1161,16 @@ function showBox(target, { status, latencyMs, model, body, isError }) {
   detail.className = "result-body";
   detail.textContent = body;
   target.append(meta, detail);
+  const cost = costNode(usage, model);
+  if (cost) {
+    target.append(cost);
+  }
+  if (result) {
+    target.append(soloUiLink(result));
+  }
 }
 
-function card(className, extraClass, metaText, bodyText) {
+function card(className, extraClass, metaText, bodyText, extras = []) {
   const wrap = document.createElement("div");
   wrap.className = `${className} ${extraClass}`.trim();
 
@@ -756,6 +1182,7 @@ function card(className, extraClass, metaText, bodyText) {
   body.className = `${className}-body`;
   body.textContent = bodyText;
   wrap.append(meta, body);
+  extras.filter(Boolean).forEach((node) => wrap.append(node));
   return wrap;
 }
 
@@ -824,11 +1251,17 @@ function runningDrawer(target, text) {
   setTestDrawer(target, [row], "running");
 }
 
-function resultDrawer(target, { ok, meta, nodes }) {
+function resultDrawer(target, { ok, meta, nodes, result }) {
   const row = document.createElement("div");
   row.className = "drawer-status";
   const state = ok ? "ok" : "fail";
-  row.append(drawerStatus(state), drawerMeta(meta), collapseButton(target));
+  const actions = document.createElement("div");
+  actions.className = "drawer-actions";
+  if (result !== undefined) {
+    actions.append(soloUiLink(result));
+  }
+  actions.append(collapseButton(target));
+  row.append(drawerStatus(state), drawerMeta(meta), actions);
   setTestDrawer(target, [row, ...nodes], state);
 }
 
@@ -864,9 +1297,14 @@ async function loadSettings() {
   const stored = await chrome.storage.local.get(STORAGE_KEYS);
   els.endpoint.value = stored.endpoint || DEFAULT_ENDPOINT;
   els.model.value = stored.model || DEFAULT_MODEL;
+  const provider = PROVIDERS[stored.provider]
+    ? stored.provider
+    : providerFromModel(stored.model || DEFAULT_MODEL);
+  setProviderSelects(provider);
   els.primaryModel.value = stored.primaryModel || DEFAULT_MODEL;
   els.fallbackModel.value = stored.fallbackModel || DEFAULT_FALLBACK_MODEL;
   els.chosenModel.value = stored.chosenModel || stored.model || DEFAULT_MODEL;
+  els.soloUi.value = stored.soloUi || DEFAULT_SOLO_UI;
   els.mcpEndpoint.value = stored.mcpEndpoint || DEFAULT_MCP_ENDPOINT;
   els.a2aEndpoint.value = stored.a2aEndpoint || DEFAULT_A2A_ENDPOINT;
   els.clusterType.value = CLUSTER_HELP[stored.clusterType]
@@ -927,6 +1365,22 @@ els.tabSettings.addEventListener("click", () => {
 els.hooray.addEventListener("change", () => {
   hoorayOn = els.hooray.checked;
   persist({ hooray: hoorayOn });
+});
+
+els.soloUi.addEventListener("change", () => {
+  persist({ soloUi: currentSoloUi() });
+});
+
+function onProviderChange(id) {
+  applyProvider(id, { setModels: true, loadYaml: true });
+}
+
+els.provider.addEventListener("change", () => {
+  onProviderChange(els.provider.value);
+});
+
+els.llmProvider.addEventListener("change", () => {
+  onProviderChange(els.llmProvider.value);
 });
 
 els.sectionLlm.addEventListener("click", () => {
@@ -1039,6 +1493,8 @@ els.test.addEventListener("click", async () => {
     model: summary.model,
     body: summary.body,
     isError: !summary.ok,
+    usage: summary.usage,
+    result,
   });
   if (summary.ok) {
     celebrate();
@@ -1109,12 +1565,14 @@ els.runChatPing.addEventListener("click", async () => {
   resultDrawer(els.resultChatPing, {
     ok: summary.ok,
     meta: `${summary.model} · ${statusText} · ${summary.latencyMs} ms`,
+    result,
     nodes: [
       card(
         "check",
         summary.ok ? "is-ok" : "is-error",
         `Chat ping · ${summary.model} · ${statusText} · ${summary.latencyMs} ms`,
-        summary.body
+        summary.body,
+        [costNode(summary.usage, summary.model)]
       ),
     ],
   });
@@ -1179,7 +1637,8 @@ els.runFailover.addEventListener("click", async () => {
       "attempt",
       attempt.ok ? "is-ok" : "is-error",
       `${attempt.label} · ${attempt.model} · ${statusText} · ${attempt.latencyMs} ms`,
-      attempt.body
+      attempt.body,
+      [costNode(attempt.usage, attempt.model)]
     );
   });
 
@@ -1188,6 +1647,7 @@ els.runFailover.addEventListener("click", async () => {
     meta: winner
       ? `${winner.model} · ${winner.latencyMs} ms`
       : "Neither model succeeded",
+    result: attempts[attempts.length - 1] && attempts[attempts.length - 1].result,
     nodes: [summary, ...cards],
   });
   if (winner) {
@@ -1261,6 +1721,7 @@ els.runListCall.addEventListener("click", async () => {
   resultDrawer(els.resultListCall, {
     ok: listOk && called.ok,
     meta: `List ${listStatus} · Call ${callStatus} · ${called.model}`,
+    result: called.result || listed,
     nodes: [
       card(
         "check",
@@ -1272,7 +1733,8 @@ els.runListCall.addEventListener("click", async () => {
         "check",
         called.ok ? "is-ok" : "is-error",
         `Call ${called.model} · ${callStatus} · ${called.latencyMs} ms`,
-        called.body
+        called.body,
+        [costNode(called.usage, called.model)]
       ),
     ],
   });
@@ -1305,7 +1767,7 @@ els.probeMcp.addEventListener("click", async () => {
     params: {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "agentgateway-extension", version: "0.8.4" },
+      clientInfo: { name: "agentgateway-extension", version: "0.9.0" },
     },
   };
 
@@ -1345,6 +1807,7 @@ els.probeMcp.addEventListener("click", async () => {
   resultDrawer(els.resultMcp, {
     ok,
     meta: meta.join(" · "),
+    result,
     nodes: [
       card(
         "check",
@@ -1409,6 +1872,7 @@ els.probeA2a.addEventListener("click", async () => {
   resultDrawer(els.resultA2a, {
     ok,
     meta: meta.join(" · "),
+    result,
     nodes: [
       card(
         "check",
@@ -1428,25 +1892,25 @@ async function runSecurityProbe(button, drawer, seq, label, messages) {
   const { endpoint, model } = await saveChatSettings();
   button.disabled = true;
   runningDrawer(drawer, label);
-  const summary = summarizeCompletion(
-    await runWithSeq(
-      seq,
-      () => postCompletions(endpoint, model, messages),
-      { ...securitySeqConfig(), ok: llmRequestOk }
-    ),
-    model
+  const result = await runWithSeq(
+    seq,
+    () => postCompletions(endpoint, model, messages),
+    { ...securitySeqConfig(), ok: llmRequestOk }
   );
+  const summary = summarizeCompletion(result, model);
   const statusText =
     summary.status == null ? "no response" : `HTTP ${summary.status}`;
   resultDrawer(drawer, {
     ok: summary.ok,
     meta: `${statusText} · ${summary.latencyMs} ms · ${summary.model}`,
+    result,
     nodes: [
       card(
         "check",
         summary.ok ? "is-ok" : "is-error",
         `${label} · ${statusText} · ${summary.latencyMs} ms`,
-        summary.body
+        summary.body,
+        [costNode(summary.usage, summary.model)]
       ),
     ],
   });
@@ -1508,9 +1972,11 @@ function exampleYaml(section, key) {
 }
 
 function loadDeployExamples(stored) {
-  const llmKey = DEPLOY_EXAMPLES.llm[stored.llmExample]
+  const provider = currentProvider();
+  const preferred = DEPLOY_EXAMPLES.llm[stored.llmExample]
     ? stored.llmExample
-    : "gateway";
+    : providerSpec(provider).example;
+  const llmKey = refreshLlmExampleOptions(provider, preferred);
   const mcpKey = DEPLOY_EXAMPLES.mcp[stored.mcpExample]
     ? stored.mcpExample
     : "mcp";

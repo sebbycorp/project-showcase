@@ -167,6 +167,456 @@ spec:
           kind: EnterpriseAgentgatewayBackend
 `,
     },
+    claude: {
+      label: "Claude backend + HTTPRoute",
+      yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/providers/anthropic/
+# Create anthropic-secret in the cluster first — do not put a key here.
+#   kubectl -n agentgateway-system create secret generic anthropic-secret \\
+#     --from-literal=Authorization="\${ANTHROPIC_API_KEY}"
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: anthropic
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      anthropic:
+        model: claude-sonnet-4-5
+  policies:
+    auth:
+      secretRef:
+        name: anthropic-secret
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: anthropic
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /anthropic
+      backendRefs:
+        - name: anthropic
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+`,
+    },
+    failoverClaude: {
+      label: "Failover backend (Claude)",
+      yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/failover/
+# Primary model: claude-sonnet-4-5 (first priority group)
+# Fallback model: claude-3-5-sonnet (second priority group)
+# secretRef name only — create anthropic-secret separately.
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: model-failover
+  namespace: agentgateway-system
+spec:
+  ai:
+    groups:
+      - providers:
+          - name: claude-primary
+            anthropic:
+              model: claude-sonnet-4-5
+            policies:
+              auth:
+                secretRef:
+                  name: anthropic-secret
+      - providers:
+          - name: claude-fallback
+            anthropic:
+              model: claude-3-5-sonnet
+            policies:
+              auth:
+                secretRef:
+                  name: anthropic-secret
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: model-failover
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /model
+      backendRefs:
+        - name: model-failover
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: model-failover-health
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
+      name: model-failover
+  backend:
+    health:
+      unhealthyCondition: "response.code >= 500 || response.code == 429"
+      eviction:
+        duration: 10s
+        consecutiveFailures: 1
+`,
+    },
+    httprouteClaude: {
+      label: "HTTPRoute add-on (/anthropic)",
+      yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/providers/anthropic/
+# Rewrites /anthropic → /v1/chat/completions. Tweak the path or backend name.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: anthropic-path
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /anthropic
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /v1/chat/completions
+      backendRefs:
+        - name: anthropic
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+`,
+    },
+    grok: {
+      label: "Grok backend + HTTPRoute",
+      yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/providers/openai-compatible/
+# xAI Grok uses the OpenAI-compatible provider shape (host api.x.ai).
+# Create grok-secret in the cluster first — do not put a key here.
+#   kubectl -n agentgateway-system create secret generic grok-secret \\
+#     --from-literal=Authorization="\${XAI_API_KEY}"
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: grok
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      openai:
+        model: grok-3
+      host: api.x.ai
+      port: 443
+      path: /v1/chat/completions
+  policies:
+    auth:
+      secretRef:
+        name: grok-secret
+    tls:
+      sni: api.x.ai
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grok
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /grok
+      backendRefs:
+        - name: grok
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+`,
+    },
+    failoverGrok: {
+      label: "Failover backend (Grok)",
+      yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/failover/
+# Primary model: grok-3 (first priority group)
+# Fallback model: grok-2-latest (second priority group)
+# secretRef name only — create grok-secret separately.
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: model-failover
+  namespace: agentgateway-system
+spec:
+  ai:
+    groups:
+      - providers:
+          - name: grok-primary
+            openai:
+              model: grok-3
+            host: api.x.ai
+            port: 443
+            path: /v1/chat/completions
+            policies:
+              auth:
+                secretRef:
+                  name: grok-secret
+              tls:
+                sni: api.x.ai
+      - providers:
+          - name: grok-fallback
+            openai:
+              model: grok-2-latest
+            host: api.x.ai
+            port: 443
+            path: /v1/chat/completions
+            policies:
+              auth:
+                secretRef:
+                  name: grok-secret
+              tls:
+                sni: api.x.ai
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: model-failover
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /model
+      backendRefs:
+        - name: model-failover
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: model-failover-health
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
+      name: model-failover
+  backend:
+    health:
+      unhealthyCondition: "response.code >= 500 || response.code == 429"
+      eviction:
+        duration: 10s
+        consecutiveFailures: 1
+`,
+    },
+    httprouteGrok: {
+      label: "HTTPRoute add-on (/grok)",
+      yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/providers/openai-compatible/
+# Rewrites /grok → /v1/chat/completions. Tweak the path or backend name.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grok-path
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /grok
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /v1/chat/completions
+      backendRefs:
+        - name: grok
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+`,
+    },
+    bedrock: {
+      label: "Bedrock backend + HTTPRoute",
+      yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/providers/bedrock/
+# Documented example model: amazon.nova-micro-v1:0
+# Create bedrock-secret in the cluster first — do not put a key here.
+#   kubectl -n agentgateway-system create secret generic bedrock-secret \\
+#     --from-literal=accessKey="\${AWS_ACCESS_KEY_ID}" \\
+#     --from-literal=secretKey="\${AWS_SECRET_ACCESS_KEY}"
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: bedrock
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      bedrock:
+        model: amazon.nova-micro-v1:0
+        region: us-east-1
+  policies:
+    auth:
+      aws:
+        secretRef:
+          name: bedrock-secret
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: bedrock
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /bedrock
+      backendRefs:
+        - name: bedrock
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+`,
+    },
+    failoverBedrock: {
+      label: "Failover backend (Bedrock)",
+      yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/failover/
+# Primary model: amazon.nova-micro-v1:0 (first priority group)
+# Fallback model: amazon.titan-text-lite-v1 (second priority group)
+# secretRef name only — create bedrock-secret separately.
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: model-failover
+  namespace: agentgateway-system
+spec:
+  ai:
+    groups:
+      - providers:
+          - name: bedrock-primary
+            bedrock:
+              model: amazon.nova-micro-v1:0
+              region: us-east-1
+            policies:
+              auth:
+                aws:
+                  secretRef:
+                    name: bedrock-secret
+      - providers:
+          - name: bedrock-fallback
+            bedrock:
+              model: amazon.titan-text-lite-v1
+              region: us-east-1
+            policies:
+              auth:
+                aws:
+                  secretRef:
+                    name: bedrock-secret
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: model-failover
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /model
+      backendRefs:
+        - name: model-failover
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: model-failover-health
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
+      name: model-failover
+  backend:
+    health:
+      unhealthyCondition: "response.code >= 500 || response.code == 429"
+      eviction:
+        duration: 10s
+        consecutiveFailures: 1
+`,
+    },
+    httprouteBedrock: {
+      label: "HTTPRoute add-on (/bedrock)",
+      yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/providers/bedrock/
+# Rewrites /bedrock → /v1/chat/completions. Tweak the path or backend name.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: bedrock-path
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /bedrock
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /v1/chat/completions
+      backendRefs:
+        - name: bedrock
+          namespace: agentgateway-system
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+`,
+    },
   },
   mcp: {
     mcp: {

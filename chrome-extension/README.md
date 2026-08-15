@@ -21,10 +21,14 @@ xAI/Grok mark, AWS cube, MCP, A2A, Policy). Toolbar PNGs (`icon16.png`,
 Chat and each Services test show a compact one-row flow
 (AI Agent tile → Agentgateway mark → provider or MCP/A2A tile). Hover
 title and `aria-label` name the path; there is no caption bar. **Test**
-and each named **Run** light tiles in order. The active hop’s chevrons
-march left → right toward the next tile (teal glow, staggered hop 1 then
-hop 2), with a lighter return march after the response. The path settles
-teal on success, or motion stops on the failing hop.
+and each named **Run** light tiles in order. When the request is in
+flight, tiles follow real fetch hops when they are available: AI Agent
+(request sent) → Agentgateway (HTTP headers / status) → provider (model
+in the body). Sliding chevrons still march as a fallback so demos move
+if timing or traces are empty. A traces GET against the Solo UI origin
+is attempted without extra auth and never blocks Run; a 401 or CORS
+failure stays on the client-side fallback. The path settles teal on
+success, or motion stops on the failing hop.
 
 The header gear opens **Settings**. **Hooray** (default on, stored in
 `chrome.storage.local`) plays a short canvas confetti burst after a
@@ -44,22 +48,31 @@ The toolbar action opens a 448×600 popup.
 
 ## Chat
 
-Configure **Endpoint URL** and **Model**, then use **Test** or the chat box.
+Configure **Endpoint URL**, **Provider**, and **Model**, then use **Test**
+or the chat box.
 
 The **Endpoint URL** field is pre-filled with:
 
 `http://35.226.209.32/v1/chat/completions`
 
-The **Model** field defaults to `gpt-4o-mini`. Endpoint and model are saved in
-`chrome.storage.local`.
+**Provider** (OpenAI, Claude, Grok, Bedrock) sits above the model field. Switching
+updates the right-hand flow icon immediately and fills a default model
+(`gpt-4o-mini`, `claude-sonnet-4-5`, `grok-3`, `amazon.nova-micro-v1:0`).
+The same control appears on Services → LLM. Provider, endpoint, and model
+are saved in `chrome.storage.local`.
 
 If you enter a base URL without `/v1/chat/completions` (for example
 `http://35.226.209.32`), the extension appends that path.
 
 **Test** sends a tiny `POST` and shows HTTP status, round-trip latency, the
 response model when present, and the reply or error. It does not clear chat
-history. While the request is in flight, chevrons travel AI Agent →
-Agentgateway → provider, then a lighter return march.
+history. After success or failure, **Open in Solo UI** opens the configured
+UI traces page in a new tab (`/age/tracing`, or `/age/tracing/<id>` when a
+trace id is in `traceparent` / `x-b3-traceid` / similar headers). If the
+JSON includes `usage.prompt_tokens` / `usage.completion_tokens`, the result
+also shows token counts and an estimated USD cost from an in-extension rate
+table (clearly labeled as an estimate, not a bill). Missing usage hides
+cost — token counts are never invented.
 
 The chat box uses the same saved endpoint and model for follow-up messages.
 Each send is `POST` with JSON `{ "model": "<chosen model>", "messages": [...] }`.
@@ -78,8 +91,11 @@ Open **Services**, then choose a subnav: **LLM**, **MCP / A2A**, or
 
 Click **Run** on a card. The drawer opens in place with live status
 (`Running` → `OK` / `Fail`), latency, model when present, and the
-response or error. **Collapse** hides the drawer; run again to reopen
-it. There is no shared Run control at the bottom of the page.
+response or error. After success or failure, **Open in Solo UI** is on
+that drawer. Token/cost lines appear when usage is present; failover
+shows cost per attempt when both responses include usage. **Collapse**
+hides the drawer; run again to reopen it. There is no shared Run control
+at the bottom of the page.
 
 **Deploy config** is a secondary accordion on each service page so
 tests stay primary. It loads a prebuilt YAML example you can edit, then
@@ -90,12 +106,17 @@ or sent. `secretRef` uses a name only.
 
 ### LLM
 
+The provider switcher matches Chat. Changing it updates LLM flow icons,
+default models (including failover primary/fallback), and the Deploy
+accordion’s prebuilt backend / HTTPRoute YAML for that provider
+(`secretRef` name only).
+
 Tests run against the Chat endpoint. Each result shows HTTP status,
 latency, model, and reply or error.
 
 - **Chat ping** — tiny `Reply with the word pong.` prompt
 - **Model failover** — primary model, then fallback if it fails
-  (persisted; defaults `gpt-4o-mini` / `gpt-4o`)
+  (persisted; defaults follow the selected provider)
 - **List / call model** — `GET /v1/models`, then chat with the chosen
   model
 
@@ -108,6 +129,11 @@ Prebuilt deploys (from `manifests/` and
 - Failover backend — priority groups for `gpt-4o-mini` then `gpt-4o`,
   plus HTTPRoute and a health policy
 - HTTPRoute add-on — `/openai` rewrite you can tweak
+- Claude `EnterpriseAgentgatewayBackend` + HTTPRoute (`anthropic-secret`)
+- Grok OpenAI-compatible backend (`api.x.ai`) + HTTPRoute (`grok-secret`)
+- Bedrock backend + HTTPRoute (`bedrock-secret`, documented
+  `amazon.nova-micro-v1:0`)
+- Matching failover and HTTPRoute add-on examples per provider
 
 ### MCP / A2A
 
@@ -135,6 +161,11 @@ rejects the string `credit card` (Solo regex guardrails example).
 
 The gear in the header opens **Settings**.
 
+- **Solo UI URL** — default `http://35.225.111.45/age/` (`/age/` is the
+  app). Persisted in `chrome.storage.local` like the chat endpoint.
+  **Open in Solo UI** uses this base and the SPA traces path
+  (`/age/tracing`). A trace id from gateway response headers is appended
+  as a path segment when present. No invented query params.
 - **Hooray** — “Confetti on a successful test.” Persisted in
   `chrome.storage.local`; default **on**. One ~1s canvas burst, not a
   loop. Honors `prefers-reduced-motion`.
