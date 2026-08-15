@@ -4,27 +4,68 @@ A Chrome extension for chatting, testing, and teaching [Solo Agentgateway](https
 
 The extension is in [`chrome-extension/`](chrome-extension/). Current version: **0.10.1** (`manifest.json`).
 
-![Chat tab](docs/images/chat.png)
-
 ## Use cases
 
 These match the tabs and header controls in the popup.
 
-- **Chat with an LLM through Agentgateway.** On **Chat**, set **Endpoint URL**, pick a **Provider** (OpenAI, Claude, Grok, Bedrock, Gemini), choose a **Model**, then **Test** or send a message. The gateway injects backend auth — Chat does not store or send an API key.
+- **Chat with an LLM through Agentgateway.** On **Chat**, set **Endpoint URL**, pick a **Provider** (OpenAI, Claude, Grok, Bedrock, Gemini), choose a **Model**, then **Test** or send a message. Check **Stream** to send `stream: true` and render SSE tokens. The hop flow shows AI Agent → Agentgateway → provider. The gateway injects backend auth — Chat does not store or send an API key.
+
+![Chat tab](docs/images/chat.png)
+
 - **LLM provider testing.** The **LLM** tab runs **Chat ping**, **Model failover**, and **List / call model** against the Chat endpoint. Each card has a visual hop flow (AI Agent → Agentgateway → provider), a result drawer with latency, an estimated token/cost line when usage is present, and **Open in Solo UI**.
 
 ![LLM tab](docs/images/llm.png)
 
 - **Deploy and test LLM configs from a catalog.** On **LLM**, open **Build & apply config**. Search the **LLM config catalog** (Connect / Route / Protect / Control), fill the form, preview YAML, and **Apply** `Gateway`, `HTTPRoute`, `EnterpriseAgentgatewayBackend`, and `EnterpriseAgentgatewayPolicy` (plus Model / RateLimit / Budget where the recipe uses them).
 - **MCP: one-click virtual MCP, live status, and tests.** The **MCP** tab has **One-click deploys** (for example **Deploy everything server**, **Deploy website fetcher**, **Deploy virtual MCP**). Virtual examples show a live **Running** / **Pending** / **Error** (or **Missing**) chip. **Run test** and **Run all** probe initialize, list tools, echo, and fetch. Separate cards cover **MCP initialize**, **List tools**, **Call echo**, **Call fetch**, **JWT / unauth**, and **Tool calling**.
-
-![MCP tab](docs/images/mcp.png)
-
 - **A2A and API/HTTP.** **A2A** probes **A2A agent-card / health**. **API/HTTP** runs **HTTP request**, **Unauthenticated request**, and **Junk / policy-probe**. Each tab can **Apply** a prebuilt example when a cluster is connected.
-- **Workshop demos.** Each of **LLM**, **MCP**, **A2A**, and **API/HTTP** has Apply + Run cards from the Solo Enterprise Agentgateway workshop (plus five original flows). Hop labels include promptGuard, prompt.prepend, rateLimit, OpenAPI→REST, WAF, and A2A task. Highlights: builtin guardrails, token budget → 429, streaming SSE, embeddings, OpenAPI→MCP (Open-Meteo), real A2A task, and WAF first-pass. Dedicated paths (`/openai-jwt`, `/mcp-weather`, `/mcp-jwt`) keep default Chat / MCP usable.
 - **Connect to any cluster and apply CRDs.** In **Settings → Cluster**, choose **Source** **Manual** (GKE, AKS, EKS, or Local) or **Omni** (Sidero Omni). **Test connection**, then apply from the builders or **Resources**.
 - **Clusters without a public proxy.** **Settings → Port forward** copies a `kubectl port-forward` command. Run it locally, click **Use localhost**, and point Chat / MCP / API tests at `127.0.0.1`. **Check localhost** reports Reachable or Not reachable.
 - **Persistence.** The last top-level tab and the header **Demo** toggle are remembered. A **Connected** / **Not connected** chip (or **Checking** on open) sits in the header; click it to jump to Cluster.
+
+## Workshop demos
+
+Each of **LLM**, **MCP**, **A2A**, and **API/HTTP** has **Apply** + **Run** cards from the Solo Enterprise Agentgateway workshop (plus a few original flows). Hop labels include promptGuard, prompt.prepend, rateLimit, OpenAPI→REST, WAF, and A2A task. Dedicated paths (`/openai-jwt`, `/mcp-weather`, `/mcp-jwt`) keep default Chat / MCP usable.
+
+**LLM**
+
+- **Prompt Guard pass vs jailbreak** — builtin guardrails: pass, DAN jailbreak → 403, fake SSN/email → 422, invented email masked as `<EMAIL_ADDRESS>`
+- **Prompt enrichment** — prepend a system “Return the response in JSON format”
+- **Local token budget → 429** — 5 input tokens / minute on HTTPRoute `openai`; burst tiny chat pings: 200 then 429
+- **Stream ping** — no extra CRD; sends `stream: true` and renders SSE `delta.content` (shows TTFT)
+- **Embeddings ping** — `POST /v1/embeddings` on the Chat host
+- **Body-based routing** — PreRouting sets `x-gateway-model-name` from `json(request.body).model`
+- **Mock OpenAI** — deploy `llm-d-inference-sim` + `/openai` when you have no provider key
+- **Timeouts / retries** — timeout + retry on mock-openai (200, or 504 if the mock is down)
+
+![LLM workshop demos](docs/images/llm-workshop.png)
+
+**MCP**
+
+- **OpenAPI → MCP (Open-Meteo)** — ConfigMap schema + entMcp OpenAPI to `api.open-meteo.com`; initialize → list → `getWeatherForecast` (London)
+- **Remote MCP (search.solo.io)** — TLS backend; initialize + list tools
+- **MCP tool rate limit** — hammer one tool until 429; echo still 200
+- **Tool federation FailOpen** — slim virtual MCP with two targets
+- **Composable MCP** — `entMcp.targets[].custom` HTTP echo
+- **Tool mode Search / Code** — `get_tool` + `invoke_tool`, or `run_code`
+- **MCP JWT + tool RBAC** — Strict JWT on `/mcp-jwt` and CEL `mcp.tool.name==echo`
+
+![MCP workshop demos](docs/images/mcp-workshop.png)
+
+**A2A**
+
+- **A2A agent-card / health** — GET agent-card, or POST health
+- **Real A2A task** — GET agent-card, POST `tasks/send`, poll `tasks/get` until completed or timeout (`gcr.io/solo-public/docs/test-a2a-agent`)
+
+![A2A tab](docs/images/a2a.png)
+
+**API/HTTP**
+
+- **WAF first-pass** — WAFPolicy model allow-list + `rm -rf` signature on `/openai-waf`; allowed 200, disallowed model or `rm -rf` → 403
+- **Direct response / health** — HTTPRoute `/health` returns a fixed body (no backend)
+- **JWT + RBAC on LLM** — Strict JWT + CEL on `/openai-jwt` so Chat without a token still works
+
+![API/HTTP workshop demos](docs/images/api-waf.png)
 
 ## Install
 
@@ -37,7 +78,7 @@ Load the unpacked extension in Chrome (desktop). This is not on the Chrome Web S
 5. Select the **`chrome-extension`** folder — the folder that contains `manifest.json`, not the repo root.
 6. Pin **Agentgateway** from the extensions menu so the toolbar icon stays visible.
 
-Click the toolbar icon to open the popup. Version **0.10.1** is the `version` field in `chrome-extension/manifest.json`.
+Click the toolbar icon to open the popup. Version **0.10.1** is the `version` field in `chrome-extension/manifest.json`. If you already had 0.10.0 loaded, click **Reload** on the unpacked card so you pick up the PortForward crash fix.
 
 ## Configure it to your cluster
 
