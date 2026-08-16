@@ -35,7 +35,11 @@
 
 html.demo-stage {
   --popup-w: 480px;
-  --popup-h: 640px;
+  /* Chrome caps extension popups at 600px tall. Asking for more does not
+     make the popup taller — it makes the document overflow the viewport,
+     which lets the header scroll out of reach. Width can still grow;
+     Chrome allows up to 800px. */
+  --popup-h: 600px;
   --seq-box: 52px;
   --seq-gw: 58px;
   --seq-icon: 40px;
