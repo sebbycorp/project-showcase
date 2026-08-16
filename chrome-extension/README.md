@@ -6,7 +6,7 @@ Install, cluster setup, workshop demo cards, and how to use the popup are in the
 
 ## Load unpacked
 
-Download [project-showcase-main.zip](https://github.com/sebbycorp/project-showcase/archive/refs/heads/main.zip) (or **Code** → **Download ZIP** on GitHub), unzip, then load this folder — `project-showcase-main/chrome-extension/`, not the zip and not `project-showcase-main`.
+Prefer [`packages/agentgateway.zip`](../packages/agentgateway.zip) (or [direct download](https://github.com/sebbycorp/project-showcase/raw/main/packages/agentgateway.zip)) — unzip, then load the `chrome-extension/` folder that contains `manifest.json`. The whole-repo zip / `git clone` still works if you want source.
 
 1. Open `chrome://extensions`.
 2. Turn on **Developer mode** (top right).

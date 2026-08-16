@@ -78,12 +78,20 @@ Not on the Chrome Web Store. Load it unpacked in Chrome (desktop).
 
 ### Download
 
-- Direct zip: [project-showcase-main.zip](https://github.com/sebbycorp/project-showcase/archive/refs/heads/main.zip)
+The Load unpacked package (extension files only — not the whole repo):
+
+- [`packages/agentgateway.zip`](packages/agentgateway.zip)
+- Direct: [agentgateway.zip](https://github.com/sebbycorp/project-showcase/raw/main/packages/agentgateway.zip)
+
+1. Download [agentgateway.zip](packages/agentgateway.zip)
+2. Unzip → `chrome-extension/` with `manifest.json`
+3. Chrome `chrome://extensions` → Developer mode → Load unpacked → select that `chrome-extension` folder
+
+If you want the full source (infra, tests, docs):
+
+- Whole-repo zip: [project-showcase-main.zip](https://github.com/sebbycorp/project-showcase/archive/refs/heads/main.zip)
 - Or on the GitHub repo page: green **Code** → **Download ZIP**
-
-Unzip it. You should have `project-showcase-main/chrome-extension/` — that inner folder has `manifest.json`. Load unpacked must select **that** `chrome-extension` folder, not `project-showcase-main` and not the zip.
-
-If you already have git: `git clone https://github.com/sebbycorp/project-showcase.git` then use `project-showcase/chrome-extension/`.
+- Or `git clone https://github.com/sebbycorp/project-showcase.git` then use `project-showcase/chrome-extension/`
 
 ### Load in Chrome
 
