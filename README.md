@@ -244,4 +244,6 @@ az account get-access-token --resource api://<client-id>
 - The extension **cannot spawn kubectl**. That is why **Port forward** is copy/paste, then **Use localhost** / **Check localhost**.
 - Chat and the test tabs do **not** store provider API keys or a Solo license. Cluster tokens stay in `chrome.storage.local` (not sync) and are not logged.
 
-Terraform under `infrastructure/` is still in the repo if you want to stand up a demo cluster later. The live GCP project that used to back the default endpoints is gone — set **Endpoint URL**, **Solo UI URL**, and Cluster to **your** environment.
+Endpoints default to `http://localhost:8080`, which matches the port-forward command in **Settings → Port forward**. Run that command and the defaults work as-is; otherwise point **Endpoint URL** and **Solo UI URL** at your own gateway.
+
+Terraform under `infrastructure/` is still in the repo if you want to stand up a demo cluster later.

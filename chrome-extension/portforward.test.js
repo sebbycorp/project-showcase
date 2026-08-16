@@ -83,7 +83,7 @@ assert.strictEqual(
 );
 assert.strictEqual(PortForward.isLocalhostUrl("http://localhost:8080/mcp"), true);
 assert.strictEqual(
-  PortForward.isLocalhostUrl("http://35.226.209.32/v1/chat/completions"),
+  PortForward.isLocalhostUrl("http://10.0.0.5/v1/chat/completions"),
   false
 );
 

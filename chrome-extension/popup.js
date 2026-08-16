@@ -1,11 +1,15 @@
-const DEFAULT_ENDPOINT = "http://35.226.209.32/v1/chat/completions";
+// Gateway defaults point at the local port-forward, so they line up with the
+// command Settings → Port forward hands you (PortForward.DEFAULTS.localPort).
+const DEFAULT_GATEWAY_ORIGIN = "http://localhost:8080";
+const DEFAULT_ENDPOINT = `${DEFAULT_GATEWAY_ORIGIN}/v1/chat/completions`;
 const DEFAULT_MODEL = "gpt-4o-mini";
 const DEFAULT_FALLBACK_MODEL = "gpt-4o";
-const DEFAULT_MCP_ENDPOINT = "http://35.226.209.32/mcp";
-const DEFAULT_A2A_ENDPOINT = "http://35.226.209.32/.well-known/agent-card.json";
+const DEFAULT_MCP_ENDPOINT = `${DEFAULT_GATEWAY_ORIGIN}/mcp`;
+const DEFAULT_A2A_ENDPOINT = `${DEFAULT_GATEWAY_ORIGIN}/.well-known/agent-card.json`;
 const DEFAULT_CLUSTER_NAMESPACE = "agentgateway-system";
 const DEFAULT_OMNI_URL = "https://maniak.na-west-1.omni.siderolabs.io";
-const DEFAULT_SOLO_UI = "http://35.225.111.45/age/";
+// Solo UI is a separate service you port-forward on its own port.
+const DEFAULT_SOLO_UI = "http://localhost/age/";
 const CHAT_PATH = "/v1/chat/completions";
 const TEST_MESSAGE = { role: "user", content: "Reply with the word pong." };
 const JUNK_PROMPT = `policy-probe ${"x".repeat(1024)}`;
