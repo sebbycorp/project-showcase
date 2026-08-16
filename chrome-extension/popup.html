@@ -1746,10 +1746,59 @@
         </p>
         <label class="field-label" for="cluster-source">Source</label>
         <select id="cluster-source">
+          <option value="proxy">kubectl proxy (any cluster)</option>
           <option value="manual">Manual</option>
           <option value="omni">Omni</option>
         </select>
         <p id="cluster-source-help" class="hint"></p>
+
+        <div id="cluster-proxy-fields" hidden>
+          <p class="hint">
+            1 · Run this in a terminal and leave it open. It works for any
+            context in your kubeconfig — kind, GKE, EKS, or Omni — because
+            kubectl runs the exec plugin locally.
+          </p>
+          <label class="field-label" for="proxy-command">Command</label>
+          <textarea
+            id="proxy-command"
+            rows="2"
+            readonly
+            spellcheck="false"
+          ></textarea>
+          <div class="button-row">
+            <button id="proxy-copy" type="button" class="btn btn-secondary">
+              Copy command
+            </button>
+          </div>
+
+          <div class="field-grid">
+            <div>
+              <label class="field-label" for="proxy-context">Context</label>
+              <input
+                id="proxy-context"
+                type="text"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="current-context"
+              />
+            </div>
+            <div>
+              <label class="field-label" for="proxy-port">Local port</label>
+              <input
+                id="proxy-port"
+                type="number"
+                min="1"
+                max="65535"
+                step="1"
+                placeholder="8001"
+              />
+            </div>
+          </div>
+          <p class="hint">
+            2 · Click Test connection. No bearer token needed — the proxy
+            attaches your kubeconfig credentials to every request.
+          </p>
+        </div>
 
         <div id="cluster-manual-fields">
           <label class="field-label" for="cluster-type">Cluster type</label>

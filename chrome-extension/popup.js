@@ -88,6 +88,8 @@ const STORAGE_KEYS = [
   "omniUrl",
   "omniServiceAccountKey",
   "omniContext",
+  "proxyContext",
+  "proxyPort",
   "clusterConnected",
   "clusterKind",
   "clusterManifest",
@@ -188,6 +190,8 @@ const CLUSTER_HELP = {
     "API server + bearer token (for example kubectl create token). Chrome rejects self-signed CAs, so kind/minikube often fail unless the CA is trusted.",
 };
 const CLUSTER_SOURCE_HELP = {
+  proxy:
+    "Run kubectl proxy locally and the extension talks to 127.0.0.1. Works with any kubeconfig context — including exec plugins, client certs, and Omni OIDC — because kubectl handles auth, not Chrome.",
   manual:
     "API server + bearer token. Chrome cannot run kubeconfig exec plugins.",
   omni:
@@ -485,6 +489,11 @@ const els = {
   clusterSourceHelp: document.getElementById("cluster-source-help"),
   clusterManualFields: document.getElementById("cluster-manual-fields"),
   clusterOmniFields: document.getElementById("cluster-omni-fields"),
+  clusterProxyFields: document.getElementById("cluster-proxy-fields"),
+  proxyCommand: document.getElementById("proxy-command"),
+  proxyCopy: document.getElementById("proxy-copy"),
+  proxyContext: document.getElementById("proxy-context"),
+  proxyPort: document.getElementById("proxy-port"),
   clusterType: document.getElementById("cluster-type"),
   clusterHelp: document.getElementById("cluster-help"),
   clusterApiServer: document.getElementById("cluster-api-server"),
@@ -2343,13 +2352,19 @@ async function loadSettings() {
       ? stored.httpMethod
       : "GET";
   els.httpUrl.value = stored.httpUrl || stored.endpoint || DEFAULT_ENDPOINT;
-  els.clusterSource.value =
-    stored.clusterSource === "omni" ? "omni" : "manual";
+  // Fresh installs land on the proxy flow; anyone who already picked a
+  // source keeps it.
+  els.clusterSource.value = CLUSTER_SOURCES.includes(stored.clusterSource)
+    ? stored.clusterSource
+    : "proxy";
   els.clusterType.value = CLUSTER_HELP[stored.clusterType]
     ? stored.clusterType
     : "gke";
   els.clusterApiServer.value = stored.clusterApiServer || "";
   els.clusterToken.value = stored.clusterToken || "";
+  els.proxyContext.value = stored.proxyContext || "";
+  els.proxyPort.value = stored.proxyPort || 8001;
+  updateProxyCommand();
   els.omniUrl.value = stored.omniUrl || DEFAULT_OMNI_URL;
   els.omniSaKey.value = stored.omniServiceAccountKey || "";
   els.clusterNamespace.value =
@@ -3821,8 +3836,37 @@ els.runHttp.addEventListener("click", async () => {
   els.runHttp.disabled = false;
 });
 
+const CLUSTER_SOURCES = ["proxy", "manual", "omni"];
+
 function currentClusterSource() {
-  return els.clusterSource.value === "omni" ? "omni" : "manual";
+  return CLUSTER_SOURCES.includes(els.clusterSource.value)
+    ? els.clusterSource.value
+    : "manual";
+}
+
+function proxyPort() {
+  const raw = parseInt((els.proxyPort.value || "").trim(), 10);
+  return Number.isInteger(raw) && raw > 0 && raw < 65536 ? raw : 8001;
+}
+
+function proxyApiServer() {
+  return `http://127.0.0.1:${proxyPort()}`;
+}
+
+function proxyCommand() {
+  const context = (els.proxyContext.value || "").trim();
+  const flags = [`--port=${proxyPort()}`];
+  if (context) {
+    flags.push(`--context=${context}`);
+  }
+  return `kubectl proxy ${flags.join(" ")}`;
+}
+
+function updateProxyCommand() {
+  els.proxyCommand.value = proxyCommand();
+  if (currentClusterSource() === "proxy") {
+    els.clusterApiServer.value = proxyApiServer();
+  }
 }
 
 function updateClusterHelp() {
@@ -3834,10 +3878,15 @@ function updateClusterHelp() {
 function updateClusterSourceUi() {
   const source = currentClusterSource();
   const isOmni = source === "omni";
+  const isProxy = source === "proxy";
   els.clusterSource.value = source;
   els.clusterSourceHelp.textContent = CLUSTER_SOURCE_HELP[source];
-  els.clusterManualFields.hidden = isOmni;
+  els.clusterProxyFields.hidden = !isProxy;
+  els.clusterManualFields.hidden = isOmni || isProxy;
   els.clusterOmniFields.hidden = !isOmni;
+  if (isProxy) {
+    updateProxyCommand();
+  }
   if (!els.omniUrl.value.trim()) {
     els.omniUrl.value = DEFAULT_OMNI_URL;
   }
@@ -3978,13 +4027,21 @@ function normalizeOmniUrl(raw) {
 }
 
 function currentClusterSettings() {
+  const source = currentClusterSource();
+  const isProxy = source === "proxy";
   return {
-    clusterSource: currentClusterSource(),
+    clusterSource: source,
     clusterType: CLUSTER_HELP[els.clusterType.value]
       ? els.clusterType.value
       : "gke",
-    clusterApiServer: normalizeApiServer(els.clusterApiServer.value),
-    clusterToken: (els.clusterToken.value || "").trim(),
+    // The proxy owns both of these: a fixed loopback target and no token,
+    // since kubectl supplies the credentials on our behalf.
+    clusterApiServer: isProxy
+      ? proxyApiServer()
+      : normalizeApiServer(els.clusterApiServer.value),
+    clusterToken: isProxy ? "" : (els.clusterToken.value || "").trim(),
+    proxyContext: (els.proxyContext.value || "").trim(),
+    proxyPort: proxyPort(),
     omniUrl: normalizeOmniUrl(els.omniUrl.value),
     omniServiceAccountKey: (els.omniSaKey.value || "").trim(),
     omniContext:
@@ -5816,18 +5873,34 @@ async function saveClusterSettings(extra = {}) {
 }
 
 function k8sHeaders(token, contentType) {
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-  };
+  const headers = { Accept: "application/json" };
+  // kubectl proxy attaches the kubeconfig credentials itself. Sending an
+  // empty bearer would override that and get us a 401.
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
   if (contentType) {
     headers["Content-Type"] = contentType;
   }
   return headers;
 }
 
+// A kubectl proxy listens on loopback and injects auth, so it is the one
+// target that legitimately needs no token from us.
+function isLocalProxyTarget(apiServer) {
+  try {
+    const url = new URL(apiServer);
+    return url.hostname === "127.0.0.1" || url.hostname === "localhost";
+  } catch {
+    return false;
+  }
+}
+
 function clusterTargetError(settings) {
-  if (!settings.clusterApiServer || !settings.clusterToken) {
+  if (!settings.clusterApiServer) {
+    return "API server URL is required.";
+  }
+  if (!settings.clusterToken && !isLocalProxyTarget(settings.clusterApiServer)) {
     return "API server URL and bearer token are required.";
   }
   try {
@@ -6393,6 +6466,30 @@ async function confirmDelete(kind, item, which) {
   }
   await refreshInventory(which);
 }
+
+for (const field of [els.proxyContext, els.proxyPort]) {
+  field.addEventListener("change", () => {
+    updateProxyCommand();
+    saveClusterSettings();
+  });
+  field.addEventListener("input", updateProxyCommand);
+}
+
+els.proxyCopy.addEventListener("click", async () => {
+  const command = proxyCommand();
+  updateProxyCommand();
+  await saveClusterSettings();
+  try {
+    await navigator.clipboard.writeText(command);
+    const previous = els.proxyCopy.textContent;
+    els.proxyCopy.textContent = "Copied";
+    window.setTimeout(() => {
+      els.proxyCopy.textContent = previous;
+    }, 1200);
+  } catch {
+    els.proxyCommand.select();
+  }
+});
 
 els.clusterSource.addEventListener("change", () => {
   updateClusterSourceUi();

@@ -109,6 +109,24 @@ Open the **gear** in the header. That is **Settings**. Cluster connection lives 
 
 ![Settings](docs/images/settings.png)
 
+### Connect with kubectl proxy (recommended, any cluster)
+
+This is the simplest path and the only one that works for every cluster type, because `kubectl` — not Chrome — handles authentication. Exec plugins, client certificates, and OIDC all work.
+
+1. Under **Cluster**, set **Source** to **kubectl proxy (any cluster)**.
+2. Optionally set **Context** (blank uses your `current-context`) and **Local port** (default `8001`).
+3. Click **Copy command** and run it in a terminal, leaving it open:
+
+   ```bash
+   kubectl proxy --port=8001 --context=my-cluster
+   ```
+
+4. Click **Test connection**. No bearer token is needed — the proxy attaches your kubeconfig credentials to every request.
+
+This solves the two problems that block the other sources: Chrome rejects self-signed API server CAs (kind, k3d, minikube), and Chrome cannot run exec plugins (`gke-gcloud-auth-plugin`, `kubelogin`, `aws eks get-token`, Omni `oidc-login`). The proxy listens on `127.0.0.1`, which Chrome trusts, and runs those plugins locally.
+
+The terminal must stay open, and the proxy runs on the same machine as Chrome.
+
 ### Connect with API server URL + bearer token
 
 1. Under **Cluster**, set **Source** to **Manual**.
@@ -136,6 +154,8 @@ Under **Kubeconfig YAML (optional)**, paste a kubeconfig that includes `user.tok
 Chrome cannot run exec plugins (`gke-gcloud-auth-plugin`, `kubelogin`, `aws eks get-token` as an exec plugin, Omni `oidc-login`). An exec-only kubeconfig will not work. Client-certificate kubeconfigs are also unsupported.
 
 ### Omni (Sidero Omni)
+
+**The easiest way to reach an Omni cluster is [kubectl proxy](#connect-with-kubectl-proxy-recommended-any-cluster)** with your normal OIDC kubeconfig — no `omnictl`, no service-account token, nothing to expire. Use the token-kubeconfig flow below only if you need a connection that survives without a terminal open.
 
 Omni’s management API is gRPC, so the extension cannot list clusters from the browser. Connect with a **token** kubeconfig.
 
