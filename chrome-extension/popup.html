@@ -96,19 +96,14 @@
           role="radiogroup"
           aria-labelledby="provider-label"
         ></div>
-        <div class="model-row">
-          <div class="model-field">
-            <label class="field-label" for="model">Model</label>
-            <input
-              id="model"
-              type="text"
-              spellcheck="false"
-              autocomplete="off"
-              placeholder="gpt-4o-mini"
-            />
-          </div>
-          <button id="test" type="button" class="btn">Test</button>
-        </div>
+        <label class="field-label" for="model">Model</label>
+        <input
+          id="model"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="gpt-4o-mini"
+        />
         <figure
           class="seq"
           id="seq-chat"
@@ -144,7 +139,6 @@
             </div>
           </div>
         </figure>
-        <div id="test-result" class="result-box" hidden></div>
       </div>
 
       <main id="log" class="log" aria-live="polite"></main>
@@ -1707,15 +1701,23 @@
     </section>
 
     <section id="area-settings" class="area" hidden>
-      <div class="panel">
-        <h2 class="cluster-heading">Settings</h2>
+      <nav class="settings-tabs" id="settings-tabs" aria-label="Settings sections">
+        <button type="button" data-pane="connect" class="is-active">Connect</button>
+        <button type="button" data-pane="forward">Forward</button>
+        <button type="button" data-pane="resources">Resources</button>
+        <button type="button" data-pane="identity">Identity</button>
+        <button type="button" data-pane="app">App</button>
+      </nav>
+
+      <div class="panel settings-pane" id="pane-app" hidden>
+        <h2 class="cluster-heading">App</h2>
         <label class="field-label" for="solo-ui">Solo UI URL</label>
         <input
           id="solo-ui"
           type="url"
           spellcheck="false"
           autocomplete="off"
-          placeholder="http://35.225.111.45/age/"
+          placeholder="http://localhost/age/"
         />
         <p class="hint">
           Base URL for the Solo UI app (path <code>/age/</code>). After a Run or
@@ -1742,20 +1744,72 @@
         </label>
       </div>
 
-      <div class="panel cluster-panel" id="cluster-panel">
-        <h2 class="cluster-heading">Cluster</h2>
-        <p class="hint">
-          API server, token, and Apply for Gateway / Agentgateway CRDs. Used by
-          the LLM and MCP builders, MCP one-click deploys, and each tab’s
-          Deploy accordion. Port forward copies a local kubectl command for
-          clusters without a public proxy — Chrome cannot start the tunnel.
-        </p>
-        <label class="field-label" for="cluster-source">Source</label>
-        <select id="cluster-source">
+      <div class="panel cluster-panel settings-pane" id="cluster-panel">
+        <h2 class="cluster-heading">Connect</h2>
+
+        <span class="field-label" id="connect-method-label">
+          How do you reach the cluster?
+        </span>
+        <div
+          class="method-switch"
+          id="connect-methods"
+          role="radiogroup"
+          aria-labelledby="connect-method-label"
+        ></div>
+
+        <!-- Still the source of truth for the chosen method, and still what
+             every existing handler reads. The cards above drive it. -->
+        <select id="cluster-source" class="visually-hidden" tabindex="-1">
+          <option value="proxy">kubectl proxy (any cluster)</option>
           <option value="manual">Manual</option>
           <option value="omni">Omni</option>
         </select>
         <p id="cluster-source-help" class="hint"></p>
+
+        <ol class="steps" id="connect-steps"></ol>
+
+        <div id="cluster-proxy-fields" hidden>
+          <label class="field-label" for="proxy-command">Command</label>
+          <textarea
+            id="proxy-command"
+            rows="2"
+            readonly
+            spellcheck="false"
+          ></textarea>
+          <div class="button-row">
+            <button id="proxy-copy" type="button" class="btn btn-secondary">
+              Copy command
+            </button>
+          </div>
+
+          <div class="field-grid">
+            <div>
+              <label class="field-label" for="proxy-context">Context</label>
+              <input
+                id="proxy-context"
+                type="text"
+                spellcheck="false"
+                autocomplete="off"
+                placeholder="current-context"
+              />
+            </div>
+            <div>
+              <label class="field-label" for="proxy-port">Local port</label>
+              <input
+                id="proxy-port"
+                type="number"
+                min="1"
+                max="65535"
+                step="1"
+                placeholder="8001"
+              />
+            </div>
+          </div>
+          <p class="hint">
+            No bearer token needed — the proxy attaches your kubeconfig
+            credentials to every request.
+          </p>
+        </div>
 
         <div id="cluster-manual-fields">
           <label class="field-label" for="cluster-type">Cluster type</label>
@@ -1844,6 +1898,9 @@
         </button>
         <div id="cluster-test-result" class="result-box" hidden></div>
 
+      </div>
+
+      <div class="panel settings-pane" id="pane-forward" hidden>
         <div id="port-forward-section">
           <h2 class="cluster-heading">Port forward</h2>
           <p class="hint">
@@ -1961,7 +2018,9 @@
           </div>
           <div id="pf-result" class="result-box" hidden></div>
         </div>
+      </div>
 
+      <div class="panel settings-pane" id="pane-resources" hidden>
         <h2 class="cluster-heading">Resources</h2>
         <p class="hint">
           Gateway, Backend, HTTPRoute, Policy, Model, RateLimit, and Budget
@@ -2013,7 +2072,7 @@
         <div id="crd-apply-result" class="result-box" hidden></div>
       </div>
 
-      <div class="panel" id="identity-panel">
+      <div class="panel settings-pane" id="identity-panel" hidden>
         <h2 class="cluster-heading">Identity</h2>
         <p class="hint">
           Paste Entra ID or Keycloak details, Apply a Strict JWT policy on a
@@ -2128,6 +2187,7 @@
     <canvas id="confetti" class="confetti" aria-hidden="true"></canvas>
     <script src="yaml.js"></script>
     <script src="kubeconfig.js"></script>
+    <script src="connectsteps.js"></script>
     <script src="portforward.js"></script>
     <script src="examples.js"></script>
     <script src="identity.js"></script>

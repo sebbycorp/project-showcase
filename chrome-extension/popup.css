@@ -35,7 +35,11 @@
 
 html.demo-stage {
   --popup-w: 480px;
-  --popup-h: 640px;
+  /* Chrome caps extension popups at 600px tall. Asking for more does not
+     make the popup taller — it makes the document overflow the viewport,
+     which lets the header scroll out of reach. Width can still grow;
+     Chrome allows up to 800px. */
+  --popup-h: 600px;
   --seq-box: 52px;
   --seq-gw: 58px;
   --seq-icon: 40px;
@@ -471,21 +475,6 @@ html.demo-stage .provider-pill {
 html.demo-stage .provider-pill img {
   width: 15px;
   height: 15px;
-}
-
-.model-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.model-field {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.model-field .field-label {
-  margin-top: 10px;
 }
 
 .hint {
@@ -1847,6 +1836,9 @@ html.demo-stage .seq-wire {
 
 .log {
   flex: 1 1 auto;
+  /* Without min-height:0 a flex item refuses to shrink below its content,
+     so a long transcript pushes the composer past the popup's bottom edge. */
+  min-height: 0;
   overflow-y: auto;
   padding: 12px 16px;
   display: flex;
@@ -1975,6 +1967,11 @@ html.demo-stage .seq-wire {
   gap: 10px;
   margin-top: 14px;
   cursor: pointer;
+  /* The visually-hidden input below is absolutely positioned. Without a
+     containing block here it resolves against the initial containing block,
+     escapes the scrolling panel, and stretches the document past the popup
+     viewport — which lets the header scroll out of reach. */
+  position: relative;
 }
 
 .toggle input {
@@ -2048,4 +2045,180 @@ html.demo-stage .seq-wire {
   height: 100%;
   pointer-events: none;
   z-index: 20;
+}
+
+/* Settings sub-navigation ------------------------------------------------
+   Settings used to be one ~2700px scroll holding Cluster, Port forward,
+   Resources and Identity. Each is now its own pane behind this tab row. */
+
+.settings-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.settings-tabs button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 8px 2px 9px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.settings-tabs button:hover {
+  color: var(--text);
+}
+
+.settings-tabs button.is-active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+.settings-pane {
+  border-bottom: 0;
+}
+
+/* Connection method cards ------------------------------------------------ */
+
+.method-switch {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.method-card {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 8px 9px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.method-card:hover {
+  border-color: var(--accent);
+}
+
+.method-card.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.method-card-name {
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.method-card-blurb {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* Numbered steps --------------------------------------------------------- */
+
+.steps {
+  margin: 12px 0 4px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.step-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.step.is-done .step-marker {
+  border-color: var(--ok);
+  background: var(--ok);
+  color: var(--ok-fg);
+}
+
+.step.is-current .step-marker {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.step.is-error .step-marker {
+  border-color: var(--error-fg);
+  background: var(--error-fg);
+  color: #fff;
+}
+
+.step-label {
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.step.is-pending .step-label {
+  color: var(--muted);
+}
+
+.step-hint {
+  margin: 1px 0 0;
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.step-detail {
+  margin: 2px 0 0;
+  color: var(--error-fg);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }

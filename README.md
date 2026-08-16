@@ -2,13 +2,13 @@
 
 A Chrome extension for chatting, testing, and teaching [Solo Agentgateway](https://docs.solo.io/agentgateway/latest/) (LLM, MCP, A2A, and API/HTTP) against **your** Kubernetes cluster. Point it at a reachable API server, apply Gateway / Agentgateway CRDs from the popup, and run the same hops you would show in a live demo.
 
-The extension is in [`chrome-extension/`](chrome-extension/). Current version: **0.11.0** (`manifest.json`).
+The extension is in [`chrome-extension/`](chrome-extension/). Current version: **0.14.0** (`manifest.json`).
 
 ## Use cases
 
 These match the tabs and header controls in the popup.
 
-- **Chat with an LLM through Agentgateway.** On **Chat**, set **Endpoint URL**, pick a **Provider** (OpenAI, Claude, Grok, Bedrock, Gemini), choose a **Model**, then **Test** or send a message. Check **Stream** to send `stream: true` and render SSE tokens. The hop flow shows AI Agent → Agentgateway → provider. The gateway injects backend auth — Chat does not store or send an API key.
+- **Chat with an LLM through Agentgateway.** On **Chat**, set **Endpoint URL**, pick a **Provider** (OpenAI, Claude, Grok, Bedrock, Gemini), choose a **Model**, then send a message. Check **Stream** to send `stream: true` and render SSE tokens. The hop flow shows AI Agent → Agentgateway → provider. The gateway injects backend auth — Chat does not store or send an API key. To fire a one-shot test instead of a conversation, use **LLM → Chat ping**.
 
 ![Chat tab](docs/images/chat.png)
 
@@ -19,10 +19,10 @@ These match the tabs and header controls in the popup.
 - **Deploy and test LLM configs from a catalog.** On **LLM**, open **Build & apply config**. Search the **LLM config catalog** (Connect / Route / Protect / Control), fill the form, preview YAML, and **Apply** `Gateway`, `HTTPRoute`, `EnterpriseAgentgatewayBackend`, and `EnterpriseAgentgatewayPolicy` (plus Model / RateLimit / Budget where the recipe uses them).
 - **MCP: one-click virtual MCP, live status, and tests.** The **MCP** tab has **One-click deploys** (for example **Deploy everything server**, **Deploy website fetcher**, **Deploy virtual MCP**). Virtual examples show a live **Running** / **Pending** / **Error** (or **Missing**) chip. **Run test** and **Run all** probe initialize, list tools, echo, and fetch. Separate cards cover **MCP initialize**, **List tools**, **Call echo**, **Call fetch**, **JWT / unauth**, and **Tool calling**.
 - **A2A and API/HTTP.** **A2A** probes **A2A agent-card / health**. **API/HTTP** runs **HTTP request**, **Unauthenticated request**, and **Junk / policy-probe**. Each tab can **Apply** a prebuilt example when a cluster is connected.
-- **Connect to any cluster and apply CRDs.** In **Settings → Cluster**, choose **Source** **Manual** (GKE, AKS, EKS, or Local) or **Omni** (Sidero Omni). **Test connection**, then apply from the builders or **Resources**.
+- **Connect to any cluster and apply CRDs.** **Settings** has its own sub-tabs — **Connect**, **Forward**, **Resources**, **Identity**, **App**. On **Connect**, pick how you reach the cluster (**kubectl proxy**, **API + token**, or **Omni**) and follow the numbered steps; each ticks as you satisfy it. Then apply from the builders or **Resources**.
 - **Corporate IdP JWT on a dedicated LLM route.** In **Settings → Identity**, paste Entra tenant / client / token or Keycloak issuer / realm / audience. **Apply Entra JWT** or **Apply Keycloak JWT** puts Strict JWT on `/openai-entra` or `/openai-keycloak` so Chat on `/openai` stays open. Mint an Entra token with `az account get-access-token` (v1) or `az account get-access-token --resource api://<client-id>`.
-- **Clusters without a public proxy.** **Settings → Port forward** copies a `kubectl port-forward` command. Run it locally, click **Use localhost**, and point Chat / MCP / API tests at `127.0.0.1`. **Check localhost** reports Reachable or Not reachable.
-- **Persistence.** The last top-level tab and the header **Demo** toggle are remembered. A **Connected** / **Not connected** chip (or **Checking** on open) sits in the header; click it to jump to Cluster.
+- **Clusters without a public proxy.** **Settings → Forward** copies a `kubectl port-forward` command. Run it locally, click **Use localhost**, and point Chat / MCP / API tests at `127.0.0.1`. **Check localhost** reports Reachable or Not reachable.
+- **Persistence.** The last top-level tab and the header **Demo** toggle are remembered. A **Connected** / **Not connected** chip (or **Checking** on open) sits in the header; click it to jump to **Settings → Connect**.
 
 ## Workshop demos
 
@@ -101,7 +101,7 @@ If you want the full source (infra, tests, docs):
 4. Select the **`chrome-extension`** folder — the one that contains `manifest.json`.
 5. Pin **Agentgateway** from the extensions menu so the toolbar icon stays visible.
 
-Click the toolbar icon to open the popup. Version **0.11.0** is the `version` field in `chrome-extension/manifest.json`. If you already had 0.10.1 loaded, click **Reload** on the unpacked card so you pick up **Settings → Identity**.
+Click the toolbar icon to open the popup. Version **0.14.0** is the `version` field in `chrome-extension/manifest.json`. If you already had an older build loaded, click **Reload** on the unpacked card so you pick up the new **Settings** sub-tabs.
 
 ## Configure it to your cluster
 
@@ -109,9 +109,27 @@ Open the **gear** in the header. That is **Settings**. Cluster connection lives 
 
 ![Settings](docs/images/settings.png)
 
+### Connect with kubectl proxy (recommended, any cluster)
+
+This is the simplest path and the only one that works for every cluster type, because `kubectl` — not Chrome — handles authentication. Exec plugins, client certificates, and OIDC all work.
+
+1. Open **Settings → Connect** and pick the **kubectl proxy** card.
+2. Optionally set **Context** (blank uses your `current-context`) and **Local port** (default `8001`).
+3. Click **Copy command** and run it in a terminal, leaving it open:
+
+   ```bash
+   kubectl proxy --port=8001 --context=my-cluster
+   ```
+
+4. Click **Test connection**. No bearer token is needed — the proxy attaches your kubeconfig credentials to every request.
+
+This solves the two problems that block the other sources: Chrome rejects self-signed API server CAs (kind, k3d, minikube), and Chrome cannot run exec plugins (`gke-gcloud-auth-plugin`, `kubelogin`, `aws eks get-token`, Omni `oidc-login`). The proxy listens on `127.0.0.1`, which Chrome trusts, and runs those plugins locally.
+
+The terminal must stay open, and the proxy runs on the same machine as Chrome.
+
 ### Connect with API server URL + bearer token
 
-1. Under **Cluster**, set **Source** to **Manual**.
+1. Open **Settings → Connect** and pick the **API + token** card.
 2. Choose **Cluster type** (GKE, AKS, EKS, or Local). The hint under the dropdown tells you where to get the server and token for that type.
 3. Paste **API server URL** (for example from `kubectl cluster-info`).
 4. Paste **Bearer token** (password field). Chrome cannot run exec plugins, so this must be a real token — not a kubeconfig that only has `exec`.
@@ -137,6 +155,8 @@ Chrome cannot run exec plugins (`gke-gcloud-auth-plugin`, `kubelogin`, `aws eks 
 
 ### Omni (Sidero Omni)
 
+**The easiest way to reach an Omni cluster is [kubectl proxy](#connect-with-kubectl-proxy-recommended-any-cluster)** with your normal OIDC kubeconfig — no `omnictl`, no service-account token, nothing to expire. Use the token-kubeconfig flow below only if you need a connection that survives without a terminal open.
+
 Omni’s management API is gRPC, so the extension cannot list clusters from the browser. Connect with a **token** kubeconfig.
 
 1. In a terminal (not Chrome), generate a service-account kubeconfig:
@@ -145,7 +165,7 @@ Omni’s management API is gRPC, so the extension cannot list clusters from the 
    omnictl kubeconfig --service-account --cluster <name> --user <username> ./omni.kubeconfig
    ```
 
-2. In **Settings → Cluster**, set **Source** to **Omni**.
+2. In **Settings → Connect**, pick the **Omni** card.
 3. Confirm **Omni URL** (default `https://maniak.na-west-1.omni.siderolabs.io`).
 4. Optionally paste **OMNI_SERVICE_ACCOUNT_KEY**. That key is stored locally; it is not used to list clusters.
 5. Paste the kubeconfig into **Omni kubeconfig**. If there are multiple contexts, pick **Context / cluster**.
@@ -155,13 +175,13 @@ The kubeconfig from the Omni UI (**Download kubeconfig**) or `omnictl kubeconfig
 
 ### How to tell it worked
 
-The header chip next to **Demo** / the gear shows **Connected** (plus a short host or context hint) or **Not connected**. On open it may briefly show **Checking**. Click the chip to return to **Settings → Cluster**.
+The header chip next to **Demo** / the gear shows **Connected** (plus a short host or context hint) or **Not connected**. On open it may briefly show **Checking**. Click the chip to return to **Settings → Connect**.
 
 ### Port forward (no public proxy)
 
 If the cluster does not expose Agentgateway on a public load balancer:
 
-1. Stay in **Settings → Port forward**.
+1. Stay in **Settings → Forward**.
 2. Confirm **Resource** (Service or Deployment), **Name** (default `agentgateway-proxy`), **Namespace** (default `agentgateway-system`), **Local port** (`8080`), and **Remote port** (`80`).
 3. Click **Copy command**. Example:
 
@@ -210,7 +230,7 @@ az account get-access-token --resource api://<client-id>
 ## Quick start after connect
 
 - Confirm the header chip says **Connected**.
-- Open **Chat**, set **Endpoint URL** (or **Use localhost**), pick a provider and model, click **Test**.
+- Open **Chat**, set **Endpoint URL** (or **Use localhost**), pick a provider and model, and send a message.
 - Open **LLM**, run **Chat ping**, then open **Build & apply config** and **Apply** a catalog item (Connect / Route / Protect / Control).
 - Open **MCP**, click a one-click deploy (for example **Deploy virtual MCP**), wait for **Running**, then **Run test** or **Run all**.
 - Optionally set **Solo UI URL** and use **Open in Solo UI** on a result drawer.
@@ -224,4 +244,6 @@ az account get-access-token --resource api://<client-id>
 - The extension **cannot spawn kubectl**. That is why **Port forward** is copy/paste, then **Use localhost** / **Check localhost**.
 - Chat and the test tabs do **not** store provider API keys or a Solo license. Cluster tokens stay in `chrome.storage.local` (not sync) and are not logged.
 
-Terraform under `infrastructure/` is still in the repo if you want to stand up a demo cluster later. The live GCP project that used to back the default endpoints is gone — set **Endpoint URL**, **Solo UI URL**, and Cluster to **your** environment.
+Endpoints default to `http://localhost:8080`, which matches the port-forward command in **Settings → Forward**. Run that command and the defaults work as-is; otherwise point **Endpoint URL** and **Solo UI URL** at your own gateway.
+
+Terraform under `infrastructure/` is still in the repo if you want to stand up a demo cluster later.

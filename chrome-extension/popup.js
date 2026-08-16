@@ -1,11 +1,15 @@
-const DEFAULT_ENDPOINT = "http://35.226.209.32/v1/chat/completions";
+// Gateway defaults point at the local port-forward, so they line up with the
+// command Settings → Port forward hands you (PortForward.DEFAULTS.localPort).
+const DEFAULT_GATEWAY_ORIGIN = "http://localhost:8080";
+const DEFAULT_ENDPOINT = `${DEFAULT_GATEWAY_ORIGIN}/v1/chat/completions`;
 const DEFAULT_MODEL = "gpt-4o-mini";
 const DEFAULT_FALLBACK_MODEL = "gpt-4o";
-const DEFAULT_MCP_ENDPOINT = "http://35.226.209.32/mcp";
-const DEFAULT_A2A_ENDPOINT = "http://35.226.209.32/.well-known/agent-card.json";
+const DEFAULT_MCP_ENDPOINT = `${DEFAULT_GATEWAY_ORIGIN}/mcp`;
+const DEFAULT_A2A_ENDPOINT = `${DEFAULT_GATEWAY_ORIGIN}/.well-known/agent-card.json`;
 const DEFAULT_CLUSTER_NAMESPACE = "agentgateway-system";
 const DEFAULT_OMNI_URL = "https://maniak.na-west-1.omni.siderolabs.io";
-const DEFAULT_SOLO_UI = "http://35.225.111.45/age/";
+// Solo UI is a separate service you port-forward on its own port.
+const DEFAULT_SOLO_UI = "http://localhost/age/";
 const CHAT_PATH = "/v1/chat/completions";
 const TEST_MESSAGE = { role: "user", content: "Reply with the word pong." };
 const JUNK_PROMPT = `policy-probe ${"x".repeat(1024)}`;
@@ -88,6 +92,8 @@ const STORAGE_KEYS = [
   "omniUrl",
   "omniServiceAccountKey",
   "omniContext",
+  "proxyContext",
+  "proxyPort",
   "clusterConnected",
   "clusterKind",
   "clusterManifest",
@@ -188,6 +194,8 @@ const CLUSTER_HELP = {
     "API server + bearer token (for example kubectl create token). Chrome rejects self-signed CAs, so kind/minikube often fail unless the CA is trusted.",
 };
 const CLUSTER_SOURCE_HELP = {
+  proxy:
+    "Run kubectl proxy locally and the extension talks to 127.0.0.1. Works with any kubeconfig context — including exec plugins, client certs, and Omni OIDC — because kubectl handles auth, not Chrome.",
   manual:
     "API server + bearer token. Chrome cannot run kubeconfig exec plugins.",
   omni:
@@ -325,8 +333,6 @@ const els = {
   provider: document.getElementById("provider"),
   llmProvider: document.getElementById("llm-provider"),
   model: document.getElementById("model"),
-  test: document.getElementById("test"),
-  testResult: document.getElementById("test-result"),
   log: document.getElementById("log"),
   form: document.getElementById("chat-form"),
   message: document.getElementById("message"),
@@ -487,6 +493,14 @@ const els = {
   clusterSourceHelp: document.getElementById("cluster-source-help"),
   clusterManualFields: document.getElementById("cluster-manual-fields"),
   clusterOmniFields: document.getElementById("cluster-omni-fields"),
+  clusterProxyFields: document.getElementById("cluster-proxy-fields"),
+  settingsTabs: document.getElementById("settings-tabs"),
+  connectMethods: document.getElementById("connect-methods"),
+  connectSteps: document.getElementById("connect-steps"),
+  proxyCommand: document.getElementById("proxy-command"),
+  proxyCopy: document.getElementById("proxy-copy"),
+  proxyContext: document.getElementById("proxy-context"),
+  proxyPort: document.getElementById("proxy-port"),
   clusterType: document.getElementById("cluster-type"),
   clusterHelp: document.getElementById("cluster-help"),
   clusterApiServer: document.getElementById("cluster-api-server"),
@@ -2345,13 +2359,19 @@ async function loadSettings() {
       ? stored.httpMethod
       : "GET";
   els.httpUrl.value = stored.httpUrl || stored.endpoint || DEFAULT_ENDPOINT;
-  els.clusterSource.value =
-    stored.clusterSource === "omni" ? "omni" : "manual";
+  // Fresh installs land on the proxy flow; anyone who already picked a
+  // source keeps it.
+  els.clusterSource.value = CLUSTER_SOURCES.includes(stored.clusterSource)
+    ? stored.clusterSource
+    : "proxy";
   els.clusterType.value = CLUSTER_HELP[stored.clusterType]
     ? stored.clusterType
     : "gke";
   els.clusterApiServer.value = stored.clusterApiServer || "";
   els.clusterToken.value = stored.clusterToken || "";
+  els.proxyContext.value = stored.proxyContext || "";
+  els.proxyPort.value = stored.proxyPort || 8001;
+  updateProxyCommand();
   els.omniUrl.value = stored.omniUrl || DEFAULT_OMNI_URL;
   els.omniSaKey.value = stored.omniServiceAccountKey || "";
   els.clusterNamespace.value =
@@ -2367,6 +2387,7 @@ async function loadSettings() {
   loadDeployExamples(stored);
   updateClusterHelp();
   updateClusterSourceUi();
+  showSettingsPane(settingsPane);
   if (els.clusterKubeconfig.value.trim()) {
     try {
       const parsed = Kubeconfig.parse(els.clusterKubeconfig.value);
@@ -2624,38 +2645,10 @@ els.a2aEndpoint.addEventListener("input", () => {
   refreshSeqDiagrams();
 });
 
-els.test.addEventListener("click", async () => {
-  const { endpoint, model } = await saveChatSettings();
-  els.test.disabled = true;
-  els.testResult.hidden = false;
-  els.testResult.classList.remove("is-error");
-  els.testResult.replaceChildren();
-  const pending = document.createElement("div");
-  pending.className = "result-body";
-  pending.textContent = "Testing…";
-  els.testResult.append(pending);
-
-  const result = await runWithSeq(
-    els.seqChat,
-    () => postCompletions(endpoint, model, [TEST_MESSAGE]),
-    { ...llmSeqConfig(model), ok: llmRequestOk, path: requestPath(endpoint), model }
-  );
-  const summary = summarizeCompletion(result, model);
-  showBox(els.testResult, {
-    status: summary.status,
-    latencyMs: summary.latencyMs,
-    model: summary.model,
-    body: summary.body,
-    isError: !summary.ok,
-    usage: summary.usage,
-    result,
-  });
-  if (summary.ok) {
-    celebrate();
-  }
-  els.test.disabled = false;
-});
-
+// The Chat tab used to carry its own Test button. It ran exactly the same
+// request as LLM ▸ Chat ping, and its result box pushed the composer off
+// screen, so the test now lives only under LLM. #seq-chat stays — the
+// composer animates it on every send.
 els.form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -3851,8 +3844,156 @@ els.runHttp.addEventListener("click", async () => {
   els.runHttp.disabled = false;
 });
 
+const CLUSTER_SOURCES = ["proxy", "manual", "omni"];
+
+// --- Settings sub-navigation ------------------------------------------------
+
+const SETTINGS_PANES = {
+  connect: "cluster-panel",
+  forward: "pane-forward",
+  resources: "pane-resources",
+  identity: "identity-panel",
+  app: "pane-app",
+};
+let settingsPane = "connect";
+
+function showSettingsPane(name) {
+  const next = SETTINGS_PANES[name] ? name : "connect";
+  settingsPane = next;
+  for (const [pane, id] of Object.entries(SETTINGS_PANES)) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.hidden = pane !== next;
+    }
+  }
+  if (els.settingsTabs) {
+    for (const button of els.settingsTabs.querySelectorAll("button")) {
+      button.classList.toggle("is-active", button.dataset.pane === next);
+    }
+  }
+  if (next === "connect") {
+    renderConnectSteps();
+  }
+}
+
+// --- Connect: method cards + numbered steps ---------------------------------
+
+function renderConnectMethods() {
+  if (!els.connectMethods || typeof ConnectSteps === "undefined") {
+    return;
+  }
+  const active = currentClusterSource();
+  els.connectMethods.replaceChildren();
+  for (const method of ConnectSteps.methods()) {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "method-card";
+    card.classList.toggle("is-active", method.id === active);
+    card.setAttribute("role", "radio");
+    card.setAttribute("aria-checked", String(method.id === active));
+    card.title = method.detail;
+    const name = document.createElement("span");
+    name.className = "method-card-name";
+    name.textContent = method.label;
+    const blurb = document.createElement("span");
+    blurb.className = "method-card-blurb";
+    blurb.textContent = method.blurb;
+    card.append(name, blurb);
+    card.addEventListener("click", () => {
+      if (els.clusterSource.value === method.id) {
+        return;
+      }
+      els.clusterSource.value = method.id;
+      // Reuse the select's existing handler so nothing about how a source is
+      // applied lives in two places.
+      els.clusterSource.dispatchEvent(new Event("change"));
+      renderConnectMethods();
+    });
+    els.connectMethods.append(card);
+  }
+}
+
+let lastConnectError = "";
+
+function renderConnectSteps() {
+  if (!els.connectSteps || typeof ConnectSteps === "undefined") {
+    return;
+  }
+  const parsedToken = Boolean(
+    els.clusterToken && els.clusterToken.value.trim()
+  );
+  const model = ConnectSteps.build({
+    source: currentClusterSource(),
+    proxyContext: els.proxyContext ? els.proxyContext.value : "",
+    proxyPort: els.proxyPort ? els.proxyPort.value : "",
+    apiServer: els.clusterApiServer ? els.clusterApiServer.value : "",
+    token: els.clusterToken ? els.clusterToken.value : "",
+    omniUrl: els.omniUrl ? els.omniUrl.value : "",
+    hasKubeconfigToken: parsedToken,
+    connected: clusterConnected,
+    error: lastConnectError,
+  });
+
+  els.connectSteps.replaceChildren();
+  for (const step of model.steps) {
+    const li = document.createElement("li");
+    li.className = `step is-${step.state}`;
+    const marker = document.createElement("span");
+    marker.className = "step-marker";
+    marker.textContent =
+      step.state === "done" ? "✓" : step.state === "error" ? "!" : String(step.n);
+    marker.setAttribute("aria-hidden", "true");
+    const body = document.createElement("div");
+    const label = document.createElement("div");
+    label.className = "step-label";
+    label.textContent = `${step.n}. ${step.label}`;
+    body.append(label);
+    if (step.hint) {
+      const hint = document.createElement("p");
+      hint.className = "step-hint";
+      hint.textContent = step.hint;
+      body.append(hint);
+    }
+    if (step.detail) {
+      const detail = document.createElement("p");
+      detail.className = "step-detail";
+      detail.textContent = step.detail;
+      body.append(detail);
+    }
+    li.append(marker, body);
+    els.connectSteps.append(li);
+  }
+}
+
 function currentClusterSource() {
-  return els.clusterSource.value === "omni" ? "omni" : "manual";
+  return CLUSTER_SOURCES.includes(els.clusterSource.value)
+    ? els.clusterSource.value
+    : "manual";
+}
+
+function proxyPort() {
+  const raw = parseInt((els.proxyPort.value || "").trim(), 10);
+  return Number.isInteger(raw) && raw > 0 && raw < 65536 ? raw : 8001;
+}
+
+function proxyApiServer() {
+  return `http://127.0.0.1:${proxyPort()}`;
+}
+
+function proxyCommand() {
+  const context = (els.proxyContext.value || "").trim();
+  const flags = [`--port=${proxyPort()}`];
+  if (context) {
+    flags.push(`--context=${context}`);
+  }
+  return `kubectl proxy ${flags.join(" ")}`;
+}
+
+function updateProxyCommand() {
+  els.proxyCommand.value = proxyCommand();
+  if (currentClusterSource() === "proxy") {
+    els.clusterApiServer.value = proxyApiServer();
+  }
 }
 
 function updateClusterHelp() {
@@ -3864,10 +4005,15 @@ function updateClusterHelp() {
 function updateClusterSourceUi() {
   const source = currentClusterSource();
   const isOmni = source === "omni";
+  const isProxy = source === "proxy";
   els.clusterSource.value = source;
   els.clusterSourceHelp.textContent = CLUSTER_SOURCE_HELP[source];
-  els.clusterManualFields.hidden = isOmni;
+  els.clusterProxyFields.hidden = !isProxy;
+  els.clusterManualFields.hidden = isOmni || isProxy;
   els.clusterOmniFields.hidden = !isOmni;
+  if (isProxy) {
+    updateProxyCommand();
+  }
   if (!els.omniUrl.value.trim()) {
     els.omniUrl.value = DEFAULT_OMNI_URL;
   }
@@ -3880,6 +4026,8 @@ function updateClusterSourceUi() {
   updateContextVisibility();
   updatePortForwardOmniNote();
   updatePortForwardContextVisibility();
+  renderConnectMethods();
+  renderConnectSteps();
 }
 
 function updateContextVisibility() {
@@ -4008,13 +4156,21 @@ function normalizeOmniUrl(raw) {
 }
 
 function currentClusterSettings() {
+  const source = currentClusterSource();
+  const isProxy = source === "proxy";
   return {
-    clusterSource: currentClusterSource(),
+    clusterSource: source,
     clusterType: CLUSTER_HELP[els.clusterType.value]
       ? els.clusterType.value
       : "gke",
-    clusterApiServer: normalizeApiServer(els.clusterApiServer.value),
-    clusterToken: (els.clusterToken.value || "").trim(),
+    // The proxy owns both of these: a fixed loopback target and no token,
+    // since kubectl supplies the credentials on our behalf.
+    clusterApiServer: isProxy
+      ? proxyApiServer()
+      : normalizeApiServer(els.clusterApiServer.value),
+    clusterToken: isProxy ? "" : (els.clusterToken.value || "").trim(),
+    proxyContext: (els.proxyContext.value || "").trim(),
+    proxyPort: proxyPort(),
     omniUrl: normalizeOmniUrl(els.omniUrl.value),
     omniServiceAccountKey: (els.omniSaKey.value || "").trim(),
     omniContext:
@@ -5846,18 +6002,34 @@ async function saveClusterSettings(extra = {}) {
 }
 
 function k8sHeaders(token, contentType) {
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-  };
+  const headers = { Accept: "application/json" };
+  // kubectl proxy attaches the kubeconfig credentials itself. Sending an
+  // empty bearer would override that and get us a 401.
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
   if (contentType) {
     headers["Content-Type"] = contentType;
   }
   return headers;
 }
 
+// A kubectl proxy listens on loopback and injects auth, so it is the one
+// target that legitimately needs no token from us.
+function isLocalProxyTarget(apiServer) {
+  try {
+    const url = new URL(apiServer);
+    return url.hostname === "127.0.0.1" || url.hostname === "localhost";
+  } catch {
+    return false;
+  }
+}
+
 function clusterTargetError(settings) {
-  if (!settings.clusterApiServer || !settings.clusterToken) {
+  if (!settings.clusterApiServer) {
+    return "API server URL is required.";
+  }
+  if (!settings.clusterToken && !isLocalProxyTarget(settings.clusterApiServer)) {
     return "API server URL and bearer token are required.";
   }
   try {
@@ -6424,6 +6596,53 @@ async function confirmDelete(kind, item, which) {
   await refreshInventory(which);
 }
 
+if (els.settingsTabs) {
+  els.settingsTabs.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-pane]");
+    if (button) {
+      showSettingsPane(button.dataset.pane);
+    }
+  });
+}
+
+// Any field that feeds a step's satisfied state re-renders the list, so the
+// ticks track what the user has actually filled in.
+for (const field of [
+  els.clusterApiServer,
+  els.clusterToken,
+  els.omniUrl,
+  els.proxyContext,
+  els.proxyPort,
+]) {
+  if (field) {
+    field.addEventListener("input", renderConnectSteps);
+  }
+}
+
+for (const field of [els.proxyContext, els.proxyPort]) {
+  field.addEventListener("change", () => {
+    updateProxyCommand();
+    saveClusterSettings();
+  });
+  field.addEventListener("input", updateProxyCommand);
+}
+
+els.proxyCopy.addEventListener("click", async () => {
+  const command = proxyCommand();
+  updateProxyCommand();
+  await saveClusterSettings();
+  try {
+    await navigator.clipboard.writeText(command);
+    const previous = els.proxyCopy.textContent;
+    els.proxyCopy.textContent = "Copied";
+    window.setTimeout(() => {
+      els.proxyCopy.textContent = previous;
+    }, 1200);
+  } catch {
+    els.proxyCommand.select();
+  }
+});
+
 els.clusterSource.addEventListener("change", () => {
   updateClusterSourceUi();
   saveClusterSettings();
@@ -6656,6 +6875,8 @@ async function probeClusterConnection({ interactive = false } = {}) {
   }
 
   clusterConnected = ok;
+  lastConnectError = ok ? "" : body;
+  renderConnectSteps();
   await persist({ clusterConnected: ok });
   setClusterChip(ok ? "connected" : "disconnected");
   if (interactive || (els.clusterTestResult && !els.clusterTestResult.hidden)) {
