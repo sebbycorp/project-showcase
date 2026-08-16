@@ -1963,6 +1963,11 @@ html.demo-stage .seq-wire {
   gap: 10px;
   margin-top: 14px;
   cursor: pointer;
+  /* The visually-hidden input below is absolutely positioned. Without a
+     containing block here it resolves against the initial containing block,
+     escapes the scrolling panel, and stretches the document past the popup
+     viewport — which lets the header scroll out of reach. */
+  position: relative;
 }
 
 .toggle input {
