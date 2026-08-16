@@ -96,19 +96,14 @@
           role="radiogroup"
           aria-labelledby="provider-label"
         ></div>
-        <div class="model-row">
-          <div class="model-field">
-            <label class="field-label" for="model">Model</label>
-            <input
-              id="model"
-              type="text"
-              spellcheck="false"
-              autocomplete="off"
-              placeholder="gpt-4o-mini"
-            />
-          </div>
-          <button id="test" type="button" class="btn">Test</button>
-        </div>
+        <label class="field-label" for="model">Model</label>
+        <input
+          id="model"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="gpt-4o-mini"
+        />
         <figure
           class="seq"
           id="seq-chat"
@@ -144,7 +139,6 @@
             </div>
           </div>
         </figure>
-        <div id="test-result" class="result-box" hidden></div>
       </div>
 
       <main id="log" class="log" aria-live="polite"></main>

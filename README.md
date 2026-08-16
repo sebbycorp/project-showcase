@@ -8,7 +8,7 @@ The extension is in [`chrome-extension/`](chrome-extension/). Current version: *
 
 These match the tabs and header controls in the popup.
 
-- **Chat with an LLM through Agentgateway.** On **Chat**, set **Endpoint URL**, pick a **Provider** (OpenAI, Claude, Grok, Bedrock, Gemini), choose a **Model**, then **Test** or send a message. Check **Stream** to send `stream: true` and render SSE tokens. The hop flow shows AI Agent → Agentgateway → provider. The gateway injects backend auth — Chat does not store or send an API key.
+- **Chat with an LLM through Agentgateway.** On **Chat**, set **Endpoint URL**, pick a **Provider** (OpenAI, Claude, Grok, Bedrock, Gemini), choose a **Model**, then send a message. Check **Stream** to send `stream: true` and render SSE tokens. The hop flow shows AI Agent → Agentgateway → provider. The gateway injects backend auth — Chat does not store or send an API key. To fire a one-shot test instead of a conversation, use **LLM → Chat ping**.
 
 ![Chat tab](docs/images/chat.png)
 
@@ -210,7 +210,7 @@ az account get-access-token --resource api://<client-id>
 ## Quick start after connect
 
 - Confirm the header chip says **Connected**.
-- Open **Chat**, set **Endpoint URL** (or **Use localhost**), pick a provider and model, click **Test**.
+- Open **Chat**, set **Endpoint URL** (or **Use localhost**), pick a provider and model, and send a message.
 - Open **LLM**, run **Chat ping**, then open **Build & apply config** and **Apply** a catalog item (Connect / Route / Protect / Control).
 - Open **MCP**, click a one-click deploy (for example **Deploy virtual MCP**), wait for **Running**, then **Run test** or **Run all**.
 - Optionally set **Solo UI URL** and use **Open in Solo UI** on a result drawer.

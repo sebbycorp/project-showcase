@@ -325,8 +325,6 @@ const els = {
   provider: document.getElementById("provider"),
   llmProvider: document.getElementById("llm-provider"),
   model: document.getElementById("model"),
-  test: document.getElementById("test"),
-  testResult: document.getElementById("test-result"),
   log: document.getElementById("log"),
   form: document.getElementById("chat-form"),
   message: document.getElementById("message"),
@@ -2624,38 +2622,10 @@ els.a2aEndpoint.addEventListener("input", () => {
   refreshSeqDiagrams();
 });
 
-els.test.addEventListener("click", async () => {
-  const { endpoint, model } = await saveChatSettings();
-  els.test.disabled = true;
-  els.testResult.hidden = false;
-  els.testResult.classList.remove("is-error");
-  els.testResult.replaceChildren();
-  const pending = document.createElement("div");
-  pending.className = "result-body";
-  pending.textContent = "Testing…";
-  els.testResult.append(pending);
-
-  const result = await runWithSeq(
-    els.seqChat,
-    () => postCompletions(endpoint, model, [TEST_MESSAGE]),
-    { ...llmSeqConfig(model), ok: llmRequestOk, path: requestPath(endpoint), model }
-  );
-  const summary = summarizeCompletion(result, model);
-  showBox(els.testResult, {
-    status: summary.status,
-    latencyMs: summary.latencyMs,
-    model: summary.model,
-    body: summary.body,
-    isError: !summary.ok,
-    usage: summary.usage,
-    result,
-  });
-  if (summary.ok) {
-    celebrate();
-  }
-  els.test.disabled = false;
-});
-
+// The Chat tab used to carry its own Test button. It ran exactly the same
+// request as LLM ▸ Chat ping, and its result box pushed the composer off
+// screen, so the test now lives only under LLM. #seq-chat stays — the
+// composer animates it on every send.
 els.form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
