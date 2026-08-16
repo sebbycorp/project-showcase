@@ -494,6 +494,9 @@ const els = {
   clusterManualFields: document.getElementById("cluster-manual-fields"),
   clusterOmniFields: document.getElementById("cluster-omni-fields"),
   clusterProxyFields: document.getElementById("cluster-proxy-fields"),
+  settingsTabs: document.getElementById("settings-tabs"),
+  connectMethods: document.getElementById("connect-methods"),
+  connectSteps: document.getElementById("connect-steps"),
   proxyCommand: document.getElementById("proxy-command"),
   proxyCopy: document.getElementById("proxy-copy"),
   proxyContext: document.getElementById("proxy-context"),
@@ -2384,6 +2387,7 @@ async function loadSettings() {
   loadDeployExamples(stored);
   updateClusterHelp();
   updateClusterSourceUi();
+  showSettingsPane(settingsPane);
   if (els.clusterKubeconfig.value.trim()) {
     try {
       const parsed = Kubeconfig.parse(els.clusterKubeconfig.value);
@@ -3842,6 +3846,125 @@ els.runHttp.addEventListener("click", async () => {
 
 const CLUSTER_SOURCES = ["proxy", "manual", "omni"];
 
+// --- Settings sub-navigation ------------------------------------------------
+
+const SETTINGS_PANES = {
+  connect: "cluster-panel",
+  forward: "pane-forward",
+  resources: "pane-resources",
+  identity: "identity-panel",
+  app: "pane-app",
+};
+let settingsPane = "connect";
+
+function showSettingsPane(name) {
+  const next = SETTINGS_PANES[name] ? name : "connect";
+  settingsPane = next;
+  for (const [pane, id] of Object.entries(SETTINGS_PANES)) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.hidden = pane !== next;
+    }
+  }
+  if (els.settingsTabs) {
+    for (const button of els.settingsTabs.querySelectorAll("button")) {
+      button.classList.toggle("is-active", button.dataset.pane === next);
+    }
+  }
+  if (next === "connect") {
+    renderConnectSteps();
+  }
+}
+
+// --- Connect: method cards + numbered steps ---------------------------------
+
+function renderConnectMethods() {
+  if (!els.connectMethods || typeof ConnectSteps === "undefined") {
+    return;
+  }
+  const active = currentClusterSource();
+  els.connectMethods.replaceChildren();
+  for (const method of ConnectSteps.methods()) {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "method-card";
+    card.classList.toggle("is-active", method.id === active);
+    card.setAttribute("role", "radio");
+    card.setAttribute("aria-checked", String(method.id === active));
+    card.title = method.detail;
+    const name = document.createElement("span");
+    name.className = "method-card-name";
+    name.textContent = method.label;
+    const blurb = document.createElement("span");
+    blurb.className = "method-card-blurb";
+    blurb.textContent = method.blurb;
+    card.append(name, blurb);
+    card.addEventListener("click", () => {
+      if (els.clusterSource.value === method.id) {
+        return;
+      }
+      els.clusterSource.value = method.id;
+      // Reuse the select's existing handler so nothing about how a source is
+      // applied lives in two places.
+      els.clusterSource.dispatchEvent(new Event("change"));
+      renderConnectMethods();
+    });
+    els.connectMethods.append(card);
+  }
+}
+
+let lastConnectError = "";
+
+function renderConnectSteps() {
+  if (!els.connectSteps || typeof ConnectSteps === "undefined") {
+    return;
+  }
+  const parsedToken = Boolean(
+    els.clusterToken && els.clusterToken.value.trim()
+  );
+  const model = ConnectSteps.build({
+    source: currentClusterSource(),
+    proxyContext: els.proxyContext ? els.proxyContext.value : "",
+    proxyPort: els.proxyPort ? els.proxyPort.value : "",
+    apiServer: els.clusterApiServer ? els.clusterApiServer.value : "",
+    token: els.clusterToken ? els.clusterToken.value : "",
+    omniUrl: els.omniUrl ? els.omniUrl.value : "",
+    hasKubeconfigToken: parsedToken,
+    connected: clusterConnected,
+    error: lastConnectError,
+  });
+
+  els.connectSteps.replaceChildren();
+  for (const step of model.steps) {
+    const li = document.createElement("li");
+    li.className = `step is-${step.state}`;
+    const marker = document.createElement("span");
+    marker.className = "step-marker";
+    marker.textContent =
+      step.state === "done" ? "✓" : step.state === "error" ? "!" : String(step.n);
+    marker.setAttribute("aria-hidden", "true");
+    const body = document.createElement("div");
+    const label = document.createElement("div");
+    label.className = "step-label";
+    label.textContent = `${step.n}. ${step.label}`;
+    body.append(label);
+    if (step.hint) {
+      const hint = document.createElement("p");
+      hint.className = "step-hint";
+      hint.textContent = step.hint;
+      body.append(hint);
+    }
+    if (step.detail) {
+      const detail = document.createElement("p");
+      detail.className = "step-detail";
+      detail.textContent = step.detail;
+      body.append(detail);
+    }
+    li.append(marker, body);
+    els.connectSteps.append(li);
+  }
+}
+
 function currentClusterSource() {
   return CLUSTER_SOURCES.includes(els.clusterSource.value)
     ? els.clusterSource.value
@@ -3903,6 +4026,8 @@ function updateClusterSourceUi() {
   updateContextVisibility();
   updatePortForwardOmniNote();
   updatePortForwardContextVisibility();
+  renderConnectMethods();
+  renderConnectSteps();
 }
 
 function updateContextVisibility() {
@@ -6471,6 +6596,29 @@ async function confirmDelete(kind, item, which) {
   await refreshInventory(which);
 }
 
+if (els.settingsTabs) {
+  els.settingsTabs.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-pane]");
+    if (button) {
+      showSettingsPane(button.dataset.pane);
+    }
+  });
+}
+
+// Any field that feeds a step's satisfied state re-renders the list, so the
+// ticks track what the user has actually filled in.
+for (const field of [
+  els.clusterApiServer,
+  els.clusterToken,
+  els.omniUrl,
+  els.proxyContext,
+  els.proxyPort,
+]) {
+  if (field) {
+    field.addEventListener("input", renderConnectSteps);
+  }
+}
+
 for (const field of [els.proxyContext, els.proxyPort]) {
   field.addEventListener("change", () => {
     updateProxyCommand();
@@ -6727,6 +6875,8 @@ async function probeClusterConnection({ interactive = false } = {}) {
   }
 
   clusterConnected = ok;
+  lastConnectError = ok ? "" : body;
+  renderConnectSteps();
   await persist({ clusterConnected: ok });
   setClusterChip(ok ? "connected" : "disconnected");
   if (interactive || (els.clusterTestResult && !els.clusterTestResult.hidden)) {
