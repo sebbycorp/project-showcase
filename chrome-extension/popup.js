@@ -168,6 +168,15 @@ const PROVIDERS = {
     failoverExample: "failoverGemini",
     httprouteExample: "httprouteGemini",
   },
+  dgx: {
+    id: "dgx",
+    label: "DGX Spark",
+    model: "Qwen/Qwen3.6-35B-A3B-FP8",
+    fallback: "Qwen/Qwen3.6-35B-A3B-FP8",
+    example: "dgx",
+    failoverExample: "failover",
+    httprouteExample: "httprouteDgx",
+  },
 };
 // USD per 1M tokens. In-extension estimate only — not a bill.
 const MODEL_RATES = [
@@ -185,6 +194,8 @@ const MODEL_RATES = [
   { match: /gemini-2\.0-flash|gemini-2\.5-flash|gemini-1\.5-flash/i, prompt: 0.1, completion: 0.4 },
   { match: /gemini/i, prompt: 0.15, completion: 0.6 },
   { match: /amazon\.|bedrock/i, prompt: 0.15, completion: 0.6 },
+  // Runs on your own hardware - no per-token cost to estimate.
+  { match: /qwen/i, prompt: 0, completion: 0 },
 ];
 const CLUSTER_HELP = {
   gke: "API server from kubectl cluster-info or gcloud container clusters describe. Token from gcloud auth print-access-token. Chrome cannot run gke-gcloud-auth-plugin.",
@@ -226,6 +237,13 @@ const K8S_KINDS = {
     group: "agentgateway.dev",
     version: "v1alpha1",
     plural: "agentgatewaymodels",
+  },
+  // Self-hosted providers use the OSS backend kind rather than the Enterprise
+  // one - there is no secretRef to attach for a model on your own network.
+  AgentgatewayBackend: {
+    group: "agentgateway.dev",
+    version: "v1alpha1",
+    plural: "agentgatewaybackends",
   },
   RateLimitConfig: {
     group: "ratelimit.solo.io",
@@ -1319,6 +1337,7 @@ const SEQ_ICONS = {
   grok: "icons/grok.svg",
   bedrock: "icons/bedrock.svg",
   gemini: "icons/gemini.svg",
+  dgx: "icons/dgx.svg",
   mcp: "icons/mcp.svg",
   a2a: "icons/a2a.svg",
   security: "icons/policy.svg",
@@ -1331,6 +1350,7 @@ const SEQ_LABELS = {
   grok: "Grok",
   bedrock: "Bedrock",
   gemini: "Gemini",
+  dgx: "DGX Spark",
   mcp: "MCP",
   a2a: "A2A",
   security: "Policy",
@@ -1355,6 +1375,13 @@ function providerFromModel(raw) {
   }
   if (model.includes("gemini")) {
     return "gemini";
+  }
+  if (
+    model.includes("qwen") ||
+    model.includes("dgx") ||
+    model.includes("spark")
+  ) {
+    return "dgx";
   }
   return "openai";
 }
@@ -4197,6 +4224,7 @@ const KIND_LABELS = {
   Gateway: "Gateway",
   HTTPRoute: "HTTPRoute",
   EnterpriseAgentgatewayBackend: "Backend",
+  AgentgatewayBackend: "Backend (OSS)",
   EnterpriseAgentgatewayPolicy: "Policy",
   AgentgatewayModel: "Model",
   RateLimitConfig: "RateLimit",
@@ -6001,6 +6029,36 @@ async function saveClusterSettings(extra = {}) {
   return settings;
 }
 
+// Same persistence without the normalising write-back above. Rewriting a
+// field's value while the user is still typing in it would move the caret and
+// strip characters mid-word, so autosave uses this and leaves tidying up to
+// the change handler on blur.
+function persistClusterSettings() {
+  return persist(currentClusterSettings());
+}
+
+function debounce(fn, ms) {
+  let timer = 0;
+  return () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(fn, ms);
+  };
+}
+
+// Settings otherwise persist only on `change`, which fires on blur. Closing
+// the popup straight after typing - the common case, since it closes whenever
+// it loses focus - dropped the edit.
+const AUTOSAVE_MS = 400;
+
+function bindAutosave(fields, save) {
+  const run = debounce(save, AUTOSAVE_MS);
+  for (const field of fields) {
+    if (field) {
+      field.addEventListener("input", run);
+    }
+  }
+}
+
 function k8sHeaders(token, contentType) {
   const headers = { Accept: "application/json" };
   // kubectl proxy attaches the kubeconfig credentials itself. Sending an
@@ -6595,6 +6653,25 @@ async function confirmDelete(kind, item, which) {
   }
   await refreshInventory(which);
 }
+
+bindAutosave(
+  [
+    els.clusterApiServer,
+    els.clusterToken,
+    els.clusterNamespace,
+    els.clusterKubeconfig,
+    els.omniUrl,
+    els.omniSaKey,
+    els.proxyContext,
+    els.proxyPort,
+  ],
+  persistClusterSettings
+);
+bindAutosave([els.soloUi], () => persist({ soloUi: currentSoloUi() }));
+bindAutosave(
+  [els.endpoint, els.model, els.mcpEndpoint, els.a2aEndpoint, els.httpUrl],
+  saveChatSettings
+);
 
 if (els.settingsTabs) {
   els.settingsTabs.addEventListener("click", (event) => {
@@ -7191,7 +7268,7 @@ if (els.runKeycloakJwt) {
   );
 }
 
-[
+const IDENTITY_FIELDS = [
   els.entraTenantId,
   els.entraClientId,
   els.entraIssuer,
@@ -7200,13 +7277,14 @@ if (els.runKeycloakJwt) {
   els.keycloakRealm,
   els.keycloakAudience,
   els.keycloakToken,
-]
-  .filter(Boolean)
-  .forEach((node) => {
-    node.addEventListener("change", () => {
-      saveIdentitySettings();
-    });
+].filter(Boolean);
+
+IDENTITY_FIELDS.forEach((node) => {
+  node.addEventListener("change", () => {
+    saveIdentitySettings();
   });
+});
+bindAutosave(IDENTITY_FIELDS, saveIdentitySettings);
 
 els.loadExample.addEventListener("click", () => {
   els.crdYaml.value = EXAMPLE_MANIFEST;
