@@ -81,7 +81,7 @@ Not on the Chrome Web Store. Load it unpacked in Chrome (desktop).
 The Load unpacked package (extension files only — not the whole repo):
 
 - [`packages/agentgateway.zip`](packages/agentgateway.zip)
-- Direct: [agentgateway.zip](https://github.com/sebbycorp/project-showcase/raw/main/packages/agentgateway.zip)
+- Direct: [agentgateway.zip](https://github.com/sebbycorp/agw-extension/raw/main/packages/agentgateway.zip)
 
 1. Download [agentgateway.zip](packages/agentgateway.zip)
 2. Unzip → `chrome-extension/` with `manifest.json`
@@ -89,9 +89,9 @@ The Load unpacked package (extension files only — not the whole repo):
 
 If you want the full source (infra, tests, docs):
 
-- Whole-repo zip: [project-showcase-main.zip](https://github.com/sebbycorp/project-showcase/archive/refs/heads/main.zip)
+- Whole-repo zip: [agw-extension-main.zip](https://github.com/sebbycorp/agw-extension/archive/refs/heads/main.zip)
 - Or on the GitHub repo page: green **Code** → **Download ZIP**
-- Or `git clone https://github.com/sebbycorp/project-showcase.git` then use `project-showcase/chrome-extension/`
+- Or `git clone https://github.com/sebbycorp/agw-extension.git` then use `agw-extension/chrome-extension/`
 
 ### Load in Chrome
 

@@ -2422,6 +2422,9 @@ async function loadSettings() {
   updateClusterHelp();
   updateClusterSourceUi();
   showSettingsPane(settingsPane);
+  for (const areaId of Object.keys(AREA_SUBTABS)) {
+    buildAreaSubtabs(areaId);
+  }
   if (els.clusterKubeconfig.value.trim()) {
     try {
       const parsed = Kubeconfig.parse(els.clusterKubeconfig.value);
@@ -3868,6 +3871,136 @@ els.runHttp.addEventListener("click", async () => {
   }
   els.runHttp.disabled = false;
 });
+
+// --- Per-area sub-tabs -------------------------------------------------------
+// Each protocol tab held its tests, its workshop cards, and a build accordion
+// in one column - 3.2 screens of scrolling on MCP. The panes below are built by
+// MOVING the existing nodes, never recreating them, so every id and listener
+// already wired up keeps working.
+
+const AREA_SUBTABS = {
+  "area-llm": [
+    { id: "tests", label: "Tests" },
+    { id: "workshop", label: "Workshop" },
+    { id: "build", label: "Build" },
+  ],
+  "area-mcp": [
+    { id: "tests", label: "Tests" },
+    // One-click deploys carry their own Run test / Run all buttons, so they
+    // stay whole in their own pane rather than being split from them.
+    { id: "deploys", label: "Deploys" },
+    { id: "workshop", label: "Workshop" },
+    { id: "build", label: "Build" },
+  ],
+  "area-a2a": [
+    { id: "tests", label: "Tests" },
+    { id: "workshop", label: "Workshop" },
+    { id: "build", label: "Build" },
+  ],
+  "area-api": [
+    { id: "tests", label: "Tests" },
+    { id: "workshop", label: "Workshop" },
+    { id: "build", label: "Build" },
+  ],
+};
+
+// Which pane a given child belongs in. `null` means pin it above the sub-nav,
+// because both tests and the builder read it (provider switch, endpoint field).
+function subPaneFor(node, panes) {
+  const cls = (node.className || "").toString();
+  if (cls.includes("service-intro")) {
+    return null;
+  }
+  if (node.tagName === "DETAILS" && cls.includes("deploy")) {
+    return "build";
+  }
+  if (cls.includes("workshop-head") || cls.includes("workshop-list")) {
+    return "workshop";
+  }
+  if (cls.includes("mcp-deploys")) {
+    return panes.some((p) => p.id === "deploys") ? "deploys" : "tests";
+  }
+  // Test cards, plus the loose endpoint label/input/hint that MCP keeps above
+  // its tests.
+  return "tests";
+}
+
+const areaSubPane = {};
+
+function buildAreaSubtabs(areaId) {
+  const panes = AREA_SUBTABS[areaId];
+  const area = document.getElementById(areaId);
+  if (!panes || !area) {
+    return;
+  }
+  const body = area.querySelector(".area-body");
+  if (!body || body.querySelector(":scope > .subtabs")) {
+    return;
+  }
+
+  const children = Array.from(body.children);
+  const nav = document.createElement("nav");
+  nav.className = "subtabs";
+  nav.setAttribute("aria-label", "Sections");
+  const wrap = document.createElement("div");
+  wrap.className = "subpanes";
+  const paneEl = {};
+  for (const pane of panes) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.subpane = pane.id;
+    button.textContent = pane.label;
+    nav.append(button);
+    const div = document.createElement("div");
+    div.className = "subpane";
+    div.dataset.subpane = pane.id;
+    paneEl[pane.id] = div;
+    wrap.append(div);
+  }
+
+  // Anything pinned stays at the top, in order, ahead of the nav.
+  const pinned = [];
+  for (const child of children) {
+    const target = subPaneFor(child, panes);
+    if (target === null) {
+      pinned.push(child);
+    } else if (paneEl[target]) {
+      paneEl[target].append(child);
+    } else {
+      pinned.push(child);
+    }
+  }
+  body.replaceChildren(...pinned, nav, wrap);
+
+  nav.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-subpane]");
+    if (button) {
+      showAreaSubPane(areaId, button.dataset.subpane);
+    }
+  });
+  showAreaSubPane(areaId, areaSubPane[areaId] || panes[0].id);
+}
+
+function showAreaSubPane(areaId, paneId) {
+  const panes = AREA_SUBTABS[areaId];
+  const area = document.getElementById(areaId);
+  if (!panes || !area) {
+    return;
+  }
+  const next = panes.some((p) => p.id === paneId) ? paneId : panes[0].id;
+  areaSubPane[areaId] = next;
+  for (const el of area.querySelectorAll(".subpane")) {
+    el.hidden = el.dataset.subpane !== next;
+  }
+  for (const button of area.querySelectorAll(".subtabs button")) {
+    button.classList.toggle("is-active", button.dataset.subpane === next);
+  }
+  // The build accordion is the whole point of its pane, so open it there.
+  const details = area.querySelector('.subpane[data-subpane="build"] details.deploy');
+  if (details && next === "build") {
+    details.open = true;
+  }
+}
 
 const CLUSTER_SOURCES = ["proxy", "manual", "omni"];
 

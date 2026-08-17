@@ -6,7 +6,7 @@ Install, cluster setup, workshop demo cards, and how to use the popup are in the
 
 ## Load unpacked
 
-Prefer [`packages/agentgateway.zip`](../packages/agentgateway.zip) (or [direct download](https://github.com/sebbycorp/project-showcase/raw/main/packages/agentgateway.zip)) — unzip, then load the `chrome-extension/` folder that contains `manifest.json`. The whole-repo zip / `git clone` still works if you want source.
+Prefer [`packages/agentgateway.zip`](../packages/agentgateway.zip) (or [direct download](https://github.com/sebbycorp/agw-extension/raw/main/packages/agentgateway.zip)) — unzip, then load the `chrome-extension/` folder that contains `manifest.json`. The whole-repo zip / `git clone` still works if you want source.
 
 1. Open `chrome://extensions`.
 2. Turn on **Developer mode** (top right).
