@@ -13,6 +13,6 @@ Prefer [`packages/agentgateway.zip`](../packages/agentgateway.zip) (or [direct d
 3. Click **Load unpacked**.
 4. Select **this folder** (`chrome-extension/`) — the one that contains `manifest.json`, not the repo root.
 
-Current version: **0.11.0** (`manifest.json`). Pin the toolbar icon, then open the gear for **Settings → Cluster** and **Settings → Identity**. If you already had 0.10.1 loaded, click **Reload** on this unpacked card.
+Current version: **0.18.0** (`manifest.json`). Pin the toolbar icon, then open the gear for **Settings** sub-tabs **Connect**, **Forward**, **Resources**, **Identity**, and **App**. If you already had an older build loaded, click **Reload** on this unpacked card.
 
 **Identity** — paste Entra tenant / client / token or Keycloak issuer / realm / audience. **Apply Entra JWT** or **Apply Keycloak JWT** puts Strict JWT on `/openai-entra` or `/openai-keycloak` (Chat on `/openai` stays open). Mint an Entra token with `az account get-access-token` (v1) or `az account get-access-token --resource api://<client-id>`. Settings → Identity and the API/HTTP Entra / Keycloak cards are in the [root README](../README.md#identity-entra-id--keycloak) shots.

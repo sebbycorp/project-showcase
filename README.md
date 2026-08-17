@@ -2,23 +2,26 @@
 
 A Chrome extension for chatting, testing, and teaching [Solo Agentgateway](https://docs.solo.io/agentgateway/latest/) (LLM, MCP, A2A, and API/HTTP) against **your** Kubernetes cluster. Point it at a reachable API server, apply Gateway / Agentgateway CRDs from the popup, and run the same hops you would show in a live demo.
 
-The extension is in [`chrome-extension/`](chrome-extension/). Current version: **0.14.0** (`manifest.json`).
+The extension is in [`chrome-extension/`](chrome-extension/). Current version: **0.18.0** (`manifest.json`).
 
 ## Use cases
 
 These match the tabs and header controls in the popup.
 
-- **Chat with an LLM through Agentgateway.** On **Chat**, set **Endpoint URL**, pick a **Provider** (OpenAI, Claude, Grok, Bedrock, Gemini), choose a **Model**, then send a message. Check **Stream** to send `stream: true` and render SSE tokens. The hop flow shows AI Agent → Agentgateway → provider. The gateway injects backend auth — Chat does not store or send an API key. To fire a one-shot test instead of a conversation, use **LLM → Chat ping**.
+- **Chat with an LLM through Agentgateway.** On **Chat**, set **Endpoint URL**, pick a **Provider** (OpenAI, Claude, Grok, Bedrock, Gemini, DGX), choose a **Model**, then send a message. Check **Stream** to send `stream: true` and render SSE tokens. The hop flow shows AI Agent → Agentgateway → provider. The gateway injects backend auth — Chat does not store or send an API key. To fire a one-shot test instead of a conversation, use **LLM → Tests → Chat ping**.
 
 ![Chat tab](docs/images/chat.png)
 
-- **LLM provider testing.** The **LLM** tab runs **Chat ping**, **Model failover**, and **List / call model** against the Chat endpoint. Each card has a visual hop flow (AI Agent → Agentgateway → provider), a result drawer with latency, an estimated token/cost line when usage is present, and **Open in Solo UI**.
+- **LLM provider testing.** The **LLM** tab has **Tests**, **Workshop**, and **Build**. **Tests** runs **Chat ping** and **Model failover** (plus **List / call model** further down) against the Chat endpoint. Each card has a visual hop flow (AI Agent → Agentgateway → provider), a result drawer with latency, an estimated token/cost line when usage is present, and **Open in Solo UI**.
 
 ![LLM tab](docs/images/llm.png)
 
-- **Deploy and test LLM configs from a catalog.** On **LLM**, open **Build & apply config**. Search the **LLM config catalog** (Connect / Route / Protect / Control), fill the form, preview YAML, and **Apply** `Gateway`, `HTTPRoute`, `EnterpriseAgentgatewayBackend`, and `EnterpriseAgentgatewayPolicy` (plus Model / RateLimit / Budget where the recipe uses them).
-- **MCP: one-click virtual MCP, live status, and tests.** The **MCP** tab has **One-click deploys** (for example **Deploy everything server**, **Deploy website fetcher**, **Deploy virtual MCP**). Virtual examples show a live **Running** / **Pending** / **Error** (or **Missing**) chip. **Run test** and **Run all** probe initialize, list tools, echo, and fetch. Separate cards cover **MCP initialize**, **List tools**, **Call echo**, **Call fetch**, **JWT / unauth**, and **Tool calling**.
-- **A2A and API/HTTP.** **A2A** probes **A2A agent-card / health**. **API/HTTP** runs **HTTP request**, **Unauthenticated request**, and **Junk / policy-probe**. Each tab can **Apply** a prebuilt example when a cluster is connected.
+- **Deploy and test LLM configs from a catalog.** On **LLM → Build**, search the **LLM config catalog** (Connect / Route / Protect / Control), fill the form, preview YAML, and **Apply** `Gateway`, `HTTPRoute`, `EnterpriseAgentgatewayBackend`, and `EnterpriseAgentgatewayPolicy` (plus Model / RateLimit / Budget where the recipe uses them).
+- **MCP: one-click virtual MCP, live status, and tests.** The **MCP** tab has **Tests**, **Deploys**, **Workshop**, and **Build**. **Tests** probes **MCP initialize** and **List tools** (plus echo, fetch, JWT, and tool-calling cards further down). **Deploys** has one-click examples (for example **Deploy everything server**, **Deploy website fetcher**, **Deploy virtual MCP**) with a live **Running** / **Pending** / **Error** (or **Missing**) chip, then **Run test** / **Run all**.
+
+![MCP tab](docs/images/mcp.png)
+
+- **A2A and API/HTTP.** **A2A** and **API/HTTP** each have **Tests**, **Workshop**, and **Build**. **A2A → Tests** probes **A2A agent-card / health**. **API/HTTP → Tests** runs generic HTTP and policy connectivity checks. Each tab can **Apply** a prebuilt example when a cluster is connected.
 - **Connect to any cluster and apply CRDs.** **Settings** has its own sub-tabs — **Connect**, **Forward**, **Resources**, **Identity**, **App**. On **Connect**, pick how you reach the cluster (**kubectl proxy**, **API + token**, or **Omni**) and follow the numbered steps; each ticks as you satisfy it. Then apply from the builders or **Resources**.
 - **Corporate IdP JWT on a dedicated LLM route.** In **Settings → Identity**, paste Entra tenant / client / token or Keycloak issuer / realm / audience. **Apply Entra JWT** or **Apply Keycloak JWT** puts Strict JWT on `/openai-entra` or `/openai-keycloak` so Chat on `/openai` stays open. Mint an Entra token with `az account get-access-token` (v1) or `az account get-access-token --resource api://<client-id>`.
 - **Clusters without a public proxy.** **Settings → Forward** copies a `kubectl port-forward` command. Run it locally, click **Use localhost**, and point Chat / MCP / API tests at `127.0.0.1`. **Check localhost** reports Reachable or Not reachable.
@@ -51,7 +54,7 @@ Each of **LLM**, **MCP**, **A2A**, and **API/HTTP** has **Apply** + **Run** card
 - **Tool mode Search / Code** — `get_tool` + `invoke_tool`, or `run_code`
 - **MCP JWT + tool RBAC** — Strict JWT on `/mcp-jwt` and CEL `mcp.tool.name==echo`
 
-![MCP workshop demos](docs/images/mcp-workshop.png)
+![MCP tests](docs/images/mcp.png)
 
 **A2A**
 
@@ -101,13 +104,13 @@ If you want the full source (infra, tests, docs):
 4. Select the **`chrome-extension`** folder — the one that contains `manifest.json`.
 5. Pin **Agentgateway** from the extensions menu so the toolbar icon stays visible.
 
-Click the toolbar icon to open the popup. Version **0.14.0** is the `version` field in `chrome-extension/manifest.json`. If you already had an older build loaded, click **Reload** on the unpacked card so you pick up the new **Settings** sub-tabs.
+Click the toolbar icon to open the popup. Version **0.18.0** is the `version` field in `chrome-extension/manifest.json`. If you already had an older build loaded, click **Reload** on the unpacked card so you pick up the new **Settings** sub-tabs.
 
 ## Configure it to your cluster
 
-Open the **gear** in the header. That is **Settings**. Cluster connection lives here, not on a top-level tab.
+Open the **gear** in the header. That is **Settings**, with sub-tabs **Connect**, **Forward**, **Resources**, **Identity**, and **App**. Cluster connection lives on **Connect**, not on a top-level tab.
 
-![Settings](docs/images/settings.png)
+![Settings → Connect](docs/images/settings.png)
 
 ### Connect with kubectl proxy (recommended, any cluster)
 
@@ -136,7 +139,7 @@ The terminal must stay open, and the proxy runs on the same machine as Chrome.
 5. Set **Namespace** (default `agentgateway-system`).
 6. Click **Test connection**.
 
-![Cluster connect form](docs/images/cluster.png)
+![Settings → Connect](docs/images/cluster.png)
 
 Typical token sources (same text the UI uses):
 
@@ -193,6 +196,8 @@ If the cluster does not expose Agentgateway on a public load balancer:
 5. Click **Use localhost** so Chat and API/HTTP tests use `http://127.0.0.1:<localPort>` (Chat still appends `/v1/chat/completions`). Turn on **MCP path** if MCP should use `http://127.0.0.1:<port>/mcp`.
 6. Click **Check localhost**. You want **Reachable**. A `127.0.0.1:<port>` chip appears in the header while tests use localhost.
 
+![Settings → Forward](docs/images/settings-forward.png)
+
 For Omni, port-forward still needs a working kubeconfig on that laptop (`omnictl kubeconfig` / OIDC). It is local kubectl, not the extension token.
 
 ### Chat endpoint
@@ -203,9 +208,9 @@ MCP defaults to the Chat gateway host + `/mcp` unless you override **MCP endpoin
 
 ### Solo UI (optional)
 
-In **Settings**, set **Solo UI URL** to the Solo UI app base (path `/age/`). After a **Test** or **Run**, **Open in Solo UI** opens the traces page (`/age/tracing`, or `/age/tracing/<id>` when a trace id is in the response headers).
+In **Settings → App**, set **Solo UI URL** to the Solo UI app base (path `/age/`). After a **Test** or **Run**, **Open in Solo UI** opens the traces page (`/age/tracing`, or `/age/tracing/<id>` when a trace id is in the response headers). **Hooray** plays a short confetti burst after a successful test.
 
-The popup always uses the projector layout — 480px wide, larger hop tiles, slower arrows. This used to sit behind a **Demo** toggle; it is now the only layout. **Hooray** plays a short confetti burst after a successful test.
+![Settings → App](docs/images/settings-app.png)
 
 ### Identity (Entra ID / Keycloak)
 
@@ -231,9 +236,9 @@ az account get-access-token --resource api://<client-id>
 
 - Confirm the header chip says **Connected**.
 - Open **Chat**, set **Endpoint URL** (or **Use localhost**), pick a provider and model, and send a message.
-- Open **LLM**, run **Chat ping**, then open **Build & apply config** and **Apply** a catalog item (Connect / Route / Protect / Control).
-- Open **MCP**, click a one-click deploy (for example **Deploy virtual MCP**), wait for **Running**, then **Run test** or **Run all**.
-- Optionally set **Solo UI URL** and use **Open in Solo UI** on a result drawer.
+- Open **LLM → Tests**, run **Chat ping**, then open **LLM → Build** and **Apply** a catalog item (Connect / Route / Protect / Control).
+- Open **MCP → Deploys**, click a one-click deploy (for example **Deploy virtual MCP**), wait for **Running**, then **Run test** or **Run all**.
+- Optionally set **Solo UI URL** in **Settings → App** and use **Open in Solo UI** on a result drawer.
 
 ## Requirements / limits
 
