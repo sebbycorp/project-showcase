@@ -2164,3 +2164,53 @@ body {
   white-space: nowrap;
   border: 0;
 }
+
+/* Per-area sub-tabs ------------------------------------------------------
+   Tests / Workshop / Build inside each protocol tab. Lighter than the top
+   tab row so the hierarchy reads correctly. */
+
+.subtabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 10px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.subtabs button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 5px 6px 6px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.subtabs button:hover {
+  color: var(--text);
+}
+
+.subtabs button.is-active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+.subpane[hidden] {
+  display: none;
+}
+
+/* The build accordion is the only thing in its pane, so it should not also
+   look like a collapsible box inside a box. */
+.subpane[data-subpane="build"] > details.deploy {
+  margin-top: 0;
+  border: 0;
+  padding: 0;
+}
