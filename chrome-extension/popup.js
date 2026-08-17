@@ -1946,11 +1946,26 @@ async function saveChatSettings() {
   return { endpoint, model };
 }
 
+// Generous by default: a chat completion can legitimately run a long time, so
+// this only exists to stop a request hanging forever. Cluster calls override it
+// with CLUSTER_TIMEOUT_MS, because /version answering slowly means unreachable,
+// not busy.
+const DEFAULT_TIMEOUT_MS = 60000;
+const CLUSTER_TIMEOUT_MS = 10000;
+
 async function timedFetch(url, options) {
   const started = performance.now();
   const fetchOptions = { ...(options || {}) };
   const quiet = Boolean(fetchOptions.quiet);
   delete fetchOptions.quiet;
+  const timeoutMs = Number.isFinite(fetchOptions.timeoutMs)
+    ? fetchOptions.timeoutMs
+    : DEFAULT_TIMEOUT_MS;
+  delete fetchOptions.timeoutMs;
+  // Never clobber a signal the caller supplied - the route probe uses its own.
+  if (!fetchOptions.signal && timeoutMs > 0) {
+    fetchOptions.signal = AbortSignal.timeout(timeoutMs);
+  }
   if (!quiet) {
     notifySeqProgress("start", { started });
   }
@@ -1978,6 +1993,11 @@ async function timedFetch(url, options) {
       error: null,
     };
   } catch (error) {
+    // AbortSignal.timeout raises TimeoutError; a caller-cancelled request
+    // raises AbortError. "signal is aborted without reason" tells nobody
+    // anything, so say what actually happened.
+    const name = error && error.name;
+    const timedOut = name === "TimeoutError";
     return {
       response: null,
       status: null,
@@ -1987,7 +2007,12 @@ async function timedFetch(url, options) {
       payload: null,
       headers: {},
       traceId: "",
-      error: error.message || String(error),
+      error: timedOut
+        ? `No response after ${Math.round(timeoutMs / 1000)}s. Check the host is reachable from this machine.`
+        : name === "AbortError"
+          ? "Request cancelled."
+          : error.message || String(error),
+      timedOut,
     };
   }
 }
@@ -4207,6 +4232,9 @@ const KIND_LABELS = {
   Secret: "Secret",
 };
 const inventoryCache = { llm: [], mcp: [], cluster: [] };
+// Bumped per refresh so a slow response from an earlier tab cannot overwrite a
+// newer render. Same guard clusterProbeToken gives the connection probe.
+const inventoryTokens = { llm: 0, mcp: 0, cluster: 0 };
 let mcpTargetName = "mcp-target";
 
 function exampleYaml(section, key) {
@@ -6250,7 +6278,11 @@ async function listKind(settings, kind) {
       settings.clusterApiServer,
       collectionPath(spec, settings.clusterNamespace)
     ),
-    { method: "GET", headers: k8sHeaders(settings.clusterToken) }
+    {
+      method: "GET",
+      headers: k8sHeaders(settings.clusterToken),
+      timeoutMs: CLUSTER_TIMEOUT_MS,
+    }
   );
   const items =
     result.payload && Array.isArray(result.payload.items)
@@ -6399,10 +6431,16 @@ async function refreshInventory(which) {
           ]
         : ["Gateway", "HTTPRoute", "EnterpriseAgentgatewayBackend"];
   // These are independent reads, so fetch them together. Serially this cost
-  // one round trip per kind - about 1.3s for the seven-kind lists against a
+  // one round trip per kind - about 1.5s for the eight-kind lists against a
   // real cluster, paid again on every tab switch. Promise.all keeps the
   // resolution order, which the rendering relies on.
+  const token = (inventoryTokens[which] = (inventoryTokens[which] || 0) + 1);
   const groups = await Promise.all(kinds.map((kind) => listKind(settings, kind)));
+  // Switching tabs starts a refresh per tab. Without this the slowest response
+  // wins the render, so a stale list could overwrite a newer one.
+  if (token !== inventoryTokens[which]) {
+    return;
+  }
   inventoryCache[which] = groups;
   if (which === "llm") {
     renderInventory(els.llmInventory, filterInventoryGroups(groups, "llm"), {
@@ -6896,13 +6934,14 @@ async function probeClusterConnection({ interactive = false } = {}) {
   let result = await timedFetch(k8sUrl(settings.clusterApiServer, "/version"), {
     method: "GET",
     headers,
+    timeoutMs: CLUSTER_TIMEOUT_MS,
   });
   let probe = "/version";
 
   if (result.error || !result.response || !result.response.ok) {
     const gateway = await timedFetch(
       k8sUrl(settings.clusterApiServer, "/apis/gateway.networking.k8s.io/v1"),
-      { method: "GET", headers }
+      { method: "GET", headers, timeoutMs: CLUSTER_TIMEOUT_MS }
     );
     if (!gateway.error && gateway.response && gateway.response.ok) {
       result = gateway;
