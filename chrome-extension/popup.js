@@ -6001,6 +6001,36 @@ async function saveClusterSettings(extra = {}) {
   return settings;
 }
 
+// Same persistence without the normalising write-back above. Rewriting a
+// field's value while the user is still typing in it would move the caret and
+// strip characters mid-word, so autosave uses this and leaves tidying up to
+// the change handler on blur.
+function persistClusterSettings() {
+  return persist(currentClusterSettings());
+}
+
+function debounce(fn, ms) {
+  let timer = 0;
+  return () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(fn, ms);
+  };
+}
+
+// Settings otherwise persist only on `change`, which fires on blur. Closing
+// the popup straight after typing - the common case, since it closes whenever
+// it loses focus - dropped the edit.
+const AUTOSAVE_MS = 400;
+
+function bindAutosave(fields, save) {
+  const run = debounce(save, AUTOSAVE_MS);
+  for (const field of fields) {
+    if (field) {
+      field.addEventListener("input", run);
+    }
+  }
+}
+
 function k8sHeaders(token, contentType) {
   const headers = { Accept: "application/json" };
   // kubectl proxy attaches the kubeconfig credentials itself. Sending an
@@ -6595,6 +6625,25 @@ async function confirmDelete(kind, item, which) {
   }
   await refreshInventory(which);
 }
+
+bindAutosave(
+  [
+    els.clusterApiServer,
+    els.clusterToken,
+    els.clusterNamespace,
+    els.clusterKubeconfig,
+    els.omniUrl,
+    els.omniSaKey,
+    els.proxyContext,
+    els.proxyPort,
+  ],
+  persistClusterSettings
+);
+bindAutosave([els.soloUi], () => persist({ soloUi: currentSoloUi() }));
+bindAutosave(
+  [els.endpoint, els.model, els.mcpEndpoint, els.a2aEndpoint, els.httpUrl],
+  saveChatSettings
+);
 
 if (els.settingsTabs) {
   els.settingsTabs.addEventListener("click", (event) => {
@@ -7191,7 +7240,7 @@ if (els.runKeycloakJwt) {
   );
 }
 
-[
+const IDENTITY_FIELDS = [
   els.entraTenantId,
   els.entraClientId,
   els.entraIssuer,
@@ -7200,13 +7249,14 @@ if (els.runKeycloakJwt) {
   els.keycloakRealm,
   els.keycloakAudience,
   els.keycloakToken,
-]
-  .filter(Boolean)
-  .forEach((node) => {
-    node.addEventListener("change", () => {
-      saveIdentitySettings();
-    });
+].filter(Boolean);
+
+IDENTITY_FIELDS.forEach((node) => {
+  node.addEventListener("change", () => {
+    saveIdentitySettings();
   });
+});
+bindAutosave(IDENTITY_FIELDS, saveIdentitySettings);
 
 els.loadExample.addEventListener("click", () => {
   els.crdYaml.value = EXAMPLE_MANIFEST;

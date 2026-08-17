@@ -1,0 +1,72 @@
+name: extension
+
+on:
+  pull_request:
+    paths:
+      - "chrome-extension/**"
+      - ".github/workflows/extension.yml"
+  push:
+    paths:
+      - "chrome-extension/**"
+      - ".github/workflows/extension.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chrome-extension
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # The extension has no build step and no dependencies - the modules are
+      # plain UMD files and the tests are plain node scripts.
+      - name: Syntax check every module
+        run: |
+          for f in *.js; do
+            node --check "$f"
+          done
+
+      - name: Run tests
+        run: |
+          status=0
+          for t in *.test.js; do
+            echo "--- $t"
+            node "$t" || status=1
+          done
+          exit $status
+
+      - name: Manifest version matches the packaged zip
+        run: |
+          manifest=$(node -p "require('./manifest.json').version")
+          echo "manifest.json: $manifest"
+          unzip -p ../packages/agentgateway.zip chrome-extension/manifest.json \
+            > /tmp/zipped-manifest.json
+          zipped=$(node -p "require('/tmp/zipped-manifest.json').version")
+          echo "packages/agentgateway.zip: $zipped"
+          if [ "$manifest" != "$zipped" ]; then
+            echo "::error::agentgateway.zip is stale - rebuild it before merging"
+            exit 1
+          fi
+
+      - name: No dangling getElementById targets
+        run: |
+          node -e '
+            const fs = require("fs");
+            const html = fs.readFileSync("popup.html", "utf8");
+            const js = fs.readFileSync("popup.js", "utf8");
+            const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
+            const wanted = [...js.matchAll(/getElementById\("([^"]+)"\)/g)].map((m) => m[1]);
+            // Known dead refs, guarded at every use. Fail on anything new.
+            const known = new Set(["llm-example", "mcp-example"]);
+            const missing = [...new Set(wanted)].filter((id) => !ids.has(id) && !known.has(id));
+            if (missing.length) {
+              console.error("getElementById targets missing from popup.html:", missing);
+              process.exit(1);
+            }
+            console.log("dom refs ok");
+          '
