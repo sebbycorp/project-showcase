@@ -4187,6 +4187,7 @@ const CONNECT_CLUSTER_MSG = "Connect a cluster in Settings first.";
 const INVENTORY_KINDS = [
   "Gateway",
   "EnterpriseAgentgatewayBackend",
+  "AgentgatewayBackend",
   "HTTPRoute",
   "EnterpriseAgentgatewayPolicy",
   "AgentgatewayModel",
@@ -6390,16 +6391,18 @@ async function refreshInventory(which) {
             "Gateway",
             "HTTPRoute",
             "EnterpriseAgentgatewayBackend",
+            "AgentgatewayBackend",
             "EnterpriseAgentgatewayPolicy",
             "AgentgatewayModel",
             "RateLimitConfig",
             "EnterpriseAgentgatewayBudget",
           ]
         : ["Gateway", "HTTPRoute", "EnterpriseAgentgatewayBackend"];
-  const groups = [];
-  for (const kind of kinds) {
-    groups.push(await listKind(settings, kind));
-  }
+  // These are independent reads, so fetch them together. Serially this cost
+  // one round trip per kind - about 1.3s for the seven-kind lists against a
+  // real cluster, paid again on every tab switch. Promise.all keeps the
+  // resolution order, which the rendering relies on.
+  const groups = await Promise.all(kinds.map((kind) => listKind(settings, kind)));
   inventoryCache[which] = groups;
   if (which === "llm") {
     renderInventory(els.llmInventory, filterInventoryGroups(groups, "llm"), {
