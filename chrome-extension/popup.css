@@ -21,24 +21,9 @@
   --running-bg: #fbf3d8;
   --shadow: 0 1px 2px rgb(21 32 43 / 4%), 0 6px 16px rgb(21 32 43 / 4%);
   --shadow-sm: 0 1px 2px rgb(21 32 43 / 5%);
-  --popup-w: 448px;
-  --popup-h: 600px;
-  --seq-box: 40px;
-  --seq-gw: 46px;
-  --seq-icon: 32px;
-  --seq-step: 560ms;
-  --seq-return: 480ms;
-  --seq-dash: 0.42s;
-  --seq-chevron: 0.52s;
-  --seq-chevron-back: 0.48s;
-}
-
-html.demo-stage {
+  /* The projector layout is the only layout now - it used to live behind a
+     Demo toggle. --popup-h stays 600px because Chrome caps popup height there. */
   --popup-w: 480px;
-  /* Chrome caps extension popups at 600px tall. Asking for more does not
-     make the popup taller — it makes the document overflow the viewport,
-     which lets the header scroll out of reach. Width can still grow;
-     Chrome allows up to 800px. */
   --popup-h: 600px;
   --seq-box: 52px;
   --seq-gw: 58px;
@@ -225,7 +210,6 @@ body {
   background: var(--error-fg);
 }
 
-.demo-btn,
 .settings-btn {
   display: inline-flex;
   align-items: center;
@@ -237,15 +221,6 @@ body {
   cursor: pointer;
 }
 
-.demo-btn {
-  height: 28px;
-  padding: 0 9px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-}
-
 .settings-btn {
   width: 30px;
   height: 30px;
@@ -253,15 +228,12 @@ body {
   border-radius: 8px;
 }
 
-.demo-btn:hover,
 .settings-btn:hover {
   color: var(--text);
   background: var(--bg);
   border-color: var(--border);
 }
 
-.demo-btn.is-active,
-.demo-btn[aria-pressed="true"],
 .settings-btn.is-active {
   color: var(--accent);
   border-color: rgb(12 116 105 / 28%);
@@ -275,7 +247,6 @@ body {
 
 .area-tabs button,
 .settings-btn,
-.demo-btn,
 .btn,
 #cluster-type,
 #cluster-source,
@@ -427,22 +398,22 @@ body {
   gap: 5px;
   flex: 1 1 0;
   min-width: 0;
-  height: 28px;
+  height: 32px;
   padding: 0 6px;
   border: 0;
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 650;
   letter-spacing: -0.02em;
   cursor: pointer;
 }
 
 .provider-pill img {
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
   flex: 0 0 auto;
 }
 
@@ -465,16 +436,6 @@ body {
 .provider-pill:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--focus-ring);
-}
-
-html.demo-stage .provider-pill {
-  height: 32px;
-  font-size: 11px;
-}
-
-html.demo-stage .provider-pill img {
-  width: 15px;
-  height: 15px;
 }
 
 .hint {
@@ -754,14 +715,10 @@ html.demo-stage .provider-pill img {
 .seq {
   position: relative;
   margin: 8px 0 0;
-  padding: 14px 8px 20px;
+  padding: 18px 10px 24px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg);
-}
-
-html.demo-stage .seq {
-  padding: 18px 10px 24px;
 }
 
 .seq-fwd {
@@ -840,9 +797,9 @@ html.demo-stage .seq {
   top: calc(100% + 3px);
   left: 50%;
   transform: translateX(-50%);
-  max-width: 86px;
+  max-width: 110px;
   color: var(--accent);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 650;
   letter-spacing: -0.015em;
   line-height: 1.2;
@@ -851,18 +808,13 @@ html.demo-stage .seq {
   pointer-events: none;
 }
 
-html.demo-stage .seq-hop {
-  font-size: 11px;
-  max-width: 110px;
-}
-
 .seq-arrow {
   position: relative;
   z-index: 0;
   flex: 1 1 40px;
-  min-width: 36px;
-  max-width: 88px;
-  height: 24px;
+  min-width: 48px;
+  max-width: 110px;
+  height: 28px;
   margin: 0 6px;
   align-self: center;
   overflow: visible;
@@ -871,12 +823,6 @@ html.demo-stage .seq-hop {
   transition:
     opacity 0.18s,
     filter 0.18s;
-}
-
-html.demo-stage .seq-arrow {
-  min-width: 48px;
-  max-width: 110px;
-  height: 28px;
 }
 
 .seq-arrow::before,
@@ -908,6 +854,7 @@ html.demo-stage .seq-arrow {
   z-index: 2;
   pointer-events: none;
   white-space: nowrap;
+  font-size: 10px;
 }
 
 .seq-ms {
@@ -930,11 +877,6 @@ html.demo-stage .seq-arrow {
   font-size: 8.5px;
   font-weight: 650;
   letter-spacing: -0.02em;
-}
-
-html.demo-stage .seq-ms,
-html.demo-stage .seq-wire {
-  font-size: 10px;
 }
 
 .seq[data-mode="direct"] [data-slot="gateway"],

@@ -22,7 +22,7 @@ These match the tabs and header controls in the popup.
 - **Connect to any cluster and apply CRDs.** **Settings** has its own sub-tabs — **Connect**, **Forward**, **Resources**, **Identity**, **App**. On **Connect**, pick how you reach the cluster (**kubectl proxy**, **API + token**, or **Omni**) and follow the numbered steps; each ticks as you satisfy it. Then apply from the builders or **Resources**.
 - **Corporate IdP JWT on a dedicated LLM route.** In **Settings → Identity**, paste Entra tenant / client / token or Keycloak issuer / realm / audience. **Apply Entra JWT** or **Apply Keycloak JWT** puts Strict JWT on `/openai-entra` or `/openai-keycloak` so Chat on `/openai` stays open. Mint an Entra token with `az account get-access-token` (v1) or `az account get-access-token --resource api://<client-id>`.
 - **Clusters without a public proxy.** **Settings → Forward** copies a `kubectl port-forward` command. Run it locally, click **Use localhost**, and point Chat / MCP / API tests at `127.0.0.1`. **Check localhost** reports Reachable or Not reachable.
-- **Persistence.** The last top-level tab and the header **Demo** toggle are remembered. A **Connected** / **Not connected** chip (or **Checking** on open) sits in the header; click it to jump to **Settings → Connect**.
+- **Persistence.** The last top-level tab is remembered. A **Connected** / **Not connected** chip (or **Checking** on open) sits in the header; click it to jump to **Settings → Connect**.
 
 ## Workshop demos
 
@@ -175,7 +175,7 @@ The kubeconfig from the Omni UI (**Download kubeconfig**) or `omnictl kubeconfig
 
 ### How to tell it worked
 
-The header chip next to **Demo** / the gear shows **Connected** (plus a short host or context hint) or **Not connected**. On open it may briefly show **Checking**. Click the chip to return to **Settings → Connect**.
+The header chip next to the gear shows **Connected** (plus a short host or context hint) or **Not connected**. On open it may briefly show **Checking**. Click the chip to return to **Settings → Connect**.
 
 ### Port forward (no public proxy)
 
@@ -205,7 +205,7 @@ MCP defaults to the Chat gateway host + `/mcp` unless you override **MCP endpoin
 
 In **Settings**, set **Solo UI URL** to the Solo UI app base (path `/age/`). After a **Test** or **Run**, **Open in Solo UI** opens the traces page (`/age/tracing`, or `/age/tracing/<id>` when a trace id is in the response headers).
 
-**Demo stage** (header **Demo**, or the Settings toggle) grows the popup for a projector. **Hooray** plays a short confetti burst after a successful test.
+The popup always uses the projector layout — 480px wide, larger hop tiles, slower arrows. This used to sit behind a **Demo** toggle; it is now the only layout. **Hooray** plays a short confetti burst after a successful test.
 
 ### Identity (Entra ID / Keycloak)
 
@@ -234,7 +234,6 @@ az account get-access-token --resource api://<client-id>
 - Open **LLM**, run **Chat ping**, then open **Build & apply config** and **Apply** a catalog item (Connect / Route / Protect / Control).
 - Open **MCP**, click a one-click deploy (for example **Deploy virtual MCP**), wait for **Running**, then **Run test** or **Run all**.
 - Optionally set **Solo UI URL** and use **Open in Solo UI** on a result drawer.
-- Turn on **Demo** if you are projecting the hop flow.
 
 ## Requirements / limits
 
