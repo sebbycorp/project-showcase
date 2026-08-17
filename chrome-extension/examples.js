@@ -767,6 +767,78 @@ spec:
         consecutiveFailures: 1
 `,
     },
+    dgx: {
+      label: "DGX Spark backend + HTTPRoute",
+      yaml: `# Self-hosted OpenAI-compatible server (vLLM / SGLang / TGI) on your own box.
+# No secret: the model is on your network, so there is no provider key to inject.
+# Set host/port to wherever the inference server listens.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: dgx-spark-llm
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      host: 172.16.10.173
+      port: 8000
+      pathPrefix: /v1
+      openai:
+        model: Qwen/Qwen3.6-35B-A3B-FP8
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: dgx-spark-llm
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: dgx-spark-gateway
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /spark
+      backendRefs:
+        - name: dgx-spark-llm
+          namespace: agentgateway-system
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+`,
+    },
+
+    httprouteDgx: {
+      label: "HTTPRoute add-on (/spark)",
+      yaml: `# Rewrites /spark → /v1/chat/completions against the local model.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: dgx-spark-path
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: dgx-spark-gateway
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /spark
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /v1/chat/completions
+      backendRefs:
+        - name: dgx-spark-llm
+          namespace: agentgateway-system
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+`,
+    },
+
     httprouteGemini: {
       label: "HTTPRoute add-on (/gemini)",
       yaml: `# Docs: https://docs.solo.io/agentgateway/latest/llm/providers/google/
