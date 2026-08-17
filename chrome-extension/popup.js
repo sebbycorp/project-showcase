@@ -107,7 +107,6 @@ const STORAGE_KEYS = [
   "pfUsingLocalhost",
   "hooray",
   "soloUi",
-  "demoStage",
   "entraTenantId",
   "entraClientId",
   "entraIssuerVersion",
@@ -546,8 +545,6 @@ const els = {
   areaSettings: document.getElementById("area-settings"),
   soloUi: document.getElementById("solo-ui"),
   hooray: document.getElementById("hooray"),
-  demoStage: document.getElementById("demo-stage"),
-  demoToggle: document.getElementById("demo-toggle"),
   clusterChip: document.getElementById("cluster-chip"),
   clusterChipLabel: document.getElementById("cluster-chip-label"),
   clusterChipHint: document.getElementById("cluster-chip-hint"),
@@ -588,33 +585,18 @@ const els = {
 };
 
 let hoorayOn = true;
-let demoStageOn = false;
 let clusterConnected = false;
 let settingsFocus = "";
 let clusterProbeToken = 0;
 
+// The projector layout is no longer optional, so these are constants rather
+// than a branch on a toggle.
 function seqStepMs() {
-  return demoStageOn ? 840 : 560;
+  return 840;
 }
 
 function seqReturnMs() {
-  return demoStageOn ? 720 : 480;
-}
-
-function setDemoStage(on, persistIt = false) {
-  demoStageOn = Boolean(on);
-  document.documentElement.classList.toggle("demo-stage", demoStageOn);
-  document.body.classList.toggle("demo-stage", demoStageOn);
-  if (els.demoStage) {
-    els.demoStage.checked = demoStageOn;
-  }
-  if (els.demoToggle) {
-    els.demoToggle.classList.toggle("is-active", demoStageOn);
-    els.demoToggle.setAttribute("aria-pressed", demoStageOn ? "true" : "false");
-  }
-  if (persistIt) {
-    persist({ demoStage: demoStageOn });
-  }
+  return 720;
 }
 
 function clusterHintLabel() {
@@ -2437,7 +2419,6 @@ async function loadSettings() {
   }
   hoorayOn = stored.hooray !== false;
   els.hooray.checked = hoorayOn;
-  setDemoStage(stored.demoStage === true);
   settingsFocus =
     stored.settingsFocus === "cluster" || stored.settingsFocus === "portforward"
       ? stored.settingsFocus
@@ -2531,14 +2512,6 @@ if (els.localhostChip) {
 els.hooray.addEventListener("change", () => {
   hoorayOn = els.hooray.checked;
   persist({ hooray: hoorayOn });
-});
-
-els.demoStage.addEventListener("change", () => {
-  setDemoStage(els.demoStage.checked, true);
-});
-
-els.demoToggle.addEventListener("click", () => {
-  setDemoStage(!demoStageOn, true);
 });
 
 els.soloUi.addEventListener("change", () => {
